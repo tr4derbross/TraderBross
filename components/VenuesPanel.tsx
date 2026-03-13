@@ -41,6 +41,8 @@ declare global {
   }
 
   interface Window {
+    rabby?: EthereumProvider;
+    coinbaseWalletExtension?: EthereumProvider;
     phantom?: {
       solana?: SolanaProvider;
     };
@@ -277,21 +279,28 @@ function isDydxLikeAddress(value?: string) {
 
 function getInjectedEthereumProvider(wallet: string) {
   const root = window.ethereum as EthereumProvider | undefined;
-  if (!root) return null;
-
-  const providers = root.providers?.length ? root.providers : [root];
+  const providers = root?.providers?.length ? root.providers : root ? [root] : [];
+  const uniqueProviders = [...new Set<EthereumProvider>([...providers, window.rabby, window.coinbaseWalletExtension].filter(Boolean) as EthereumProvider[])];
 
   switch (wallet) {
     case "MetaMask":
       return (
-        providers.find(
+        uniqueProviders.find(
           (provider: EthereumProvider) => provider.isMetaMask && !provider.isRabby && !provider.isCoinbaseWallet
         ) ?? null
       );
     case "Rabby":
-      return providers.find((provider: EthereumProvider) => provider.isRabby) ?? null;
+      return (
+        window.rabby ??
+        uniqueProviders.find((provider: EthereumProvider) => provider.isRabby) ??
+        null
+      );
     case "Coinbase Wallet":
-      return providers.find((provider: EthereumProvider) => provider.isCoinbaseWallet) ?? null;
+      return (
+        window.coinbaseWalletExtension ??
+        uniqueProviders.find((provider: EthereumProvider) => provider.isCoinbaseWallet) ??
+        null
+      );
     default:
       return null;
   }
@@ -318,9 +327,13 @@ async function connectEvmWallet(wallet: string) {
 async function connectSolanaWallet(wallet: string) {
   const provider =
     wallet === "Phantom"
-      ? window.phantom?.solana ?? (window.solana?.isPhantom ? window.solana : undefined)
+      ? window.phantom?.solana ??
+        (window.solana?.isPhantom ? window.solana : undefined) ??
+        (window.solflare?.isPhantom ? window.solflare : undefined)
       : wallet === "Solflare"
-        ? window.solflare ?? (window.solana?.isSolflare ? window.solana : undefined)
+        ? window.solflare ??
+          (window.solana?.isSolflare ? window.solana : undefined) ??
+          (window.phantom?.solana?.isSolflare ? window.phantom.solana : undefined)
         : null;
 
   if (!provider) {
