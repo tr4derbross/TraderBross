@@ -18,10 +18,25 @@ import {
 } from "lucide-react";
 
 declare global {
+  interface EthereumProvider {
+    isMetaMask?: boolean;
+    isRabby?: boolean;
+    isCoinbaseWallet?: boolean;
+    providers?: EthereumProvider[];
+    request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+  }
+
+  interface SolanaProvider {
+    isPhantom?: boolean;
+    isSolflare?: boolean;
+    connect: () => Promise<{ publicKey?: { toString: () => string } }>;
+  }
+
   interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+    phantom?: {
+      solana?: SolanaProvider;
     };
+    solflare?: SolanaProvider;
   }
 }
 
@@ -162,6 +177,68 @@ function getStatusMeta(status: VenueStatus) {
         icon: <Circle className="h-3 w-3 text-zinc-700" />,
       };
   }
+}
+
+function getInjectedEthereumProvider(wallet: string) {
+  const root = window.ethereum as EthereumProvider | undefined;
+  if (!root) return null;
+
+  const providers = root.providers?.length ? root.providers : [root];
+
+  switch (wallet) {
+    case "MetaMask":
+      return (
+        providers.find(
+          (provider: EthereumProvider) => provider.isMetaMask && !provider.isRabby && !provider.isCoinbaseWallet
+        ) ?? null
+      );
+    case "Rabby":
+      return providers.find((provider: EthereumProvider) => provider.isRabby) ?? null;
+    case "Coinbase Wallet":
+      return providers.find((provider: EthereumProvider) => provider.isCoinbaseWallet) ?? null;
+    default:
+      return null;
+  }
+}
+
+async function connectEvmWallet(wallet: string) {
+  const provider = getInjectedEthereumProvider(wallet);
+  if (!provider) {
+    throw new Error(`${wallet} is not available in this browser.`);
+  }
+
+  const accounts = (await provider.request({
+    method: "eth_requestAccounts",
+  })) as string[];
+
+  const address = accounts?.[0];
+  if (!address) {
+    throw new Error(`No wallet address returned from ${wallet}.`);
+  }
+
+  return address;
+}
+
+async function connectSolanaWallet(wallet: string) {
+  const provider =
+    wallet === "Phantom"
+      ? window.phantom?.solana
+      : wallet === "Solflare"
+        ? window.solflare
+        : null;
+
+  if (!provider) {
+    throw new Error(`${wallet} is not available in this browser.`);
+  }
+
+  const response = await provider.connect();
+  const address = response.publicKey?.toString();
+
+  if (!address) {
+    throw new Error(`No wallet address returned from ${wallet}.`);
+  }
+
+  return address;
 }
 
 export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
@@ -348,17 +425,6 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
   const connectInjectedWallet = async (providerLabel: string) => {
     if (!activeVenue || activeVenue.type !== "DEX") return;
 
-    if (!window.ethereum) {
-      const failed: VenueConnection = {
-        ...form,
-        status: "error",
-        errorMessage: `${providerLabel} is not available in this browser.`,
-      };
-      updateConnection(activeVenue.id, failed);
-      setForm(failed);
-      return;
-    }
-
     const testingState: VenueConnection = {
       ...form,
       status: "testing",
@@ -368,14 +434,14 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
     setForm(testingState);
 
     try {
-      const accounts = (await window.ethereum.request({
-        method: "eth_requestAccounts",
-      })) as string[];
-      const walletAddress = accounts?.[0];
-
-      if (!walletAddress) {
-        throw new Error("No wallet address returned.");
-      }
+      const walletAddress =
+        providerLabel === "MetaMask" || providerLabel === "Rabby" || providerLabel === "Coinbase Wallet"
+          ? await connectEvmWallet(providerLabel)
+          : providerLabel === "Phantom" || providerLabel === "Solflare"
+            ? await connectSolanaWallet(providerLabel)
+            : (() => {
+                throw new Error(`${providerLabel} integration is not available yet.`);
+              })();
 
       const next: VenueConnection =
         activeVenue.id === "hyperliquid"
