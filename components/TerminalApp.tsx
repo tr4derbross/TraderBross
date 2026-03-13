@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { NewsItem, AVAILABLE_TICKERS } from "@/lib/mock-data";
 import { useAlerts } from "@/hooks/useAlerts";
 import { useBinanceWs } from "@/hooks/useBinanceWs";
@@ -137,7 +138,9 @@ export default function TerminalApp() {
   const [headerConnectOpen, setHeaderConnectOpen] = useState(false);
   const [headerConnectStatus, setHeaderConnectStatus] = useState<string>("");
   const { checkNewsAgainstAlerts } = useAlerts();
-  const headerPopoverRef = useRef<HTMLDivElement | null>(null);
+  const headerControlRef = useRef<HTMLDivElement | null>(null);
+  const headerPanelRef = useRef<HTMLDivElement | null>(null);
+  const [headerAnchorRect, setHeaderAnchorRect] = useState<DOMRect | null>(null);
 
   const [newsWidth, setNewsWidth] = useState(370);
   const [rightWidth, setRightWidth] = useState(295);
@@ -161,14 +164,36 @@ export default function TerminalApp() {
   useEffect(() => {
     if (!headerConnectOpen) return;
 
+    const syncAnchor = () => {
+      setHeaderAnchorRect(headerControlRef.current?.getBoundingClientRect() ?? null);
+    };
+    syncAnchor();
+
     const handlePointerDown = (event: MouseEvent) => {
-      if (!headerPopoverRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        !headerControlRef.current?.contains(target) &&
+        !headerPanelRef.current?.contains(target)
+      ) {
+        setHeaderConnectOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
         setHeaderConnectOpen(false);
       }
     };
 
     document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    window.addEventListener("resize", syncAnchor);
+    window.addEventListener("scroll", syncAnchor, true);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("resize", syncAnchor);
+      window.removeEventListener("scroll", syncAnchor, true);
+    };
   }, [headerConnectOpen]);
 
   const { prices: wsPrices, quotes: wsQuotes, connected: wsConnected } = useBinanceWs();
@@ -348,7 +373,7 @@ export default function TerminalApp() {
         <div className="relative z-10 flex items-center justify-center px-2">
           <BrandMark className="mx-auto" />
         </div>
-        <div ref={headerPopoverRef} className="absolute right-3 top-1/2 z-10 -translate-y-1/2 sm:right-4">
+        <div ref={headerControlRef} className="absolute right-3 top-1/2 z-10 -translate-y-1/2 sm:right-4">
           <div className="panel-shell-alt flex items-center gap-1.5 rounded-2xl px-2 py-1.5">
             <button
               type="button"
@@ -368,85 +393,6 @@ export default function TerminalApp() {
               <span className="text-[#f3ead7]">{selectedHeaderPlatform.label}</span>
             </button>
           </div>
-
-          {headerConnectOpen && (
-            <div className="panel-shell-alt absolute right-0 mt-3 w-[min(92vw,360px)] rounded-2xl border p-3 shadow-[0_18px_48px_rgba(0,0,0,0.42)]">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.22em] text-amber-200">Header Connect</div>
-                  <div className="mt-1 text-sm font-semibold text-[#f5efe1]">Platform Access</div>
-                  <p className="mt-1 text-[11px] leading-5 text-zinc-400">
-                    Choose a platform and start the relevant connection flow directly from the header.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setHeaderConnectOpen(false)}
-                  className="rounded-full border border-white/8 p-2 text-zinc-500 transition-colors hover:text-white"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {HEADER_PLATFORMS.map((platform) => (
-                  <button
-                    key={platform.id}
-                    type="button"
-                    onClick={() => {
-                      setHeaderPlatform(platform.id);
-                      setHeaderConnectStatus("");
-                    }}
-                    className={`rounded-xl border px-3 py-2 text-left transition-colors ${
-                      headerPlatform === platform.id
-                        ? "border-[rgba(212,161,31,0.26)] bg-[rgba(212,161,31,0.12)]"
-                        : "border-[rgba(255,255,255,0.06)] bg-[#111317] hover:bg-[rgba(212,161,31,0.05)]"
-                    }`}
-                  >
-                    <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500">{platform.eyebrow}</div>
-                    <div className="mt-1 text-[11px] font-semibold text-[#f3ead7]">{platform.label}</div>
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-3 rounded-2xl border border-[rgba(212,161,31,0.12)] bg-black/20 p-3">
-                <div className="flex items-center gap-2">
-                  <span className="brand-badge brand-badge-gold rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.14em]">
-                    {selectedHeaderPlatform.type === "wallet" ? "Wallet Flow" : "API Flow"}
-                  </span>
-                  <span className="text-[11px] font-semibold text-[#f3ead7]">{selectedHeaderPlatform.label}</span>
-                </div>
-                <p className="mt-2 text-[11px] leading-5 text-zinc-400">
-                  {selectedHeaderPlatform.description}
-                </p>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => runHeaderConnectAction("primary")}
-                    className="brand-chip-active rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em]"
-                  >
-                    {selectedHeaderPlatform.primaryAction}
-                  </button>
-                  {selectedHeaderPlatform.secondaryAction && (
-                    <button
-                      type="button"
-                      onClick={() => runHeaderConnectAction("secondary")}
-                      className="terminal-chip rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-100"
-                    >
-                      {selectedHeaderPlatform.secondaryAction}
-                    </button>
-                  )}
-                </div>
-
-                {headerConnectStatus && (
-                  <div className="mt-3 rounded-xl border border-[rgba(212,161,31,0.12)] bg-[rgba(212,161,31,0.06)] px-3 py-2 text-[10px] text-amber-100">
-                    {headerConnectStatus}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -554,6 +500,108 @@ export default function TerminalApp() {
           </span>
         </span>
       </div>
+      {headerConnectOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-[120] bg-transparent" />
+            <div
+              ref={headerPanelRef}
+              className="panel-shell-alt fixed z-[130] border p-3 shadow-[0_18px_48px_rgba(0,0,0,0.42)]"
+              style={
+                isMobile
+                  ? {
+                      left: 12,
+                      right: 12,
+                      top: 84,
+                      borderRadius: 20,
+                    }
+                  : {
+                      top: (headerAnchorRect?.bottom ?? 80) + 12,
+                      left: Math.max(12, (headerAnchorRect?.right ?? 360) - 360),
+                      width: Math.min(360, viewportWidth - 24),
+                      borderRadius: 20,
+                    }
+              }
+            >
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-amber-200">Connect Platform</div>
+                  <div className="mt-1 text-sm font-semibold text-[#f5efe1]">Platform Access</div>
+                  <p className="mt-1 text-[11px] leading-5 text-zinc-400">
+                    Choose a platform and start the relevant connection flow directly from the header.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHeaderConnectOpen(false)}
+                  className="rounded-full border border-white/8 p-2 text-zinc-500 transition-colors hover:text-white"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {HEADER_PLATFORMS.map((platform) => (
+                  <button
+                    key={platform.id}
+                    type="button"
+                    onClick={() => {
+                      setHeaderPlatform(platform.id);
+                      setHeaderConnectStatus("");
+                    }}
+                    className={`rounded-xl border px-3 py-2 text-left transition-colors ${
+                      headerPlatform === platform.id
+                        ? "border-[rgba(212,161,31,0.26)] bg-[rgba(212,161,31,0.12)]"
+                        : "border-[rgba(255,255,255,0.06)] bg-[#111317] hover:bg-[rgba(212,161,31,0.05)]"
+                    }`}
+                  >
+                    <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500">{platform.eyebrow}</div>
+                    <div className="mt-1 text-[11px] font-semibold text-[#f3ead7]">{platform.label}</div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-3 rounded-2xl border border-[rgba(212,161,31,0.12)] bg-black/20 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="brand-badge brand-badge-gold rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.14em]">
+                    {selectedHeaderPlatform.type === "wallet" ? "Wallet Flow" : "API Flow"}
+                  </span>
+                  <span className="text-[11px] font-semibold text-[#f3ead7]">{selectedHeaderPlatform.label}</span>
+                </div>
+                <p className="mt-2 text-[11px] leading-5 text-zinc-400">
+                  {selectedHeaderPlatform.description}
+                </p>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => runHeaderConnectAction("primary")}
+                    className="brand-chip-active rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em]"
+                  >
+                    {selectedHeaderPlatform.primaryAction}
+                  </button>
+                  {selectedHeaderPlatform.secondaryAction && (
+                    <button
+                      type="button"
+                      onClick={() => runHeaderConnectAction("secondary")}
+                      className="terminal-chip rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-100"
+                    >
+                      {selectedHeaderPlatform.secondaryAction}
+                    </button>
+                  )}
+                </div>
+
+                {headerConnectStatus && (
+                  <div className="mt-3 rounded-xl border border-[rgba(212,161,31,0.12)] bg-[rgba(212,161,31,0.06)] px-3 py-2 text-[10px] text-amber-100">
+                    {headerConnectStatus}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>,
+          document.body
+        )}
     </div>
   );
 }
