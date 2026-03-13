@@ -9,6 +9,7 @@ import {
   Wallet,
   Loader2,
   ChevronRight,
+  ChevronDown,
   X,
   PlugZap,
   ShieldCheck,
@@ -59,6 +60,7 @@ type PriceMap = Record<string, { price: number; changePct: number }>;
 type ConnectionMap = Record<VenueId, VenueConnection>;
 
 const STORAGE_KEY = "traderbross.venue-connections.v1";
+const OTHER_WALLET_OPTIONS = ["Phantom", "Rabby", "Solflare", "Coinbase Wallet", "WalletConnect"];
 
 const VENUES: Venue[] = [
   {
@@ -336,7 +338,7 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
     setForm({ status: "not_configured" });
   };
 
-  const connectInjectedWallet = async (providerLabel: "MetaMask" | "Injected Wallet") => {
+  const connectInjectedWallet = async (providerLabel: string) => {
     if (!activeVenue || activeVenue.type !== "DEX") return;
 
     if (!window.ethereum) {
@@ -608,9 +610,14 @@ function ConnectionDrawer({
   onSave: () => void;
   onTest: () => void;
   onRemove: () => void;
-  onConnectWallet: (providerLabel: "MetaMask" | "Injected Wallet") => Promise<void>;
+  onConnectWallet: (providerLabel: string) => Promise<void>;
 }) {
   const statusMeta = getStatusMeta(form.status);
+  const [walletMenuOpen, setWalletMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setWalletMenuOpen(false);
+  }, [venue.id]);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/55 backdrop-blur-[2px]">
@@ -682,12 +689,14 @@ function ConnectionDrawer({
               >
                 MetaMask
               </button>
-              <button
-                onClick={() => onConnectWallet("Injected Wallet")}
-                className="terminal-chip rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-100"
-              >
-                Other Wallet
-              </button>
+              <WalletMenu
+                open={walletMenuOpen}
+                onToggle={() => setWalletMenuOpen((prev) => !prev)}
+                onSelect={async (wallet) => {
+                  setWalletMenuOpen(false);
+                  await onConnectWallet(wallet);
+                }}
+              />
             </div>
             {form.walletProvider && (
               <p className="text-[10px] text-zinc-500">
@@ -720,12 +729,14 @@ function ConnectionDrawer({
               >
                 MetaMask
               </button>
-              <button
-                onClick={() => onConnectWallet("Injected Wallet")}
-                className="terminal-chip rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-100"
-              >
-                Other Wallet
-              </button>
+              <WalletMenu
+                open={walletMenuOpen}
+                onToggle={() => setWalletMenuOpen((prev) => !prev)}
+                onSelect={async (wallet) => {
+                  setWalletMenuOpen(false);
+                  await onConnectWallet(wallet);
+                }}
+              />
             </div>
             {form.walletProvider && (
               <p className="text-[10px] text-zinc-500">
@@ -769,6 +780,45 @@ function ConnectionDrawer({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function WalletMenu({
+  open,
+  onToggle,
+  onSelect,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  onSelect: (wallet: string) => Promise<void>;
+}) {
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="terminal-chip flex w-full items-center justify-between rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-100"
+      >
+        <span>Other Wallet</span>
+        <ChevronDown className={`h-3.5 w-3.5 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 z-10 mt-2 w-full min-w-[170px] overflow-hidden rounded-xl border border-[rgba(212,161,31,0.14)] bg-[#111317] shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+          {OTHER_WALLET_OPTIONS.map((wallet) => (
+            <button
+              key={wallet}
+              type="button"
+              onClick={() => void onSelect(wallet)}
+              className="flex w-full items-center justify-between px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-200 transition-colors hover:bg-[rgba(212,161,31,0.08)] hover:text-[#f3ead7]"
+            >
+              <span>{wallet}</span>
+              <Wallet className="h-3 w-3 text-zinc-500" />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
