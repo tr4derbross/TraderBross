@@ -17,19 +17,17 @@ import WatchlistPanel from "@/components/WatchlistPanel";
 import BrandMark from "@/components/BrandMark";
 import { useTradingState } from "@/hooks/useTradingState";
 import {
-  Wifi,
-  WifiOff,
-  Zap,
-  Link2,
   GripVertical,
   Newspaper,
   CandlestickChart,
   PanelsTopLeft,
+  Wallet,
 } from "lucide-react";
 
 type RightTab = "trade" | "dex" | "alerts" | "connect" | "watch";
 type DexSubTab = "hl" | "dydx";
 type WorkspaceTab = "news" | "chart" | "tools";
+type HeaderPlatform = "hyperliquid" | "dydx" | "okx" | "bybit" | "binance";
 
 function ResizeDivider({ onDrag }: { onDrag: (dx: number) => void }) {
   const dragging = useRef(false);
@@ -78,9 +76,9 @@ export default function TerminalApp() {
   const [rightTab, setRightTab] = useState<RightTab>("trade");
   const [dexSubTab, setDexSubTab] = useState<DexSubTab>("hl");
   const [hlWallet, setHlWallet] = useState("");
-  const [todayLabel, setTodayLabel] = useState("");
   const [viewportWidth, setViewportWidth] = useState(1440);
   const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<WorkspaceTab>("chart");
+  const [headerPlatform, setHeaderPlatform] = useState<HeaderPlatform>("hyperliquid");
   const { checkNewsAgainstAlerts } = useAlerts();
 
   const [newsWidth, setNewsWidth] = useState(370);
@@ -94,16 +92,6 @@ export default function TerminalApp() {
     (dx: number) => setRightWidth((w) => Math.max(250, Math.min(480, w - dx))),
     []
   );
-
-  useEffect(() => {
-    setTodayLabel(
-      new Date().toLocaleDateString("tr-TR", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      })
-    );
-  }, []);
 
   useEffect(() => {
     const syncViewport = () => setViewportWidth(window.innerWidth);
@@ -163,6 +151,22 @@ export default function TerminalApp() {
   const isTablet = viewportWidth >= 768 && viewportWidth < 1280;
   const showDesktopLayout = viewportWidth >= 1280;
   const showBottomPanel = !isMobile || mobileWorkspaceTab !== "tools";
+
+  const openHeaderConnection = () => {
+    if (headerPlatform === "hyperliquid") {
+      setRightTab("dex");
+      setDexSubTab("hl");
+    } else if (headerPlatform === "dydx") {
+      setRightTab("dex");
+      setDexSubTab("dydx");
+    } else {
+      setRightTab("connect");
+    }
+
+    if (!showDesktopLayout) {
+      setMobileWorkspaceTab("tools");
+    }
+  };
 
   const renderNewsPanel = () => (
     <div className="panel-shell soft-divider flex h-full min-h-0 flex-col overflow-hidden border xl:rounded-l-xl xl:border-r-0">
@@ -270,44 +274,32 @@ export default function TerminalApp() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-black">
-      <div className="panel-header brand-aura soft-divider status-glow relative grid shrink-0 gap-3 border-b px-3 py-3 sm:px-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
-        <div className="relative z-10 flex min-w-0 items-center gap-3 lg:order-1">
-          <div className="hidden md:block">
-            <div className="text-[10px] uppercase tracking-[0.34em] text-amber-200/80">
-              TraderBross
-            </div>
-            <div className="text-[11px] tracking-[0.2em] text-zinc-400">
-              Professional multi-venue terminal
-            </div>
-          </div>
-          <span className="hidden rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.24em] text-amber-100 md:inline-flex">
-            v1.3.0
-          </span>
-        </div>
-
-        <div className="relative z-10 flex items-center justify-center px-2 lg:order-2 lg:px-4">
+      <div className="panel-header brand-aura soft-divider status-glow relative flex shrink-0 items-center justify-center border-b px-3 py-3 sm:px-4 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
+        <div className="relative z-10 flex items-center justify-center px-2">
           <BrandMark className="mx-auto" />
         </div>
-
-        <div className="relative z-10 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10px] text-zinc-500 lg:order-3 lg:justify-end">
-          <span className="flex items-center gap-1">
-            {wsConnected ? (
-              <Wifi className="h-3 w-3 animate-pulse text-emerald-400" />
-            ) : (
-              <WifiOff className="h-3 w-3 text-red-500" />
-            )}
-            {wsConnected ? "Market Data Live" : "Reconnecting"}
-          </span>
-          <span className="hidden text-zinc-700 sm:inline">•</span>
-          <span className="flex items-center gap-1 text-[#f0d893]">
-            <Zap className="h-3 w-3" /> Hyperliquid
-          </span>
-          <span className="hidden text-zinc-700 sm:inline">•</span>
-          <span className="flex items-center gap-1 text-amber-200">
-            <Link2 className="h-3 w-3" /> OKX • Bybit • dYdX
-          </span>
-          <span className="hidden text-zinc-700 sm:inline">•</span>
-          <span>{todayLabel || "..."}</span>
+        <div className="absolute right-3 top-1/2 z-10 flex -translate-y-1/2 items-center gap-2 sm:right-4">
+          <select
+            value={headerPlatform}
+            onChange={(e) => setHeaderPlatform(e.target.value as HeaderPlatform)}
+            className="terminal-input hidden min-w-[120px] rounded-xl px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)] outline-none md:block"
+            aria-label="Select platform"
+          >
+            <option value="hyperliquid">Hyperliquid</option>
+            <option value="dydx">dYdX</option>
+            <option value="okx">OKX</option>
+            <option value="bybit">Bybit</option>
+            <option value="binance">Binance</option>
+          </select>
+          <button
+            type="button"
+            onClick={openHeaderConnection}
+            className="brand-chip-active inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em]"
+          >
+            <Wallet className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Wallet Connect</span>
+            <span className="sm:hidden">Connect</span>
+          </button>
         </div>
       </div>
 
