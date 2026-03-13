@@ -137,6 +137,16 @@ export default function TerminalApp() {
     }
   };
 
+  const handleTickerRoute = (ticker: string, item: NewsItem) => {
+    setSelectedItem(item);
+    setChartTicker(ticker);
+    setRightTab("trade");
+
+    if (!showDesktopLayout) {
+      setMobileWorkspaceTab("tools");
+    }
+  };
+
   const tabs: { id: RightTab; label: string }[] = [
     { id: "trade", label: "Trade" },
     { id: "dex", label: "DEX" },
@@ -153,6 +163,7 @@ export default function TerminalApp() {
     <div className="panel-shell soft-divider flex h-full min-h-0 flex-col overflow-hidden border xl:rounded-l-xl xl:border-r-0">
       <NewsFeed
         onSelectItem={handleSelectItem}
+        onTickerSelect={handleTickerRoute}
         selectedItem={selectedItem}
         onNewItem={(item) => checkNewsAgainstAlerts(item)}
       />

@@ -11,9 +11,10 @@ type Props = {
   onSelectItem: (item: NewsItem) => void;
   selectedItem: NewsItem | null;
   onNewItem?: (item: NewsItem) => void;
+  onTickerSelect?: (ticker: string, item: NewsItem) => void;
 };
 
-export default function NewsFeed({ onSelectItem, selectedItem, onNewItem }: Props) {
+export default function NewsFeed({ onSelectItem, selectedItem, onNewItem, onTickerSelect }: Props) {
   const [sector, setSector] = useState("All");
   const [ticker, setTicker] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -119,6 +120,7 @@ export default function NewsFeed({ onSelectItem, selectedItem, onNewItem }: Prop
               item={item}
               isNew={newIds.has(item.id)}
               onSelect={onSelectItem}
+              onTickerSelect={onTickerSelect}
               selected={selectedItem?.id === item.id}
             />
           ))
