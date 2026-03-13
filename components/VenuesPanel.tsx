@@ -16,6 +16,14 @@ import {
   Trash2,
 } from "lucide-react";
 
+declare global {
+  interface Window {
+    ethereum?: {
+      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+    };
+  }
+}
+
 type VenueStatus = "not_configured" | "saved_locally" | "testing" | "connected" | "error";
 type VenueType = "CEX" | "DEX";
 type VenueId = "binance" | "okx" | "bybit" | "hyperliquid" | "dydx";
@@ -26,6 +34,7 @@ type VenueConnection = {
   apiSecret?: string;
   passphrase?: string;
   walletAddress?: string;
+  walletProvider?: string;
   address?: string;
   errorMessage?: string;
   updatedAt?: number;
@@ -327,6 +336,74 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
     setForm({ status: "not_configured" });
   };
 
+  const connectInjectedWallet = async (providerLabel: "MetaMask" | "Injected Wallet") => {
+    if (!activeVenue || activeVenue.type !== "DEX") return;
+
+    if (!window.ethereum) {
+      const failed: VenueConnection = {
+        ...form,
+        status: "error",
+        errorMessage: `${providerLabel} is not available in this browser.`,
+      };
+      updateConnection(activeVenue.id, failed);
+      setForm(failed);
+      return;
+    }
+
+    const testingState: VenueConnection = {
+      ...form,
+      status: "testing",
+      errorMessage: undefined,
+    };
+    updateConnection(activeVenue.id, testingState);
+    setForm(testingState);
+
+    try {
+      const accounts = (await window.ethereum.request({
+        method: "eth_requestAccounts",
+      })) as string[];
+      const walletAddress = accounts?.[0];
+
+      if (!walletAddress) {
+        throw new Error("No wallet address returned.");
+      }
+
+      const next: VenueConnection =
+        activeVenue.id === "hyperliquid"
+          ? {
+              ...form,
+              walletAddress,
+              walletProvider: providerLabel,
+              status: "connected",
+              errorMessage: undefined,
+              updatedAt: Date.now(),
+            }
+          : {
+              ...form,
+              address: walletAddress,
+              walletProvider: providerLabel,
+              status: "connected",
+              errorMessage: undefined,
+              updatedAt: Date.now(),
+            };
+
+      updateConnection(activeVenue.id, next);
+      setForm(next);
+
+      if (activeVenue.id === "hyperliquid") {
+        onHlWalletChange(walletAddress);
+      }
+    } catch (error) {
+      const failed: VenueConnection = {
+        ...form,
+        status: "error",
+        errorMessage: error instanceof Error ? error.message : "Wallet connection failed.",
+      };
+      updateConnection(activeVenue.id, failed);
+      setForm(failed);
+    }
+  };
+
   const compareTickers = ["BTC", "ETH", "SOL"];
   const venuesWithData = ["Binance", "OKX", "Bybit"];
 
@@ -441,6 +518,7 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
           onSave={saveConnection}
           onTest={testConnection}
           onRemove={removeConnection}
+          onConnectWallet={connectInjectedWallet}
         />
       )}
     </>
@@ -521,6 +599,7 @@ function ConnectionDrawer({
   onSave,
   onTest,
   onRemove,
+  onConnectWallet,
 }: {
   venue: Venue;
   form: VenueConnection;
@@ -529,6 +608,7 @@ function ConnectionDrawer({
   onSave: () => void;
   onTest: () => void;
   onRemove: () => void;
+  onConnectWallet: (providerLabel: "MetaMask" | "Injected Wallet") => Promise<void>;
 }) {
   const statusMeta = getStatusMeta(form.status);
 
@@ -595,6 +675,25 @@ function ConnectionDrawer({
                 address locally for MVP state handling.
               </p>
             </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onConnectWallet("MetaMask")}
+                className="brand-chip-active rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em]"
+              >
+                MetaMask
+              </button>
+              <button
+                onClick={() => onConnectWallet("Injected Wallet")}
+                className="terminal-chip rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-100"
+              >
+                Other Wallet
+              </button>
+            </div>
+            {form.walletProvider && (
+              <p className="text-[10px] text-zinc-500">
+                Connected provider: <span className="text-zinc-300">{form.walletProvider}</span>
+              </p>
+            )}
             <Field
               label="Wallet Address"
               value={form.walletAddress ?? ""}
@@ -614,6 +713,25 @@ function ConnectionDrawer({
                 deeper wallet integration later.
               </p>
             </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onConnectWallet("MetaMask")}
+                className="brand-chip-active rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em]"
+              >
+                MetaMask
+              </button>
+              <button
+                onClick={() => onConnectWallet("Injected Wallet")}
+                className="terminal-chip rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-100"
+              >
+                Other Wallet
+              </button>
+            </div>
+            {form.walletProvider && (
+              <p className="text-[10px] text-zinc-500">
+                Connected provider: <span className="text-zinc-300">{form.walletProvider}</span>
+              </p>
+            )}
             <Field
               label="Address"
               value={form.address ?? ""}
@@ -684,12 +802,24 @@ function getVenueNote(venue: Venue, connection: VenueConnection) {
   switch (connection.status) {
     case "connected":
       if (venue.type === "CEX") return "Credentials tested and restored locally.";
-      if (venue.id === "hyperliquid") return connection.walletAddress ? `${connection.walletAddress.slice(0, 8)}... connected` : "Wallet connected.";
-      return connection.address ? `${connection.address.slice(0, 12)}... connected` : "Address connected.";
+      if (venue.id === "hyperliquid") {
+        return connection.walletAddress
+          ? `${connection.walletProvider ?? "Wallet"} • ${connection.walletAddress.slice(0, 8)}... connected`
+          : "Wallet connected.";
+      }
+      return connection.address
+        ? `${connection.walletProvider ?? "Wallet"} • ${connection.address.slice(0, 12)}... connected`
+        : "Address connected.";
     case "saved_locally":
       if (venue.type === "CEX") return "Credentials saved in browser storage.";
-      if (venue.id === "hyperliquid") return connection.walletAddress ? `${connection.walletAddress.slice(0, 8)}... saved locally` : "Wallet placeholder saved locally.";
-      return connection.address ? `${connection.address.slice(0, 12)}... saved locally` : "Address saved locally.";
+      if (venue.id === "hyperliquid") {
+        return connection.walletAddress
+          ? `${connection.walletProvider ?? "Wallet"} • ${connection.walletAddress.slice(0, 8)}... saved locally`
+          : "Wallet placeholder saved locally.";
+      }
+      return connection.address
+        ? `${connection.walletProvider ?? "Wallet"} • ${connection.address.slice(0, 12)}... saved locally`
+        : "Address saved locally.";
     case "testing":
       return "Testing local connection placeholder...";
     case "error":
