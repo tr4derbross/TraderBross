@@ -23,13 +23,21 @@ declare global {
     isRabby?: boolean;
     isCoinbaseWallet?: boolean;
     providers?: EthereumProvider[];
+    on?: (event: string, handler: (...args: unknown[]) => void) => void;
+    off?: (event: string, handler: (...args: unknown[]) => void) => void;
+    removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
+    disconnect?: () => Promise<void> | void;
     request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
   }
 
   interface SolanaProvider {
     isPhantom?: boolean;
     isSolflare?: boolean;
+    on?: (event: string, handler: (...args: unknown[]) => void) => void;
+    off?: (event: string, handler: (...args: unknown[]) => void) => void;
+    removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
     connect: () => Promise<{ publicKey?: { toString: () => string } }>;
+    disconnect?: () => Promise<void> | void;
   }
 
   interface Window {
@@ -74,8 +82,18 @@ type Props = {
 
 type PriceMap = Record<string, { price: number; changePct: number }>;
 type ConnectionMap = Record<VenueId, VenueConnection>;
+type WalletProviderKind = "evm" | "solana";
+type WalletSession = {
+  venueId: VenueId;
+  providerLabel: string;
+  providerKind: WalletProviderKind;
+  provider: EthereumProvider | SolanaProvider;
+  cleanup: () => void;
+};
 
 const STORAGE_KEY = "traderbross.venue-connections.v1";
+const ACTIVE_SESSION_KEY = "traderbross.venue-active-wallets.v1";
+const REMOVED_SESSION_KEY = "traderbross.venue-removed-wallets.v1";
 const OTHER_WALLET_OPTIONS = ["Phantom", "Rabby", "Solflare", "Coinbase Wallet", "WalletConnect"];
 const WALLET_MARKS: Record<string, string> = {
   Phantom: "P",
@@ -180,6 +198,71 @@ function getStatusMeta(status: VenueStatus) {
   }
 }
 
+function debugWalletLog(event: string, detail?: Record<string, unknown>) {
+  console.info("[TraderBross Wallet]", event, detail ?? {});
+}
+
+function readSessionVenueList(key: string) {
+  if (typeof window === "undefined") return [] as VenueId[];
+
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(key) ?? "[]");
+    return Array.isArray(parsed) ? (parsed as VenueId[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSessionVenueList(key: string, items: VenueId[]) {
+  if (typeof window === "undefined") return;
+
+  if (!items.length) {
+    sessionStorage.removeItem(key);
+    return;
+  }
+
+  sessionStorage.setItem(key, JSON.stringify(items));
+}
+
+function updateSessionVenueFlag(key: string, venueId: VenueId, enabled: boolean) {
+  const current = new Set(readSessionVenueList(key));
+
+  if (enabled) current.add(venueId);
+  else current.delete(venueId);
+
+  writeSessionVenueList(key, [...current]);
+}
+
+function writeActiveWalletSession(venueId: VenueId, providerLabel: string) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const current = JSON.parse(sessionStorage.getItem(ACTIVE_SESSION_KEY) ?? "{}") as Partial<Record<VenueId, string>>;
+    current[venueId] = providerLabel;
+    sessionStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(current));
+  } catch {
+    // ignore session storage failures
+  }
+}
+
+function clearActiveWalletSession(venueId: VenueId) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const current = JSON.parse(sessionStorage.getItem(ACTIVE_SESSION_KEY) ?? "{}") as Partial<Record<VenueId, string>>;
+    delete current[venueId];
+
+    if (Object.keys(current).length === 0) {
+      sessionStorage.removeItem(ACTIVE_SESSION_KEY);
+      return;
+    }
+
+    sessionStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(current));
+  } catch {
+    // ignore session storage failures
+  }
+}
+
 function isEvmLikeAddress(value?: string) {
   return Boolean(value && /^0x[a-zA-Z0-9]{8,}$/.test(value));
 }
@@ -229,7 +312,7 @@ async function connectEvmWallet(wallet: string) {
     throw new Error(`No wallet address returned from ${wallet}.`);
   }
 
-  return address;
+  return { address, provider };
 }
 
 async function connectSolanaWallet(wallet: string) {
@@ -251,7 +334,7 @@ async function connectSolanaWallet(wallet: string) {
     throw new Error(`No wallet address returned from ${wallet}.`);
   }
 
-  return address;
+  return { address, provider };
 }
 
 export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
@@ -261,16 +344,35 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
   const [activeVenueId, setActiveVenueId] = useState<VenueId | null>(null);
   const [selectedDexId, setSelectedDexId] = useState<VenueId>("hyperliquid");
   const [form, setForm] = useState<VenueConnection>({ status: "not_configured" });
+  const walletSessionsRef = useRef<Partial<Record<VenueId, WalletSession>>>({});
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (!saved) return;
       const parsed = JSON.parse(saved) as Partial<ConnectionMap>;
+      const removedVenues = new Set(readSessionVenueList(REMOVED_SESSION_KEY));
       const merged: ConnectionMap = { ...EMPTY_CONNECTIONS, ...parsed };
-      setConnections(merged);
-      if (merged.hyperliquid.walletAddress) {
-        onHlWalletChange(merged.hyperliquid.walletAddress);
+      const normalized = { ...merged };
+
+      (["hyperliquid", "dydx"] as const).forEach((venueId) => {
+        if (removedVenues.has(venueId)) {
+          normalized[venueId] = { status: "not_configured" };
+          return;
+        }
+
+        if (normalized[venueId].status === "connected") {
+          normalized[venueId] = {
+            ...normalized[venueId],
+            status: "saved_locally",
+            errorMessage: undefined,
+          };
+        }
+      });
+
+      setConnections(normalized);
+      if (removedVenues.has("hyperliquid")) {
+        onHlWalletChange("");
       }
     } catch {
       // ignore malformed local storage
@@ -286,7 +388,11 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
   }, [connections]);
 
   useEffect(() => {
-    if (hlWallet && connections.hyperliquid.walletAddress !== hlWallet) {
+    if (
+      hlWallet &&
+      walletSessionsRef.current.hyperliquid &&
+      connections.hyperliquid.walletAddress !== hlWallet
+    ) {
       setConnections((prev) => ({
         ...prev,
         hyperliquid: {
@@ -297,6 +403,13 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
       }));
     }
   }, [hlWallet, connections.hyperliquid.walletAddress]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(walletSessionsRef.current).forEach((session) => session?.cleanup());
+      walletSessionsRef.current = {};
+    };
+  }, []);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -351,6 +464,191 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
     }));
   };
 
+  const syncWalletConnection = (venueId: VenueId, providerLabel: string, address: string, status: VenueStatus = "connected") => {
+    const payload: VenueConnection =
+      venueId === "hyperliquid"
+        ? {
+            walletAddress: address,
+            walletProvider: providerLabel,
+            status,
+            updatedAt: Date.now(),
+          }
+        : {
+            address,
+            walletProvider: providerLabel,
+            status,
+            updatedAt: Date.now(),
+          };
+
+    updateConnection(venueId, payload);
+
+    if (activeVenueId === venueId) {
+      setForm(payload);
+    }
+
+    if (venueId === "hyperliquid") {
+      onHlWalletChange(address);
+    }
+  };
+
+  const clearWalletSession = async (
+    venueId: VenueId,
+    options?: { markRemoved?: boolean; keepError?: string; source?: string }
+  ) => {
+    const markRemoved = options?.markRemoved ?? true;
+    const source = options?.source ?? "clear";
+    const existingSession = walletSessionsRef.current[venueId];
+
+    if (existingSession) {
+      try {
+        if (typeof existingSession.provider.disconnect === "function") {
+          await existingSession.provider.disconnect();
+          debugWalletLog("provider_disconnect_called", {
+            source,
+            venueId,
+            provider: existingSession.providerLabel,
+          });
+        } else if (
+          existingSession.providerKind === "evm" &&
+          "request" in existingSession.provider &&
+          typeof existingSession.provider.request === "function"
+        ) {
+          try {
+            await existingSession.provider.request({
+              method: "wallet_revokePermissions",
+              params: [{ eth_accounts: {} }],
+            });
+            debugWalletLog("provider_permissions_revoked", {
+              source,
+              venueId,
+              provider: existingSession.providerLabel,
+            });
+          } catch {
+            debugWalletLog("provider_disconnect_not_supported", {
+              source,
+              venueId,
+              provider: existingSession.providerLabel,
+            });
+          }
+        }
+      } catch (error) {
+        debugWalletLog("provider_disconnect_failed", {
+          source,
+          venueId,
+          provider: existingSession.providerLabel,
+          message: error instanceof Error ? error.message : "unknown",
+        });
+      } finally {
+        existingSession.cleanup();
+        delete walletSessionsRef.current[venueId];
+      }
+    }
+
+    clearActiveWalletSession(venueId);
+    updateSessionVenueFlag(REMOVED_SESSION_KEY, venueId, markRemoved);
+
+    const resetState: VenueConnection = options?.keepError
+      ? { status: "error", errorMessage: options.keepError, updatedAt: Date.now() }
+      : { status: "not_configured" };
+
+    updateConnection(venueId, resetState);
+
+    if (activeVenueId === venueId) {
+      setForm(resetState);
+    }
+
+    if (venueId === "hyperliquid") {
+      onHlWalletChange("");
+    }
+
+    debugWalletLog("wallet_state_cleared", {
+      source,
+      venueId,
+      markRemoved,
+    });
+  };
+
+  const attachWalletSession = (
+    venueId: VenueId,
+    providerLabel: string,
+    providerKind: WalletProviderKind,
+    provider: EthereumProvider | SolanaProvider
+  ) => {
+    const cleanups: Array<() => void> = [];
+    const subscribe = (event: string, handler: (...args: unknown[]) => void) => {
+      if (typeof provider.on === "function") {
+        provider.on(event, handler);
+        cleanups.push(() => {
+          if (typeof provider.removeListener === "function") provider.removeListener(event, handler);
+          else if (typeof provider.off === "function") provider.off(event, handler);
+        });
+      }
+    };
+
+    if (providerKind === "evm") {
+      subscribe("accountsChanged", (...args: unknown[]) => {
+        const accounts = Array.isArray(args[0]) ? (args[0] as string[]) : [];
+        debugWalletLog("accounts_changed", { venueId, provider: providerLabel, count: accounts.length });
+
+        if (!accounts.length) {
+          void clearWalletSession(venueId, { markRemoved: true, source: "accounts_changed" });
+          return;
+        }
+
+        syncWalletConnection(venueId, providerLabel, accounts[0], "connected");
+      });
+
+      subscribe("chainChanged", (...args: unknown[]) => {
+        debugWalletLog("chain_changed", { venueId, provider: providerLabel, chain: String(args[0] ?? "") });
+      });
+
+      subscribe("disconnect", () => {
+        void clearWalletSession(venueId, { markRemoved: true, source: "provider_disconnect_event" });
+      });
+
+      subscribe("providerChanged", (...args: unknown[]) => {
+        debugWalletLog("provider_changed", { venueId, provider: providerLabel, payload: String(args[0] ?? "") });
+      });
+    } else {
+      subscribe("disconnect", () => {
+        void clearWalletSession(venueId, { markRemoved: true, source: "provider_disconnect_event" });
+      });
+
+      subscribe("accountChanged", (...args: unknown[]) => {
+        const nextAddress =
+          typeof args[0] === "string"
+            ? (args[0] as string)
+            : typeof (args[0] as { toString?: () => string } | undefined)?.toString === "function"
+              ? (args[0] as { toString: () => string }).toString()
+              : "";
+
+        debugWalletLog("account_changed", { venueId, provider: providerLabel, hasAddress: Boolean(nextAddress) });
+
+        if (!nextAddress) {
+          void clearWalletSession(venueId, { markRemoved: true, source: "account_changed" });
+          return;
+        }
+
+        syncWalletConnection(venueId, providerLabel, nextAddress, "connected");
+      });
+    }
+
+    walletSessionsRef.current[venueId]?.cleanup();
+    walletSessionsRef.current[venueId] = {
+      venueId,
+      providerLabel,
+      providerKind,
+      provider,
+      cleanup: () => {
+        cleanups.forEach((cleanup) => cleanup());
+      },
+    };
+
+    writeActiveWalletSession(venueId, providerLabel);
+    updateSessionVenueFlag(REMOVED_SESSION_KEY, venueId, false);
+    debugWalletLog("wallet_session_attached", { venueId, provider: providerLabel, providerKind });
+  };
+
   const saveConnection = () => {
     if (!activeVenue) return;
 
@@ -370,6 +668,7 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
 
     if (activeVenue.id === "hyperliquid") {
       const walletAddress = form.walletAddress?.trim();
+      updateSessionVenueFlag(REMOVED_SESSION_KEY, activeVenue.id, false);
       updateConnection(activeVenue.id, {
         ...connections.hyperliquid,
         walletAddress,
@@ -382,6 +681,7 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
     }
 
     const address = form.address?.trim();
+    updateSessionVenueFlag(REMOVED_SESSION_KEY, activeVenue.id, false);
     updateConnection(activeVenue.id, {
       ...connections.dydx,
       address,
@@ -406,19 +706,22 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
     const next = { ...form };
     let success = false;
     let errorMessage = "";
+    let finalStatus: VenueStatus = "error";
 
     if (activeVenue.type === "CEX") {
       success = Boolean(next.apiKey?.trim() && next.apiSecret?.trim() && next.apiKey!.length >= 8);
       if (!success) errorMessage = "Missing or invalid API credentials.";
+      finalStatus = success ? "connected" : "error";
     } else if (activeVenue.id === "hyperliquid") {
       success = isEvmLikeAddress(next.walletAddress?.trim()) || isSolanaLikeAddress(next.walletAddress?.trim());
       if (!success) errorMessage = "Use a valid wallet address like 0x... or a supported base58 wallet.";
+      finalStatus = walletSessionsRef.current.hyperliquid ? "connected" : success ? "saved_locally" : "error";
     } else {
       success = isDydxLikeAddress(next.address?.trim());
       if (!success) errorMessage = "Use a valid dYdX or wallet-style address placeholder.";
+      finalStatus = walletSessionsRef.current.dydx ? "connected" : success ? "saved_locally" : "error";
     }
 
-    const finalStatus: VenueStatus = success ? "connected" : "error";
     const payload: VenueConnection = {
       ...connections[activeVenue.id],
       ...next,
@@ -430,23 +733,33 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
     updateConnection(activeVenue.id, payload);
     setForm(payload);
 
-    if (activeVenue.id === "hyperliquid") {
+    if (success) {
+      updateSessionVenueFlag(REMOVED_SESSION_KEY, activeVenue.id, false);
+    }
+
+    if (activeVenue.id === "hyperliquid" && finalStatus === "connected") {
       onHlWalletChange(success ? payload.walletAddress ?? "" : "");
     }
   };
 
   const removeConnection = () => {
     if (!activeVenue) return;
+
+    if (activeVenue.type === "DEX") {
+      void clearWalletSession(activeVenue.id, { markRemoved: true, source: "manual_remove" });
+      return;
+    }
+
     updateConnection(activeVenue.id, { status: "not_configured" });
-    if (activeVenue.id === "hyperliquid") onHlWalletChange("");
     setForm({ status: "not_configured" });
   };
 
   const connectInjectedWallet = async (providerLabel: string) => {
     if (!activeVenue || activeVenue.type !== "DEX") return;
 
+    await clearWalletSession(activeVenue.id, { markRemoved: false, source: "switch_wallet" });
+
     const testingState: VenueConnection = {
-      ...form,
       status: "testing",
       errorMessage: undefined,
     };
@@ -454,7 +767,7 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
     setForm(testingState);
 
     try {
-      const walletAddress =
+      const result =
         providerLabel === "MetaMask" || providerLabel === "Rabby" || providerLabel === "Coinbase Wallet"
           ? await connectEvmWallet(providerLabel)
           : providerLabel === "Phantom" || providerLabel === "Solflare"
@@ -463,39 +776,33 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
                 throw new Error(`${providerLabel} integration is not available yet.`);
               })();
 
-      const next: VenueConnection =
-        activeVenue.id === "hyperliquid"
-          ? {
-              ...form,
-              walletAddress,
-              walletProvider: providerLabel,
-              status: "connected",
-              errorMessage: undefined,
-              updatedAt: Date.now(),
-            }
-          : {
-              ...form,
-              address: walletAddress,
-              walletProvider: providerLabel,
-              status: "connected",
-              errorMessage: undefined,
-              updatedAt: Date.now(),
-            };
+      attachWalletSession(
+        activeVenue.id,
+        providerLabel,
+        providerLabel === "MetaMask" || providerLabel === "Rabby" || providerLabel === "Coinbase Wallet" ? "evm" : "solana",
+        result.provider
+      );
 
-      updateConnection(activeVenue.id, next);
-      setForm(next);
-
-      if (activeVenue.id === "hyperliquid") {
-        onHlWalletChange(walletAddress);
-      }
+      syncWalletConnection(activeVenue.id, providerLabel, result.address, "connected");
+      debugWalletLog("wallet_connected", {
+        venueId: activeVenue.id,
+        provider: providerLabel,
+        address: result.address.slice(0, 10),
+      });
     } catch (error) {
       const failed: VenueConnection = {
-        ...form,
         status: "error",
         errorMessage: error instanceof Error ? error.message : "Wallet connection failed.",
+        updatedAt: Date.now(),
       };
       updateConnection(activeVenue.id, failed);
       setForm(failed);
+      clearActiveWalletSession(activeVenue.id);
+      debugWalletLog("wallet_connect_failed", {
+        venueId: activeVenue.id,
+        provider: providerLabel,
+        message: failed.errorMessage,
+      });
     }
   };
 
@@ -786,7 +1093,7 @@ function ConnectionDrawer({
 }) {
   const statusMeta = getStatusMeta(form.status);
   const [walletMenuOpen, setWalletMenuOpen] = useState(false);
-  const walletConnected = venue.type === "DEX" && Boolean(form.walletProvider);
+  const walletConnected = venue.type === "DEX" && form.status === "connected" && Boolean(form.walletProvider);
 
   useEffect(() => {
     setWalletMenuOpen(false);
