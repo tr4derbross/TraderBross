@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle,
   Circle,
@@ -61,6 +61,13 @@ type ConnectionMap = Record<VenueId, VenueConnection>;
 
 const STORAGE_KEY = "traderbross.venue-connections.v1";
 const OTHER_WALLET_OPTIONS = ["Phantom", "Rabby", "Solflare", "Coinbase Wallet", "WalletConnect"];
+const WALLET_MARKS: Record<string, string> = {
+  Phantom: "P",
+  Rabby: "R",
+  Solflare: "S",
+  "Coinbase Wallet": "C",
+  WalletConnect: "W",
+};
 
 const VENUES: Venue[] = [
   {
@@ -793,8 +800,23 @@ function WalletMenu({
   onToggle: () => void;
   onSelect: (wallet: string) => Promise<void>;
 }) {
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        onToggle();
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [open, onToggle]);
+
   return (
-    <div className="relative">
+    <div ref={menuRef} className="relative">
       <button
         type="button"
         onClick={onToggle}
@@ -811,10 +833,15 @@ function WalletMenu({
               key={wallet}
               type="button"
               onClick={() => void onSelect(wallet)}
-              className="flex w-full items-center justify-between px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-200 transition-colors hover:bg-[rgba(212,161,31,0.08)] hover:text-[#f3ead7]"
+              className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-200 transition-colors hover:bg-[rgba(212,161,31,0.08)] hover:text-[#f3ead7]"
             >
-              <span>{wallet}</span>
-              <Wallet className="h-3 w-3 text-zinc-500" />
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[rgba(212,161,31,0.16)] bg-[rgba(212,161,31,0.06)] text-[9px] font-bold text-amber-200">
+                  {WALLET_MARKS[wallet] ?? wallet.slice(0, 1)}
+                </span>
+                <span className="truncate">{wallet}</span>
+              </span>
+              <Wallet className="h-3 w-3 shrink-0 text-zinc-500" />
             </button>
           ))}
         </div>
