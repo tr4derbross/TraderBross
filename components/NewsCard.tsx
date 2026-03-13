@@ -11,6 +11,7 @@ type Props = {
   item: NewsItem;
   isNew?: boolean;
   onSelect: (item: NewsItem) => void;
+  onTickerSelect?: (ticker: string, item: NewsItem) => void;
   selected: boolean;
 };
 
@@ -203,7 +204,7 @@ function WhaleCard({ item, isNew, onSelect, selected }: Props) {
 }
 
 // ─── Social / Tweet Card ──────────────────────────────────────────────────────
-function SocialCard({ item, isNew, onSelect, selected }: Props) {
+function SocialCard({ item, isNew, onSelect, onTickerSelect, selected }: Props) {
   const [expanded, setExpanded] = useState(false);
   const catColor = CATEGORY_COLORS[item.authorCategory || "analyst"] || CATEGORY_COLORS.analyst;
 
@@ -241,9 +242,17 @@ function SocialCard({ item, isNew, onSelect, selected }: Props) {
       {/* Tickers */}
       <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
         {item.ticker.slice(0, 3).map((t) => (
-          <span key={t} className="text-[10px] bg-zinc-800 text-amber-400 border border-zinc-700 px-1.5 py-0.5 rounded">
+          <button
+            key={t}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTickerSelect?.(t, item);
+            }}
+            className="text-[10px] bg-zinc-800 text-amber-400 border border-zinc-700 px-1.5 py-0.5 rounded transition-colors hover:border-amber-400/40 hover:text-amber-200"
+          >
             {t}
-          </span>
+          </button>
         ))}
         <div className="ml-auto">
           {item.sentiment && item.sentiment !== "neutral" && (
@@ -273,7 +282,7 @@ function SocialCard({ item, isNew, onSelect, selected }: Props) {
 }
 
 // ─── Standard News Card ───────────────────────────────────────────────────────
-function NewsCardInner({ item, isNew, onSelect, selected }: Props) {
+function NewsCardInner({ item, isNew, onSelect, onTickerSelect, selected }: Props) {
   const [loadingSentiment, setLoadingSentiment] = useState(false);
   const [sentiment, setSentiment] = useState<{
     score: string; confidence: number; reason: string;
@@ -327,9 +336,17 @@ function NewsCardInner({ item, isNew, onSelect, selected }: Props) {
 
       <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
         {item.ticker.map((t) => (
-          <span key={t} className="text-[10px] bg-zinc-800 text-amber-400 border border-zinc-700 px-1.5 py-0.5 rounded">
+          <button
+            key={t}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTickerSelect?.(t, item);
+            }}
+            className="text-[10px] bg-zinc-800 text-amber-400 border border-zinc-700 px-1.5 py-0.5 rounded transition-colors hover:border-amber-400/40 hover:text-amber-200"
+          >
             {t}
-          </span>
+          </button>
         ))}
         <span className="text-[10px] text-zinc-600 ml-1">{item.sector}</span>
         <div className="ml-auto">
