@@ -18,12 +18,23 @@ import WatchlistPanel from "@/components/WatchlistPanel";
 import BrandMark from "@/components/BrandMark";
 import { useTradingState } from "@/hooks/useTradingState";
 import {
+  connectWalletByLabel,
+  disconnectWalletSession,
+  formatWalletAddress,
+  type ConnectedWalletSession,
+  type SupportedWalletLabel,
+} from "@/lib/wallet-connect";
+import {
   GripVertical,
   Newspaper,
   CandlestickChart,
   PanelsTopLeft,
   Wallet,
   X,
+  Loader2,
+  CheckCircle,
+  AlertTriangle,
+  Unplug,
 } from "lucide-react";
 
 type RightTab = "trade" | "dex" | "alerts" | "connect" | "watch";
@@ -38,6 +49,21 @@ type HeaderPlatformMeta = {
   description: string;
   primaryAction: string;
   secondaryAction?: string;
+  wallets?: SupportedWalletLabel[];
+};
+
+type HeaderConnectionState = {
+  status: "disconnected" | "connecting" | "connected" | "failed";
+  platform: HeaderPlatform;
+  walletLabel?: SupportedWalletLabel;
+  address?: string;
+  error?: string;
+};
+
+type PersistedHeaderConnection = {
+  platform: HeaderPlatform;
+  walletLabel?: SupportedWalletLabel;
+  address?: string;
 };
 
 const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
@@ -49,6 +75,7 @@ const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
     description: "Connect a wallet-based flow for Hyperliquid trading access.",
     primaryAction: "Connect Wallet",
     secondaryAction: "Wallet Menu",
+    wallets: ["MetaMask", "Rabby", "Coinbase Wallet", "Phantom", "Solflare"],
   },
   {
     id: "dydx",
@@ -58,6 +85,7 @@ const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
     description: "Prepare an address or wallet-based connection flow for dYdX v4.",
     primaryAction: "Connect Wallet",
     secondaryAction: "Wallet Menu",
+    wallets: ["MetaMask", "Rabby", "Coinbase Wallet", "Phantom", "Solflare"],
   },
   {
     id: "okx",
@@ -136,11 +164,16 @@ export default function TerminalApp() {
   const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<WorkspaceTab>("chart");
   const [headerPlatform, setHeaderPlatform] = useState<HeaderPlatform>("hyperliquid");
   const [headerConnectOpen, setHeaderConnectOpen] = useState(false);
-  const [headerConnectStatus, setHeaderConnectStatus] = useState<string>("");
+  const [headerConnection, setHeaderConnection] = useState<HeaderConnectionState>({
+    status: "disconnected",
+    platform: "hyperliquid",
+  });
+  const [headerActionMessage, setHeaderActionMessage] = useState("");
   const { checkNewsAgainstAlerts } = useAlerts();
   const headerControlRef = useRef<HTMLDivElement | null>(null);
   const headerPanelRef = useRef<HTMLDivElement | null>(null);
   const [headerAnchorRect, setHeaderAnchorRect] = useState<DOMRect | null>(null);
+  const headerWalletSessionRef = useRef<ConnectedWalletSession | null>(null);
 
   const [newsWidth, setNewsWidth] = useState(370);
   const [rightWidth, setRightWidth] = useState(295);
@@ -159,6 +192,68 @@ export default function TerminalApp() {
     syncViewport();
     window.addEventListener("resize", syncViewport);
     return () => window.removeEventListener("resize", syncViewport);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const savedPlatform = localStorage.getItem("traderbross.header-platform.v1") as HeaderPlatform | null;
+      if (savedPlatform && HEADER_PLATFORMS.some((platform) => platform.id === savedPlatform)) {
+        setHeaderPlatform(savedPlatform);
+        setHeaderConnection((prev) => ({ ...prev, platform: savedPlatform }));
+      }
+
+      const savedConnection = localStorage.getItem("traderbross.header-connection.v1");
+      if (savedConnection) {
+        const parsed = JSON.parse(savedConnection) as PersistedHeaderConnection;
+        if (parsed?.platform && HEADER_PLATFORMS.some((platform) => platform.id === parsed.platform)) {
+          setHeaderConnection({
+            status: "disconnected",
+            platform: parsed.platform,
+            walletLabel: parsed.walletLabel,
+            address: parsed.address,
+          });
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("traderbross.header-platform.v1", headerPlatform);
+    } catch {
+      // ignore storage errors
+    }
+    setHeaderActionMessage("");
+    setHeaderConnection((prev) =>
+      prev.platform === headerPlatform ? prev : { status: "disconnected", platform: headerPlatform }
+    );
+  }, [headerPlatform]);
+
+  useEffect(() => {
+    try {
+      if (headerConnection.status === "connected" && headerConnection.address) {
+        localStorage.setItem(
+          "traderbross.header-connection.v1",
+          JSON.stringify({
+            platform: headerConnection.platform,
+            walletLabel: headerConnection.walletLabel,
+            address: headerConnection.address,
+          } satisfies PersistedHeaderConnection)
+        );
+      } else if (headerConnection.status === "disconnected") {
+        localStorage.removeItem("traderbross.header-connection.v1");
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [headerConnection]);
+
+  useEffect(() => {
+    return () => {
+      headerWalletSessionRef.current = null;
+    };
   }, []);
 
   useEffect(() => {
@@ -249,19 +344,91 @@ export default function TerminalApp() {
   const showBottomPanel = !isMobile || mobileWorkspaceTab !== "tools";
   const selectedHeaderPlatform =
     HEADER_PLATFORMS.find((platform) => platform.id === headerPlatform) ?? HEADER_PLATFORMS[0];
+  const isHeaderWalletPlatform = selectedHeaderPlatform.type === "wallet";
+  const isActiveHeaderConnection =
+    headerConnection.platform === headerPlatform && headerConnection.status === "connected";
 
-  const runHeaderConnectAction = (mode: "primary" | "secondary" = "primary") => {
-    const actionLabel =
-      mode === "secondary"
-        ? selectedHeaderPlatform.secondaryAction ?? selectedHeaderPlatform.primaryAction
-        : selectedHeaderPlatform.primaryAction;
+  const disconnectHeaderWallet = useCallback(async () => {
+    const activeSession = headerWalletSessionRef.current;
+    headerWalletSessionRef.current = null;
+    setHeaderActionMessage("");
 
-    setHeaderConnectStatus(
-      selectedHeaderPlatform.type === "wallet"
-        ? `${selectedHeaderPlatform.label}: ${actionLabel} flow ready`
-        : `${selectedHeaderPlatform.label}: compact API setup ready`
+    setHeaderConnection((prev) => ({
+      status: "disconnected",
+      platform: prev.platform,
+      walletLabel: prev.walletLabel,
+      address: undefined,
+    }));
+
+    if (activeSession) {
+      try {
+        await disconnectWalletSession(activeSession);
+      } catch {
+        // provider disconnect may be best-effort
+      }
+    }
+
+    if (headerConnection.platform === "hyperliquid") {
+      setHlWallet("");
+    }
+  }, [headerConnection.platform]);
+
+  const connectHeaderWallet = useCallback(
+    async (walletLabel: SupportedWalletLabel) => {
+      setHeaderActionMessage("");
+      setHeaderConnection({
+        status: "connecting",
+        platform: headerPlatform,
+        walletLabel,
+      });
+
+      const previousSession = headerWalletSessionRef.current;
+      if (previousSession) {
+        try {
+          await disconnectWalletSession(previousSession);
+        } catch {
+          // best effort before switching
+        }
+      }
+
+      try {
+        const session = await connectWalletByLabel(walletLabel);
+        headerWalletSessionRef.current = session;
+        console.info("[TraderBross Header Wallet]", "connected", headerPlatform, walletLabel, session.address);
+
+        setHeaderConnection({
+          status: "connected",
+          platform: headerPlatform,
+          walletLabel,
+          address: session.address,
+        });
+
+        if (headerPlatform === "hyperliquid") {
+          setHlWallet(session.address);
+        }
+      } catch (error) {
+        headerWalletSessionRef.current = null;
+        console.info("[TraderBross Header Wallet]", "failed", headerPlatform, walletLabel, error);
+        setHeaderConnection({
+          status: "failed",
+          platform: headerPlatform,
+          walletLabel,
+          error: error instanceof Error ? error.message : "Wallet connection failed.",
+        });
+      }
+    },
+    [headerPlatform]
+  );
+
+  const runHeaderCexAction = useCallback(() => {
+    setHeaderActionMessage(
+      `${selectedHeaderPlatform.label} API setup stays inside the header flow for now. Real credential binding can attach here later.`
     );
-  };
+    setHeaderConnection({
+      status: "disconnected",
+      platform: headerPlatform,
+    });
+  }, [headerPlatform, selectedHeaderPlatform.label]);
 
   const renderNewsPanel = () => (
     <div className="panel-shell soft-divider flex h-full min-h-0 flex-col overflow-hidden border xl:rounded-l-xl xl:border-r-0">
@@ -548,7 +715,7 @@ export default function TerminalApp() {
                     type="button"
                     onClick={() => {
                       setHeaderPlatform(platform.id);
-                      setHeaderConnectStatus("");
+                      setHeaderActionMessage("");
                     }}
                     className={`rounded-xl border px-3 py-2 text-left transition-colors ${
                       headerPlatform === platform.id
@@ -563,39 +730,120 @@ export default function TerminalApp() {
               </div>
 
               <div className="mt-3 rounded-2xl border border-[rgba(212,161,31,0.12)] bg-black/20 p-3">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="brand-badge brand-badge-gold rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.14em]">
-                    {selectedHeaderPlatform.type === "wallet" ? "Wallet Flow" : "API Flow"}
+                    {isHeaderWalletPlatform ? "Wallet Flow" : "API Flow"}
                   </span>
                   <span className="text-[11px] font-semibold text-[#f3ead7]">{selectedHeaderPlatform.label}</span>
+                  <span
+                    className={`rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${
+                      headerConnection.platform === headerPlatform && headerConnection.status === "connected"
+                        ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
+                        : headerConnection.platform === headerPlatform && headerConnection.status === "connecting"
+                          ? "border-amber-400/20 bg-amber-500/10 text-amber-100"
+                          : headerConnection.platform === headerPlatform && headerConnection.status === "failed"
+                            ? "border-rose-400/20 bg-rose-500/10 text-rose-200"
+                            : "border-white/10 bg-white/5 text-zinc-400"
+                    }`}
+                  >
+                    {headerConnection.platform === headerPlatform
+                      ? headerConnection.status
+                      : "disconnected"}
+                  </span>
                 </div>
                 <p className="mt-2 text-[11px] leading-5 text-zinc-400">
                   {selectedHeaderPlatform.description}
                 </p>
 
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => runHeaderConnectAction("primary")}
-                    className="brand-chip-active rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em]"
-                  >
-                    {selectedHeaderPlatform.primaryAction}
-                  </button>
-                  {selectedHeaderPlatform.secondaryAction && (
-                    <button
-                      type="button"
-                      onClick={() => runHeaderConnectAction("secondary")}
-                      className="terminal-chip rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-100"
-                    >
-                      {selectedHeaderPlatform.secondaryAction}
-                    </button>
-                  )}
-                </div>
+                {isHeaderWalletPlatform ? (
+                  <>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {selectedHeaderPlatform.wallets?.map((walletLabel) => {
+                        const isConnecting =
+                          headerConnection.platform === headerPlatform &&
+                          headerConnection.status === "connecting" &&
+                          headerConnection.walletLabel === walletLabel;
 
-                {headerConnectStatus && (
-                  <div className="mt-3 rounded-xl border border-[rgba(212,161,31,0.12)] bg-[rgba(212,161,31,0.06)] px-3 py-2 text-[10px] text-amber-100">
-                    {headerConnectStatus}
-                  </div>
+                        return (
+                          <button
+                            key={walletLabel}
+                            type="button"
+                            onClick={() => connectHeaderWallet(walletLabel)}
+                            disabled={headerConnection.status === "connecting"}
+                            className={`rounded-xl border px-3 py-2 text-left transition-colors ${
+                              isActiveHeaderConnection && headerConnection.walletLabel === walletLabel
+                                ? "border-emerald-400/20 bg-emerald-500/10"
+                                : "border-[rgba(255,255,255,0.06)] bg-[#111317] hover:bg-[rgba(212,161,31,0.05)]"
+                            } disabled:cursor-not-allowed disabled:opacity-60`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[11px] font-semibold text-[#f3ead7]">{walletLabel}</span>
+                              {isConnecting ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-200" />
+                              ) : isActiveHeaderConnection && headerConnection.walletLabel === walletLabel ? (
+                                <CheckCircle className="h-3.5 w-3.5 text-emerald-300" />
+                              ) : null}
+                            </div>
+                            <div className="mt-1 text-[9px] uppercase tracking-[0.14em] text-zinc-500">
+                              Direct wallet request
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-3 rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0c0f13] px-3 py-2.5">
+                      {headerConnection.platform === headerPlatform && headerConnection.status === "connected" ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Connected Wallet</div>
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                              <span className="text-[11px] font-semibold text-emerald-100">
+                                {headerConnection.walletLabel}
+                              </span>
+                              <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2 py-1 text-[10px] text-emerald-200">
+                                {formatWalletAddress(headerConnection.address ?? "")}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={disconnectHeaderWallet}
+                            className="terminal-chip inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-100"
+                          >
+                            <Unplug className="h-3.5 w-3.5" />
+                            Disconnect
+                          </button>
+                        </div>
+                      ) : headerConnection.platform === headerPlatform &&
+                        headerConnection.status === "failed" ? (
+                        <div className="flex items-start gap-2 text-[10px] text-rose-200">
+                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>{headerConnection.error ?? "Wallet connection failed."}</span>
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-zinc-400">
+                          Pick a wallet above to trigger a direct connection request inside this header flow.
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={runHeaderCexAction}
+                        className="brand-chip-active rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em]"
+                      >
+                        {selectedHeaderPlatform.primaryAction}
+                      </button>
+                    </div>
+
+                    <div className="mt-3 rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0c0f13] px-3 py-2.5 text-[10px] text-zinc-400">
+                      {headerActionMessage || "Compact API setup stays in-header for now and is ready for real venue binding later."}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
