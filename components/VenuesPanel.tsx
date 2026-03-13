@@ -36,6 +36,7 @@ declare global {
     on?: (event: string, handler: (...args: unknown[]) => void) => void;
     off?: (event: string, handler: (...args: unknown[]) => void) => void;
     removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
+    request?: (args: { method: string; params?: unknown[] | Record<string, unknown> }) => Promise<unknown>;
     connect: () => Promise<{ publicKey?: { toString: () => string } }>;
     disconnect?: () => Promise<void> | void;
   }
@@ -533,7 +534,6 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
               venueId,
               provider: existingSession.providerLabel,
             });
-            continue;
           }
 
           if (
@@ -553,6 +553,27 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
               });
             } catch {
               debugWalletLog("provider_disconnect_not_supported", {
+                source,
+                venueId,
+                provider: existingSession.providerLabel,
+              });
+            }
+          }
+
+          if (
+            existingSession.providerKind === "solana" &&
+            "request" in target &&
+            typeof target.request === "function"
+          ) {
+            try {
+              await target.request({ method: "disconnect" });
+              debugWalletLog("solana_provider_request_disconnect_called", {
+                source,
+                venueId,
+                provider: existingSession.providerLabel,
+              });
+            } catch {
+              debugWalletLog("solana_provider_request_disconnect_not_supported", {
                 source,
                 venueId,
                 provider: existingSession.providerLabel,
