@@ -786,7 +786,7 @@ export default function PriceChart({
       </div>
 
       <div className="flex flex-1 min-h-0 bg-white/5">
-        <div className="relative min-h-[520px] min-w-0 flex-1 bg-[#06080d]">
+        <div className="relative min-h-[320px] min-w-0 flex-1 bg-[#06080d] sm:min-h-[420px] xl:min-h-[520px]">
 
           {displayBar && (
             <div
