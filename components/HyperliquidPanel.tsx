@@ -3,13 +3,12 @@
 import { useState } from "react";
 import { useHyperliquid } from "@/hooks/useHyperliquid";
 import { signHLAction, buildMarketOrder, buildLimitOrder } from "@/lib/hyperliquid-sign";
+import type { EthereumProvider } from "@/lib/wallet-connect";
 import { Wallet, Zap, TrendingUp, TrendingDown, Loader2 } from "lucide-react";
 
 declare global {
   interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-    };
+    ethereum?: EthereumProvider;
   }
 }
 
