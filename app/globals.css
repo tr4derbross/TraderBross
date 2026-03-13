@@ -348,6 +348,28 @@ body::before {
     0 28px 50px rgba(0, 0, 0, 0.32);
 }
 
+.legal-content h2 {
+  margin-bottom: 0.75rem;
+  color: #f5efe1;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.legal-content p {
+  color: var(--text-secondary);
+}
+
+.legal-content ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  color: var(--text-secondary);
+}
+
+.legal-content li + li {
+  margin-top: 0.35rem;
+}
+
 /* Ticker tape scroll animation */
 @keyframes ticker {
   0% { transform: translateX(0); }
