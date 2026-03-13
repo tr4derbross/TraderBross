@@ -255,9 +255,10 @@ async function connectSolanaWallet(wallet: string) {
 
 export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
   const [connections, setConnections] = useState<ConnectionMap>(EMPTY_CONNECTIONS);
-  const [prices, setPrices] = useState<Record<string, PriceMap>>({});
+  const [prices, setPrices] = useState<Record<string, PriceMap>>({}); 
   const [loadingPrices, setLoadingPrices] = useState(true);
   const [activeVenueId, setActiveVenueId] = useState<VenueId | null>(null);
+  const [selectedDexId, setSelectedDexId] = useState<VenueId>("hyperliquid");
   const [form, setForm] = useState<VenueConnection>({ status: "not_configured" });
 
   useEffect(() => {
@@ -324,6 +325,12 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
   const activeVenue = useMemo(
     () => VENUES.find((venue) => venue.id === activeVenueId) ?? null,
     [activeVenueId]
+  );
+  const dexVenues = useMemo(() => VENUES.filter((venue) => venue.type === "DEX"), []);
+  const cexVenues = useMemo(() => VENUES.filter((venue) => venue.type === "CEX"), []);
+  const selectedDexVenue = useMemo(
+    () => dexVenues.find((venue) => venue.id === selectedDexId) ?? dexVenues[0],
+    [dexVenues, selectedDexId]
   );
 
   const openDrawer = (venue: Venue) => {
@@ -512,7 +519,7 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
           <div className="bg-[rgba(212,161,31,0.04)] px-3 py-1 text-[9px] uppercase tracking-[0.18em] text-zinc-500">
             Centralized (CEX)
           </div>
-          {VENUES.filter((venue) => venue.type === "CEX").map((venue) => (
+          {cexVenues.map((venue) => (
             <VenueCard
               key={venue.id}
               venue={venue}
@@ -521,17 +528,13 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
             />
           ))}
 
-          <div className="mt-2 bg-[rgba(212,161,31,0.04)] px-3 py-1 text-[9px] uppercase tracking-[0.18em] text-zinc-500">
-            Decentralized (DEX)
-          </div>
-          {VENUES.filter((venue) => venue.type === "DEX").map((venue) => (
-            <VenueCard
-              key={venue.id}
-              venue={venue}
-              connection={connections[venue.id]}
-              onOpen={() => openDrawer(venue)}
-            />
-          ))}
+          <DexWorkspace
+            venues={dexVenues}
+            selectedVenue={selectedDexVenue}
+            connection={connections[selectedDexVenue.id]}
+            onSelectVenue={(venueId) => setSelectedDexId(venueId)}
+            onOpenConnection={() => openDrawer(selectedDexVenue)}
+          />
         </div>
 
         <div className="mt-2 border-t border-[rgba(212,161,31,0.08)]">
@@ -609,6 +612,89 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
         />
       )}
     </>
+  );
+}
+
+function DexWorkspace({
+  venues,
+  selectedVenue,
+  connection,
+  onSelectVenue,
+  onOpenConnection,
+}: {
+  venues: Venue[];
+  selectedVenue: Venue;
+  connection: VenueConnection;
+  onSelectVenue: (venueId: VenueId) => void;
+  onOpenConnection: () => void;
+}) {
+  const statusMeta = getStatusMeta(connection.status);
+  const note = getVenueNote(selectedVenue, connection);
+  const connectedValue = selectedVenue.id === "hyperliquid" ? connection.walletAddress : connection.address;
+
+  return (
+    <div className="mt-2 border-t border-[rgba(212,161,31,0.06)]">
+      <div className="flex items-center justify-between bg-[rgba(212,161,31,0.04)] px-3 py-2">
+        <span className="text-[9px] uppercase tracking-[0.18em] text-zinc-500">Decentralized (DEX)</span>
+        <button
+          type="button"
+          onClick={onOpenConnection}
+          className="brand-chip-active rounded-lg px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em]"
+        >
+          Cuzdan Bagla
+        </button>
+      </div>
+
+      <div className="flex gap-1.5 px-3 py-2">
+        {venues.map((venue) => {
+          const active = venue.id === selectedVenue.id;
+          return (
+            <button
+              key={venue.id}
+              type="button"
+              onClick={() => onSelectVenue(venue.id)}
+              className={`rounded-lg border px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                active
+                  ? "border-[rgba(212,161,31,0.22)] bg-[rgba(212,161,31,0.12)] text-amber-200"
+                  : "border-[rgba(255,255,255,0.06)] bg-[#111317] text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              {venue.name}
+            </button>
+          );
+        })}
+      </div>
+
+      <button
+        type="button"
+        onClick={onOpenConnection}
+        className="mx-3 mb-2 flex w-[calc(100%-1.5rem)] items-start gap-2 rounded-2xl border border-[rgba(212,161,31,0.08)] bg-[rgba(255,255,255,0.01)] px-3 py-3 text-left transition-colors hover:bg-[rgba(212,161,31,0.03)]"
+      >
+        <div
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[rgba(212,161,31,0.12)] bg-[#111317] text-[12px] font-bold ${selectedVenue.color}`}
+        >
+          {selectedVenue.logo}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold text-[#f3ead7]">{selectedVenue.name}</span>
+            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8px] ${statusMeta.badge}`}>
+              {statusMeta.icon}
+              {statusMeta.label}
+            </span>
+          </div>
+          <p className="mt-1 text-[10px] leading-5 text-zinc-500">{note}</p>
+          <div className="mt-2 flex items-center gap-2 text-[9px] text-zinc-400">
+            <Wallet className="h-3 w-3" />
+            <span>{maskValue(connectedValue)}</span>
+            <span className="ml-auto inline-flex items-center gap-1 text-zinc-600">
+              Baglantiyi Yonet <ChevronRight className="h-3.5 w-3.5" />
+            </span>
+          </div>
+        </div>
+      </button>
+    </div>
   );
 }
 
