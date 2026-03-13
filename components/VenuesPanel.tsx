@@ -36,6 +36,7 @@ declare global {
     phantom?: {
       solana?: SolanaProvider;
     };
+    solana?: SolanaProvider;
     solflare?: SolanaProvider;
   }
 }
@@ -234,9 +235,9 @@ async function connectEvmWallet(wallet: string) {
 async function connectSolanaWallet(wallet: string) {
   const provider =
     wallet === "Phantom"
-      ? window.phantom?.solana
+      ? window.phantom?.solana ?? (window.solana?.isPhantom ? window.solana : undefined)
       : wallet === "Solflare"
-        ? window.solflare
+        ? window.solflare ?? (window.solana?.isSolflare ? window.solana : undefined)
         : null;
 
   if (!provider) {
