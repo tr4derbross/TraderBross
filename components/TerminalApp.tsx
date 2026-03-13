@@ -53,7 +53,13 @@ type HeaderPlatformMeta = {
 };
 
 type HeaderConnectionState = {
-  status: "disconnected" | "connecting" | "connected" | "failed";
+  status:
+    | "not_configured"
+    | "saved_locally"
+    | "testing"
+    | "connected"
+    | "failed"
+    | "disconnected";
   platform: HeaderPlatform;
   walletLabel?: SupportedWalletLabel;
   address?: string;
@@ -65,6 +71,15 @@ type PersistedHeaderConnection = {
   walletLabel?: SupportedWalletLabel;
   address?: string;
 };
+
+type HeaderCexCredentials = {
+  apiKey: string;
+  apiSecret: string;
+  passphrase: string;
+};
+
+type HeaderCexCredentialMap = Record<Extract<HeaderPlatform, "okx" | "bybit" | "binance">, HeaderCexCredentials>;
+type HeaderCexPlatform = keyof HeaderCexCredentialMap;
 
 const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
   {
@@ -112,6 +127,47 @@ const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
     primaryAction: "Start API Setup",
   },
 ];
+
+const EMPTY_HEADER_CEX_CREDENTIALS: HeaderCexCredentialMap = {
+  okx: { apiKey: "", apiSecret: "", passphrase: "" },
+  bybit: { apiKey: "", apiSecret: "", passphrase: "" },
+  binance: { apiKey: "", apiSecret: "", passphrase: "" },
+};
+
+function maskCredentialPreview(value: string) {
+  if (!value) return "Not saved";
+  if (value.length <= 8) return "••••••••";
+  return `${value.slice(0, 4)}••••${value.slice(-4)}`;
+}
+
+function hasSavedHeaderCredentials(
+  platform: HeaderCexPlatform,
+  credentials: HeaderCexCredentialMap
+) {
+  const current = credentials[platform];
+  return Boolean(
+    current.apiKey.trim() &&
+      current.apiSecret.trim() &&
+      (platform !== "okx" || current.passphrase.trim())
+  );
+}
+
+function getHeaderStatusLabel(status: HeaderConnectionState["status"]) {
+  switch (status) {
+    case "not_configured":
+      return "Not configured";
+    case "saved_locally":
+      return "Saved locally";
+    case "testing":
+      return "Testing";
+    case "connected":
+      return "Connected";
+    case "failed":
+      return "Failed";
+    default:
+      return "Disconnected";
+  }
+}
 
 function ResizeDivider({ onDrag }: { onDrag: (dx: number) => void }) {
   const dragging = useRef(false);
@@ -169,6 +225,9 @@ export default function TerminalApp() {
     platform: "hyperliquid",
   });
   const [headerActionMessage, setHeaderActionMessage] = useState("");
+  const [headerCexCredentials, setHeaderCexCredentials] = useState<HeaderCexCredentialMap>(
+    EMPTY_HEADER_CEX_CREDENTIALS
+  );
   const { checkNewsAgainstAlerts } = useAlerts();
   const headerControlRef = useRef<HTMLDivElement | null>(null);
   const headerPanelRef = useRef<HTMLDivElement | null>(null);
@@ -214,6 +273,25 @@ export default function TerminalApp() {
           });
         }
       }
+
+      const savedCexCredentials = localStorage.getItem("traderbross.header-cex-credentials.v1");
+      if (savedCexCredentials) {
+        const parsed = JSON.parse(savedCexCredentials) as Partial<HeaderCexCredentialMap>;
+        setHeaderCexCredentials({
+          okx: {
+            ...EMPTY_HEADER_CEX_CREDENTIALS.okx,
+            ...parsed.okx,
+          },
+          bybit: {
+            ...EMPTY_HEADER_CEX_CREDENTIALS.bybit,
+            ...parsed.bybit,
+          },
+          binance: {
+            ...EMPTY_HEADER_CEX_CREDENTIALS.binance,
+            ...parsed.binance,
+          },
+        });
+      }
     } catch {
       // ignore storage errors
     }
@@ -226,10 +304,23 @@ export default function TerminalApp() {
       // ignore storage errors
     }
     setHeaderActionMessage("");
-    setHeaderConnection((prev) =>
-      prev.platform === headerPlatform ? prev : { status: "disconnected", platform: headerPlatform }
-    );
-  }, [headerPlatform]);
+    setHeaderConnection((prev) => {
+      if (prev.platform === headerPlatform) return prev;
+
+      const nextPlatform = HEADER_PLATFORMS.find((platform) => platform.id === headerPlatform);
+      if (nextPlatform?.type === "cex") {
+        const cexPlatform = nextPlatform.id as HeaderCexPlatform;
+        return {
+          status: hasSavedHeaderCredentials(cexPlatform, headerCexCredentials)
+            ? "saved_locally"
+            : "not_configured",
+          platform: headerPlatform,
+        };
+      }
+
+      return { status: "disconnected", platform: headerPlatform };
+    });
+  }, [headerCexCredentials, headerPlatform]);
 
   useEffect(() => {
     try {
@@ -249,6 +340,17 @@ export default function TerminalApp() {
       // ignore storage errors
     }
   }, [headerConnection]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "traderbross.header-cex-credentials.v1",
+        JSON.stringify(headerCexCredentials)
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, [headerCexCredentials]);
 
   useEffect(() => {
     return () => {
@@ -347,6 +449,11 @@ export default function TerminalApp() {
   const isHeaderWalletPlatform = selectedHeaderPlatform.type === "wallet";
   const isActiveHeaderConnection =
     headerConnection.platform === headerPlatform && headerConnection.status === "connected";
+  const selectedHeaderCexPlatform = !isHeaderWalletPlatform
+    ? (selectedHeaderPlatform.id as HeaderCexPlatform)
+    : null;
+  const selectedHeaderCredentials =
+    selectedHeaderCexPlatform ? headerCexCredentials[selectedHeaderCexPlatform] : null;
 
   const disconnectHeaderWallet = useCallback(async () => {
     const activeSession = headerWalletSessionRef.current;
@@ -377,7 +484,7 @@ export default function TerminalApp() {
     async (walletLabel: SupportedWalletLabel) => {
       setHeaderActionMessage("");
       setHeaderConnection({
-        status: "connecting",
+        status: "testing",
         platform: headerPlatform,
         walletLabel,
       });
@@ -421,14 +528,116 @@ export default function TerminalApp() {
   );
 
   const runHeaderCexAction = useCallback(() => {
+    if (selectedHeaderPlatform.type !== "cex") return;
+
+    const creds = headerCexCredentials[selectedHeaderPlatform.id as HeaderCexPlatform];
+    const hasRequired = hasSavedHeaderCredentials(
+      selectedHeaderPlatform.id as HeaderCexPlatform,
+      headerCexCredentials
+    );
+
     setHeaderActionMessage(
-      `${selectedHeaderPlatform.label} API setup stays inside the header flow for now. Real credential binding can attach here later.`
+      hasRequired
+        ? `${selectedHeaderPlatform.label} credentials saved locally for MVP setup.`
+        : selectedHeaderPlatform.id === "okx"
+          ? "Add API key, secret, and passphrase to save OKX credentials."
+          : "Add API key and secret to save these credentials locally."
     );
     setHeaderConnection({
-      status: "disconnected",
+      status: hasRequired ? "saved_locally" : "failed",
+      platform: headerPlatform,
+      error: hasRequired ? undefined : "Missing required API credentials.",
+    });
+  }, [headerCexCredentials, headerPlatform, selectedHeaderPlatform]);
+
+  const removeHeaderCexCredentials = useCallback(() => {
+    if (selectedHeaderPlatform.type !== "cex") return;
+
+    setHeaderCexCredentials((prev) => ({
+      ...prev,
+      [selectedHeaderPlatform.id]: { apiKey: "", apiSecret: "", passphrase: "" },
+    }));
+    setHeaderActionMessage(`${selectedHeaderPlatform.label} credentials removed from this device.`);
+    setHeaderConnection({
+      status: "not_configured",
       platform: headerPlatform,
     });
-  }, [headerPlatform, selectedHeaderPlatform.label]);
+  }, [headerPlatform, selectedHeaderPlatform]);
+
+  const testHeaderCexConnection = useCallback(async () => {
+    if (!selectedHeaderCexPlatform || !selectedHeaderCredentials) return;
+
+    const hasRequired = hasSavedHeaderCredentials(selectedHeaderCexPlatform, headerCexCredentials);
+    if (!hasRequired) {
+      setHeaderConnection({
+        status: "failed",
+        platform: headerPlatform,
+        error: "Missing required API credentials.",
+      });
+      setHeaderActionMessage(
+        selectedHeaderCexPlatform === "okx"
+          ? "OKX needs API key, API secret, and passphrase before testing."
+          : "API key and secret are required before testing."
+      );
+      return;
+    }
+
+    setHeaderActionMessage("");
+    setHeaderConnection({
+      status: "testing",
+      platform: headerPlatform,
+    });
+
+    try {
+      const response = await fetch("/api/venues/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          venueId: selectedHeaderCexPlatform,
+          apiKey: selectedHeaderCredentials.apiKey.trim(),
+          apiSecret: selectedHeaderCredentials.apiSecret.trim(),
+          passphrase: selectedHeaderCredentials.passphrase.trim(),
+        }),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        message?: string;
+        detail?: string;
+      };
+
+      if (result.ok) {
+        setHeaderConnection({
+          status: "connected",
+          platform: headerPlatform,
+        });
+        setHeaderActionMessage(
+          result.detail || result.message || `${selectedHeaderPlatform.label} credentials verified.`
+        );
+        return;
+      }
+
+      setHeaderConnection({
+        status: "failed",
+        platform: headerPlatform,
+        error: result.message || "Credential validation failed.",
+      });
+      setHeaderActionMessage(result.message || "Credential validation failed.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Credential validation failed.";
+      setHeaderConnection({
+        status: "failed",
+        platform: headerPlatform,
+        error: message,
+      });
+      setHeaderActionMessage(message);
+    }
+  }, [
+    headerCexCredentials,
+    headerPlatform,
+    selectedHeaderCredentials,
+    selectedHeaderCexPlatform,
+    selectedHeaderPlatform.label,
+  ]);
 
   const renderNewsPanel = () => (
     <div className="panel-shell soft-divider flex h-full min-h-0 flex-col overflow-hidden border xl:rounded-l-xl xl:border-r-0">
@@ -739,16 +948,21 @@ export default function TerminalApp() {
                     className={`rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${
                       headerConnection.platform === headerPlatform && headerConnection.status === "connected"
                         ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
-                        : headerConnection.platform === headerPlatform && headerConnection.status === "connecting"
+                        : headerConnection.platform === headerPlatform && headerConnection.status === "testing"
                           ? "border-amber-400/20 bg-amber-500/10 text-amber-100"
-                          : headerConnection.platform === headerPlatform && headerConnection.status === "failed"
-                            ? "border-rose-400/20 bg-rose-500/10 text-rose-200"
-                            : "border-white/10 bg-white/5 text-zinc-400"
+                          : headerConnection.platform === headerPlatform && headerConnection.status === "saved_locally"
+                            ? "border-[rgba(212,161,31,0.2)] bg-[rgba(212,161,31,0.1)] text-amber-100"
+                            : headerConnection.platform === headerPlatform && headerConnection.status === "failed"
+                              ? "border-rose-400/20 bg-rose-500/10 text-rose-200"
+                              : headerConnection.platform === headerPlatform &&
+                                  headerConnection.status === "not_configured"
+                                ? "border-white/10 bg-white/5 text-zinc-500"
+                                : "border-white/10 bg-white/5 text-zinc-400"
                     }`}
                   >
                     {headerConnection.platform === headerPlatform
-                      ? headerConnection.status
-                      : "disconnected"}
+                      ? getHeaderStatusLabel(headerConnection.status)
+                      : "Disconnected"}
                   </span>
                 </div>
                 <p className="mt-2 text-[11px] leading-5 text-zinc-400">
@@ -761,7 +975,7 @@ export default function TerminalApp() {
                       {selectedHeaderPlatform.wallets?.map((walletLabel) => {
                         const isConnecting =
                           headerConnection.platform === headerPlatform &&
-                          headerConnection.status === "connecting" &&
+                          headerConnection.status === "testing" &&
                           headerConnection.walletLabel === walletLabel;
 
                         return (
@@ -769,7 +983,7 @@ export default function TerminalApp() {
                             key={walletLabel}
                             type="button"
                             onClick={() => connectHeaderWallet(walletLabel)}
-                            disabled={headerConnection.status === "connecting"}
+                            disabled={headerConnection.status === "testing"}
                             className={`rounded-xl border px-3 py-2 text-left transition-colors ${
                               isActiveHeaderConnection && headerConnection.walletLabel === walletLabel
                                 ? "border-emerald-400/20 bg-emerald-500/10"
@@ -830,18 +1044,119 @@ export default function TerminalApp() {
                   </>
                 ) : (
                   <>
+                    <div className="mt-3 space-y-2.5">
+                      <label className="block">
+                        <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-500">
+                          API Key
+                        </span>
+                        <input
+                          type="text"
+                          value={selectedHeaderCredentials?.apiKey ?? ""}
+                          onChange={(event) =>
+                            setHeaderCexCredentials((prev) => ({
+                              ...prev,
+                              [selectedHeaderCexPlatform as HeaderCexPlatform]: {
+                                ...prev[selectedHeaderCexPlatform as HeaderCexPlatform],
+                                apiKey: event.target.value,
+                              },
+                            }))
+                          }
+                          placeholder={`${selectedHeaderPlatform.label} API key`}
+                          className="terminal-input w-full rounded-xl px-3 py-2 text-[11px] text-[var(--text-primary)] outline-none placeholder:text-zinc-600"
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-500">
+                          API Secret
+                        </span>
+                        <input
+                          type="password"
+                          value={selectedHeaderCredentials?.apiSecret ?? ""}
+                          onChange={(event) =>
+                            setHeaderCexCredentials((prev) => ({
+                              ...prev,
+                              [selectedHeaderCexPlatform as HeaderCexPlatform]: {
+                                ...prev[selectedHeaderCexPlatform as HeaderCexPlatform],
+                                apiSecret: event.target.value,
+                              },
+                            }))
+                          }
+                          placeholder={`${selectedHeaderPlatform.label} API secret`}
+                          className="terminal-input w-full rounded-xl px-3 py-2 text-[11px] text-[var(--text-primary)] outline-none placeholder:text-zinc-600"
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-500">
+                          Passphrase {selectedHeaderPlatform.id === "okx" ? "" : "(Optional)"}
+                        </span>
+                        <input
+                          type="password"
+                          value={selectedHeaderCredentials?.passphrase ?? ""}
+                          onChange={(event) =>
+                            setHeaderCexCredentials((prev) => ({
+                              ...prev,
+                              [selectedHeaderCexPlatform as HeaderCexPlatform]: {
+                                ...prev[selectedHeaderCexPlatform as HeaderCexPlatform],
+                                passphrase: event.target.value,
+                              },
+                            }))
+                          }
+                          placeholder={
+                            selectedHeaderPlatform.id === "okx"
+                              ? "Required for OKX"
+                              : "Optional passphrase"
+                          }
+                          className="terminal-input w-full rounded-xl px-3 py-2 text-[11px] text-[var(--text-primary)] outline-none placeholder:text-zinc-600"
+                        />
+                      </label>
+                    </div>
+
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
                         type="button"
                         onClick={runHeaderCexAction}
                         className="brand-chip-active rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em]"
                       >
-                        {selectedHeaderPlatform.primaryAction}
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={testHeaderCexConnection}
+                        className="terminal-chip rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-100"
+                      >
+                        Test Connection
+                      </button>
+                      <button
+                        type="button"
+                        onClick={removeHeaderCexCredentials}
+                        className="terminal-chip rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-100"
+                      >
+                        Remove
                       </button>
                     </div>
 
                     <div className="mt-3 rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0c0f13] px-3 py-2.5 text-[10px] text-zinc-400">
-                      {headerActionMessage || "Compact API setup stays in-header for now and is ready for real venue binding later."}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-zinc-500">Saved Key</span>
+                        <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-1 text-[9px] text-[#f3ead7]">
+                          {maskCredentialPreview(selectedHeaderCredentials?.apiKey ?? "")}
+                        </span>
+                        <span className="text-zinc-500">Secret</span>
+                        <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-1 text-[9px] text-[#f3ead7]">
+                          {maskCredentialPreview(selectedHeaderCredentials?.apiSecret ?? "")}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-[10px] text-zinc-400">
+                        {headerActionMessage ||
+                          "Credentials stay inside this header flow and are stored locally for MVP setup only."}
+                      </div>
+                      {headerConnection.platform === headerPlatform && headerConnection.status === "failed" && (
+                        <div className="mt-2 text-[10px] text-rose-200">
+                          {headerConnection.error || "Credential validation failed."}
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
