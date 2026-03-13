@@ -132,7 +132,11 @@ export default function TerminalApp() {
       if (match) {
         setChartTicker(match);
         setRightTab("trade");
-        setMobileWorkspaceTab("chart");
+        if (showDesktopLayout) {
+          setMobileWorkspaceTab("chart");
+        } else {
+          setMobileWorkspaceTab("tools");
+        }
       }
     }
   };
@@ -158,6 +162,7 @@ export default function TerminalApp() {
   const isMobile = viewportWidth < 768;
   const isTablet = viewportWidth >= 768 && viewportWidth < 1280;
   const showDesktopLayout = viewportWidth >= 1280;
+  const showBottomPanel = !isMobile || mobileWorkspaceTab !== "tools";
 
   const renderNewsPanel = () => (
     <div className="panel-shell soft-divider flex h-full min-h-0 flex-col overflow-hidden border xl:rounded-l-xl xl:border-r-0">
@@ -373,17 +378,19 @@ export default function TerminalApp() {
             </div>
           )}
 
-          <div className={isMobile ? "" : "pt-2"}>
-            <BottomPanel
-              positions={positions}
-              orders={orders}
-              balance={balance}
-              equityHistory={equityHistory}
-              onClosePosition={closePosition}
-              onCancelOrder={cancelOrder}
-              onUpdatePositionTpSl={updatePositionTpSl}
-            />
-          </div>
+          {showBottomPanel && (
+            <div className={isMobile ? "" : "pt-2"}>
+              <BottomPanel
+                positions={positions}
+                orders={orders}
+                balance={balance}
+                equityHistory={equityHistory}
+                onClosePosition={closePosition}
+                onCancelOrder={cancelOrder}
+                onUpdatePositionTpSl={updatePositionTpSl}
+              />
+            </div>
+          )}
         </div>
       </div>
 
