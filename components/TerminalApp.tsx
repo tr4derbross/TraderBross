@@ -344,7 +344,7 @@ export default function TerminalApp() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-black">
-      <div className="panel-header brand-aura soft-divider status-glow relative flex shrink-0 items-center justify-center border-b px-3 py-3 sm:px-4 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
+      <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-3 py-3 sm:px-4 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
         <div className="relative z-10 flex items-center justify-center px-2">
           <BrandMark className="mx-auto" />
         </div>
