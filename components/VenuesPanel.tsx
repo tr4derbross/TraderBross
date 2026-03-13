@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { EthereumProvider, SolanaProvider } from "@/lib/wallet-connect";
 import {
   CheckCircle,
   Circle,
@@ -18,29 +19,6 @@ import {
 } from "lucide-react";
 
 declare global {
-  interface EthereumProvider {
-    isMetaMask?: boolean;
-    isRabby?: boolean;
-    isCoinbaseWallet?: boolean;
-    providers?: EthereumProvider[];
-    on?: (event: string, handler: (...args: unknown[]) => void) => void;
-    off?: (event: string, handler: (...args: unknown[]) => void) => void;
-    removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
-    disconnect?: () => Promise<void> | void;
-    request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-  }
-
-  interface SolanaProvider {
-    isPhantom?: boolean;
-    isSolflare?: boolean;
-    on?: (event: string, handler: (...args: unknown[]) => void) => void;
-    off?: (event: string, handler: (...args: unknown[]) => void) => void;
-    removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
-    request?: (args: { method: string; params?: unknown[] | Record<string, unknown> }) => Promise<unknown>;
-    connect: () => Promise<{ publicKey?: { toString: () => string } }>;
-    disconnect?: () => Promise<void> | void;
-  }
-
   interface Window {
     rabby?: EthereumProvider;
     coinbaseWalletExtension?: EthereumProvider;
@@ -65,6 +43,7 @@ type VenueConnection = {
   walletProvider?: string;
   address?: string;
   errorMessage?: string;
+  statusMessage?: string;
   updatedAt?: number;
 };
 
@@ -387,6 +366,7 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
             ...normalized[venueId],
             status: "saved_locally",
             errorMessage: undefined,
+            statusMessage: normalized[venueId].statusMessage,
           };
         }
       });
@@ -492,12 +472,14 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
             walletAddress: address,
             walletProvider: providerLabel,
             status,
+            statusMessage: "Wallet connected and ready for local MVP usage.",
             updatedAt: Date.now(),
           }
         : {
             address,
             walletProvider: providerLabel,
             status,
+            statusMessage: "Wallet connected and ready for local MVP usage.",
             updatedAt: Date.now(),
           };
 
@@ -705,7 +687,11 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
     if (!activeVenue) return;
 
     if (activeVenue.type === "CEX") {
-      const hasRequired = Boolean(form.apiKey?.trim() && form.apiSecret?.trim());
+      const hasRequired = Boolean(
+        form.apiKey?.trim() &&
+          form.apiSecret?.trim() &&
+          (activeVenue.id !== "okx" || form.passphrase?.trim())
+      );
       updateConnection(activeVenue.id, {
         ...connections[activeVenue.id],
         apiKey: form.apiKey?.trim(),
@@ -713,6 +699,11 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
         passphrase: form.passphrase?.trim(),
         status: hasRequired ? "saved_locally" : "not_configured",
         errorMessage: undefined,
+        statusMessage: hasRequired
+          ? "Credentials saved locally on this device."
+          : activeVenue.id === "okx"
+            ? "OKX requires API key, secret, and passphrase."
+            : undefined,
         updatedAt: Date.now(),
       });
       return;
@@ -726,6 +717,7 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
         walletAddress,
         status: walletAddress ? "saved_locally" : "not_configured",
         errorMessage: undefined,
+        statusMessage: walletAddress ? "Wallet saved locally for MVP use." : undefined,
         updatedAt: Date.now(),
       });
       onHlWalletChange(walletAddress ?? "");
@@ -739,6 +731,7 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
       address,
       status: address ? "saved_locally" : "not_configured",
       errorMessage: undefined,
+      statusMessage: address ? "Address saved locally for MVP use." : undefined,
       updatedAt: Date.now(),
     });
   };
@@ -751,26 +744,66 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
       ...form,
       status: "testing",
       errorMessage: undefined,
+      statusMessage:
+        activeVenue.type === "CEX"
+          ? `Validating ${activeVenue.name} credentials...`
+          : "Checking local wallet or address state...",
     }));
-
-    await new Promise((resolve) => setTimeout(resolve, 900));
 
     const next = { ...form };
     let success = false;
     let errorMessage = "";
+    let statusMessage = "";
     let finalStatus: VenueStatus = "error";
 
     if (activeVenue.type === "CEX") {
-      success = Boolean(next.apiKey?.trim() && next.apiSecret?.trim() && next.apiKey!.length >= 8);
-      if (!success) errorMessage = "Missing or invalid API credentials.";
-      finalStatus = success ? "connected" : "error";
+      if (!next.apiKey?.trim() || !next.apiSecret?.trim()) {
+        success = false;
+        errorMessage = "Missing API key or secret.";
+        finalStatus = "error";
+      } else if (activeVenue.id === "okx" && !next.passphrase?.trim()) {
+        success = false;
+        errorMessage = "OKX passphrase is required.";
+        finalStatus = "error";
+      } else {
+        try {
+          const response = await fetch("/api/venues/validate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              venueId: activeVenue.id,
+              apiKey: next.apiKey?.trim(),
+              apiSecret: next.apiSecret?.trim(),
+              passphrase: next.passphrase?.trim(),
+            }),
+          });
+          const result = (await response.json().catch(() => ({}))) as {
+            ok?: boolean;
+            message?: string;
+            detail?: string;
+          };
+
+          success = Boolean(result.ok);
+          errorMessage = success ? "" : result.message || "Credential validation failed.";
+          statusMessage = success
+            ? result.detail || result.message || `${activeVenue.name} connection verified.`
+            : "";
+          finalStatus = success ? "connected" : "error";
+        } catch (error) {
+          success = false;
+          errorMessage = error instanceof Error ? error.message : "Credential validation failed.";
+          finalStatus = "error";
+        }
+      }
     } else if (activeVenue.id === "hyperliquid") {
       success = isEvmLikeAddress(next.walletAddress?.trim()) || isSolanaLikeAddress(next.walletAddress?.trim());
       if (!success) errorMessage = "Use a valid wallet address like 0x... or a supported base58 wallet.";
+      statusMessage = success ? "Wallet is ready for local MVP usage." : "";
       finalStatus = walletSessionsRef.current.hyperliquid ? "connected" : success ? "saved_locally" : "error";
     } else {
       success = isDydxLikeAddress(next.address?.trim());
       if (!success) errorMessage = "Use a valid dYdX or wallet-style address placeholder.";
+      statusMessage = success ? "Address is ready for local MVP usage." : "";
       finalStatus = walletSessionsRef.current.dydx ? "connected" : success ? "saved_locally" : "error";
     }
 
@@ -779,6 +812,7 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
       ...next,
       status: finalStatus,
       errorMessage: success ? undefined : errorMessage,
+      statusMessage: success ? statusMessage : undefined,
       updatedAt: Date.now(),
     };
 
@@ -1291,6 +1325,12 @@ function ConnectionDrawer({
           </div>
         )}
 
+        {!form.errorMessage && form.statusMessage && (
+          <div className="mt-4 rounded-xl border border-[rgba(212,161,31,0.12)] bg-[rgba(212,161,31,0.06)] px-3 py-2 text-[11px] text-amber-100">
+            {form.statusMessage}
+          </div>
+        )}
+
         <div className="mt-5 flex flex-wrap gap-2">
           {!walletConnected && (
             <button
@@ -1411,6 +1451,7 @@ function Field({
 function getVenueNote(venue: Venue, connection: VenueConnection) {
   switch (connection.status) {
     case "connected":
+      if (connection.statusMessage) return connection.statusMessage;
       if (venue.type === "CEX") return "Credentials tested and restored locally.";
       if (venue.id === "hyperliquid") {
         return connection.walletAddress
@@ -1421,6 +1462,7 @@ function getVenueNote(venue: Venue, connection: VenueConnection) {
         ? `${connection.walletProvider ?? "Wallet"} • ${connection.address.slice(0, 12)}... connected`
         : "Address connected.";
     case "saved_locally":
+      if (connection.statusMessage) return connection.statusMessage;
       if (venue.type === "CEX") return "Credentials saved in browser storage.";
       if (venue.id === "hyperliquid") {
         return connection.walletAddress
@@ -1431,7 +1473,7 @@ function getVenueNote(venue: Venue, connection: VenueConnection) {
         ? `${connection.walletProvider ?? "Wallet"} • ${connection.address.slice(0, 12)}... saved locally`
         : "Address saved locally.";
     case "testing":
-      return "Testing local connection placeholder...";
+      return connection.statusMessage || "Testing connection...";
     case "error":
       return connection.errorMessage || "Connection test failed.";
     default:
