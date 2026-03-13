@@ -179,6 +179,18 @@ function getStatusMeta(status: VenueStatus) {
   }
 }
 
+function isEvmLikeAddress(value?: string) {
+  return Boolean(value && /^0x[a-zA-Z0-9]{8,}$/.test(value));
+}
+
+function isSolanaLikeAddress(value?: string) {
+  return Boolean(value && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value));
+}
+
+function isDydxLikeAddress(value?: string) {
+  return Boolean(value && (value.startsWith("dydx") || isEvmLikeAddress(value) || isSolanaLikeAddress(value)));
+}
+
 function getInjectedEthereumProvider(wallet: string) {
   const root = window.ethereum as EthereumProvider | undefined;
   if (!root) return null;
@@ -391,11 +403,11 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
       success = Boolean(next.apiKey?.trim() && next.apiSecret?.trim() && next.apiKey!.length >= 8);
       if (!success) errorMessage = "Missing or invalid API credentials.";
     } else if (activeVenue.id === "hyperliquid") {
-      success = Boolean(next.walletAddress?.trim() && next.walletAddress!.startsWith("0x") && next.walletAddress!.length >= 10);
-      if (!success) errorMessage = "Use a wallet-style address like 0x....";
+      success = isEvmLikeAddress(next.walletAddress?.trim()) || isSolanaLikeAddress(next.walletAddress?.trim());
+      if (!success) errorMessage = "Use a valid wallet address like 0x... or a supported base58 wallet.";
     } else {
-      success = Boolean(next.address?.trim() && (next.address!.startsWith("dydx") || next.address!.startsWith("0x")));
-      if (!success) errorMessage = "Use a valid dYdX address placeholder.";
+      success = isDydxLikeAddress(next.address?.trim());
+      if (!success) errorMessage = "Use a valid dYdX or wallet-style address placeholder.";
     }
 
     const finalStatus: VenueStatus = success ? "connected" : "error";
@@ -687,6 +699,7 @@ function ConnectionDrawer({
 }) {
   const statusMeta = getStatusMeta(form.status);
   const [walletMenuOpen, setWalletMenuOpen] = useState(false);
+  const walletConnected = venue.type === "DEX" && Boolean(form.walletProvider);
 
   useEffect(() => {
     setWalletMenuOpen(false);
@@ -751,8 +764,8 @@ function ConnectionDrawer({
                 <span className="text-[10px] uppercase tracking-[0.18em]">Wallet-style placeholder</span>
               </div>
               <p className="text-[11px] leading-6 text-zinc-400">
-                Hyperliquid uses wallet connectivity rather than CEX API credentials. Save a wallet
-                address locally for MVP state handling.
+                Hyperliquid uses wallet connectivity rather than CEX API credentials. Connected
+                wallets are saved locally automatically for MVP state handling.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -780,7 +793,7 @@ function ConnectionDrawer({
               label="Wallet Address"
               value={form.walletAddress ?? ""}
               onChange={(value) => onChange({ ...form, walletAddress: value })}
-              placeholder="0x..."
+              placeholder="0x... or base58 wallet address"
             />
           </div>
         ) : (
@@ -792,7 +805,7 @@ function ConnectionDrawer({
               </div>
               <p className="text-[11px] leading-6 text-zinc-400">
                 dYdX v4 is handled as an address or wallet-style connection flow for MVP, ready for
-                deeper wallet integration later.
+                deeper wallet integration later. Connected wallets are saved locally automatically.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -832,17 +845,19 @@ function ConnectionDrawer({
         )}
 
         <div className="mt-5 flex flex-wrap gap-2">
-          <button
-            onClick={onSave}
-            className="brand-chip-active rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em]"
-          >
-            Save
-          </button>
+          {!walletConnected && (
+            <button
+              onClick={onSave}
+              className="brand-chip-active rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em]"
+            >
+              {venue.type === "DEX" ? "Save Manual Address" : "Save"}
+            </button>
+          )}
           <button
             onClick={onTest}
             className="terminal-chip rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-100"
           >
-            Test Connection
+            {venue.type === "DEX" ? "Verify Connection" : "Test Connection"}
           </button>
           <button
             onClick={onRemove}
@@ -852,6 +867,11 @@ function ConnectionDrawer({
             Remove Connection
           </button>
         </div>
+        {walletConnected && (
+          <p className="mt-3 text-[10px] text-zinc-500">
+            Wallet connections are saved locally as soon as the provider approves access.
+          </p>
+        )}
       </div>
     </div>
   );
