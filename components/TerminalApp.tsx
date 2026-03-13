@@ -22,12 +22,67 @@ import {
   CandlestickChart,
   PanelsTopLeft,
   Wallet,
+  X,
 } from "lucide-react";
 
 type RightTab = "trade" | "dex" | "alerts" | "connect" | "watch";
 type DexSubTab = "hl" | "dydx";
 type WorkspaceTab = "news" | "chart" | "tools";
 type HeaderPlatform = "hyperliquid" | "dydx" | "okx" | "bybit" | "binance";
+type HeaderPlatformMeta = {
+  id: HeaderPlatform;
+  label: string;
+  type: "wallet" | "cex";
+  eyebrow: string;
+  description: string;
+  primaryAction: string;
+  secondaryAction?: string;
+};
+
+const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
+  {
+    id: "hyperliquid",
+    label: "Hyperliquid",
+    type: "wallet",
+    eyebrow: "DEX Wallet",
+    description: "Connect a wallet-based flow for Hyperliquid trading access.",
+    primaryAction: "Connect Wallet",
+    secondaryAction: "Wallet Menu",
+  },
+  {
+    id: "dydx",
+    label: "dYdX",
+    type: "wallet",
+    eyebrow: "DEX Wallet",
+    description: "Prepare an address or wallet-based connection flow for dYdX v4.",
+    primaryAction: "Connect Wallet",
+    secondaryAction: "Wallet Menu",
+  },
+  {
+    id: "okx",
+    label: "OKX",
+    type: "cex",
+    eyebrow: "CEX API",
+    description: "Store API credentials locally and test venue readiness for OKX.",
+    primaryAction: "Start API Setup",
+  },
+  {
+    id: "bybit",
+    label: "Bybit",
+    type: "cex",
+    eyebrow: "CEX API",
+    description: "Configure Bybit API access for future account and execution workflows.",
+    primaryAction: "Start API Setup",
+  },
+  {
+    id: "binance",
+    label: "Binance",
+    type: "cex",
+    eyebrow: "CEX API",
+    description: "Prepare Binance connectivity with a compact setup flow in the header.",
+    primaryAction: "Start API Setup",
+  },
+];
 
 function ResizeDivider({ onDrag }: { onDrag: (dx: number) => void }) {
   const dragging = useRef(false);
@@ -79,7 +134,10 @@ export default function TerminalApp() {
   const [viewportWidth, setViewportWidth] = useState(1440);
   const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<WorkspaceTab>("chart");
   const [headerPlatform, setHeaderPlatform] = useState<HeaderPlatform>("hyperliquid");
+  const [headerConnectOpen, setHeaderConnectOpen] = useState(false);
+  const [headerConnectStatus, setHeaderConnectStatus] = useState<string>("");
   const { checkNewsAgainstAlerts } = useAlerts();
+  const headerPopoverRef = useRef<HTMLDivElement | null>(null);
 
   const [newsWidth, setNewsWidth] = useState(370);
   const [rightWidth, setRightWidth] = useState(295);
@@ -99,6 +157,19 @@ export default function TerminalApp() {
     window.addEventListener("resize", syncViewport);
     return () => window.removeEventListener("resize", syncViewport);
   }, []);
+
+  useEffect(() => {
+    if (!headerConnectOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!headerPopoverRef.current?.contains(event.target as Node)) {
+        setHeaderConnectOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [headerConnectOpen]);
 
   const { prices: wsPrices, quotes: wsQuotes, connected: wsConnected } = useBinanceWs();
   const {
@@ -151,21 +222,20 @@ export default function TerminalApp() {
   const isTablet = viewportWidth >= 768 && viewportWidth < 1280;
   const showDesktopLayout = viewportWidth >= 1280;
   const showBottomPanel = !isMobile || mobileWorkspaceTab !== "tools";
+  const selectedHeaderPlatform =
+    HEADER_PLATFORMS.find((platform) => platform.id === headerPlatform) ?? HEADER_PLATFORMS[0];
 
-  const openHeaderConnection = () => {
-    if (headerPlatform === "hyperliquid") {
-      setRightTab("dex");
-      setDexSubTab("hl");
-    } else if (headerPlatform === "dydx") {
-      setRightTab("dex");
-      setDexSubTab("dydx");
-    } else {
-      setRightTab("connect");
-    }
+  const runHeaderConnectAction = (mode: "primary" | "secondary" = "primary") => {
+    const actionLabel =
+      mode === "secondary"
+        ? selectedHeaderPlatform.secondaryAction ?? selectedHeaderPlatform.primaryAction
+        : selectedHeaderPlatform.primaryAction;
 
-    if (!showDesktopLayout) {
-      setMobileWorkspaceTab("tools");
-    }
+    setHeaderConnectStatus(
+      selectedHeaderPlatform.type === "wallet"
+        ? `${selectedHeaderPlatform.label}: ${actionLabel} flow ready`
+        : `${selectedHeaderPlatform.label}: compact API setup ready`
+    );
   };
 
   const renderNewsPanel = () => (
@@ -278,28 +348,105 @@ export default function TerminalApp() {
         <div className="relative z-10 flex items-center justify-center px-2">
           <BrandMark className="mx-auto" />
         </div>
-        <div className="absolute right-3 top-1/2 z-10 flex -translate-y-1/2 items-center gap-2 sm:right-4">
-          <select
-            value={headerPlatform}
-            onChange={(e) => setHeaderPlatform(e.target.value as HeaderPlatform)}
-            className="terminal-input hidden min-w-[120px] rounded-xl px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)] outline-none md:block"
-            aria-label="Select platform"
-          >
-            <option value="hyperliquid">Hyperliquid</option>
-            <option value="dydx">dYdX</option>
-            <option value="okx">OKX</option>
-            <option value="bybit">Bybit</option>
-            <option value="binance">Binance</option>
-          </select>
-          <button
-            type="button"
-            onClick={openHeaderConnection}
-            className="brand-chip-active inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em]"
-          >
-            <Wallet className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Wallet Connect</span>
-            <span className="sm:hidden">Connect</span>
-          </button>
+        <div ref={headerPopoverRef} className="absolute right-3 top-1/2 z-10 -translate-y-1/2 sm:right-4">
+          <div className="panel-shell-alt flex items-center gap-1.5 rounded-2xl px-2 py-1.5">
+            <button
+              type="button"
+              onClick={() => setHeaderConnectOpen((open) => !open)}
+              className="brand-chip-active inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em]"
+            >
+              <Wallet className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Wallet Connect</span>
+              <span className="sm:hidden">Connect</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setHeaderConnectOpen((open) => !open)}
+              className="terminal-chip inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)]"
+            >
+              <span className="hidden md:inline text-zinc-500">{selectedHeaderPlatform.eyebrow}</span>
+              <span className="text-[#f3ead7]">{selectedHeaderPlatform.label}</span>
+            </button>
+          </div>
+
+          {headerConnectOpen && (
+            <div className="panel-shell-alt absolute right-0 mt-3 w-[min(92vw,360px)] rounded-2xl border p-3 shadow-[0_18px_48px_rgba(0,0,0,0.42)]">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-amber-200">Header Connect</div>
+                  <div className="mt-1 text-sm font-semibold text-[#f5efe1]">Platform Access</div>
+                  <p className="mt-1 text-[11px] leading-5 text-zinc-400">
+                    Choose a platform and start the relevant connection flow directly from the header.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHeaderConnectOpen(false)}
+                  className="rounded-full border border-white/8 p-2 text-zinc-500 transition-colors hover:text-white"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {HEADER_PLATFORMS.map((platform) => (
+                  <button
+                    key={platform.id}
+                    type="button"
+                    onClick={() => {
+                      setHeaderPlatform(platform.id);
+                      setHeaderConnectStatus("");
+                    }}
+                    className={`rounded-xl border px-3 py-2 text-left transition-colors ${
+                      headerPlatform === platform.id
+                        ? "border-[rgba(212,161,31,0.26)] bg-[rgba(212,161,31,0.12)]"
+                        : "border-[rgba(255,255,255,0.06)] bg-[#111317] hover:bg-[rgba(212,161,31,0.05)]"
+                    }`}
+                  >
+                    <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500">{platform.eyebrow}</div>
+                    <div className="mt-1 text-[11px] font-semibold text-[#f3ead7]">{platform.label}</div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-3 rounded-2xl border border-[rgba(212,161,31,0.12)] bg-black/20 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="brand-badge brand-badge-gold rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.14em]">
+                    {selectedHeaderPlatform.type === "wallet" ? "Wallet Flow" : "API Flow"}
+                  </span>
+                  <span className="text-[11px] font-semibold text-[#f3ead7]">{selectedHeaderPlatform.label}</span>
+                </div>
+                <p className="mt-2 text-[11px] leading-5 text-zinc-400">
+                  {selectedHeaderPlatform.description}
+                </p>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => runHeaderConnectAction("primary")}
+                    className="brand-chip-active rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em]"
+                  >
+                    {selectedHeaderPlatform.primaryAction}
+                  </button>
+                  {selectedHeaderPlatform.secondaryAction && (
+                    <button
+                      type="button"
+                      onClick={() => runHeaderConnectAction("secondary")}
+                      className="terminal-chip rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-100"
+                    >
+                      {selectedHeaderPlatform.secondaryAction}
+                    </button>
+                  )}
+                </div>
+
+                {headerConnectStatus && (
+                  <div className="mt-3 rounded-xl border border-[rgba(212,161,31,0.12)] bg-[rgba(212,161,31,0.06)] px-3 py-2 text-[10px] text-amber-100">
+                    {headerConnectStatus}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
