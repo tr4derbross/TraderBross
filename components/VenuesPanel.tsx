@@ -90,6 +90,7 @@ type WalletSession = {
   providerLabel: string;
   providerKind: WalletProviderKind;
   provider: EthereumProvider | SolanaProvider;
+  disconnectTargets?: Array<EthereumProvider | SolanaProvider>;
   cleanup: () => void;
 };
 
@@ -321,20 +322,26 @@ async function connectEvmWallet(wallet: string) {
     throw new Error(`No wallet address returned from ${wallet}.`);
   }
 
-  return { address, provider };
+  return { address, provider, disconnectTargets: [provider] };
 }
 
 async function connectSolanaWallet(wallet: string) {
-  const provider =
+  const candidates =
     wallet === "Phantom"
-      ? window.phantom?.solana ??
-        (window.solana?.isPhantom ? window.solana : undefined) ??
-        (window.solflare?.isPhantom ? window.solflare : undefined)
+      ? [
+          window.phantom?.solana,
+          window.solana?.isPhantom ? window.solana : undefined,
+          window.solflare?.isPhantom ? window.solflare : undefined,
+        ]
       : wallet === "Solflare"
-        ? window.solflare ??
-          (window.solana?.isSolflare ? window.solana : undefined) ??
-          (window.phantom?.solana?.isSolflare ? window.phantom.solana : undefined)
-        : null;
+        ? [
+            window.solflare,
+            window.solana?.isSolflare ? window.solana : undefined,
+            window.phantom?.solana?.isSolflare ? window.phantom.solana : undefined,
+          ]
+        : [];
+  const disconnectTargets = [...new Set<SolanaProvider>(candidates.filter(Boolean) as SolanaProvider[])];
+  const provider = disconnectTargets[0] ?? null;
 
   if (!provider) {
     throw new Error(`${wallet} is not available in this browser.`);
@@ -347,7 +354,7 @@ async function connectSolanaWallet(wallet: string) {
     throw new Error(`No wallet address returned from ${wallet}.`);
   }
 
-  return { address, provider };
+  return { address, provider, disconnectTargets };
 }
 
 export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
@@ -513,35 +520,44 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
     const existingSession = walletSessionsRef.current[venueId];
 
     if (existingSession) {
+      const disconnectTargets = existingSession.disconnectTargets?.length
+        ? existingSession.disconnectTargets
+        : [existingSession.provider];
+
       try {
-        if (typeof existingSession.provider.disconnect === "function") {
-          await existingSession.provider.disconnect();
-          debugWalletLog("provider_disconnect_called", {
-            source,
-            venueId,
-            provider: existingSession.providerLabel,
-          });
-        } else if (
-          existingSession.providerKind === "evm" &&
-          "request" in existingSession.provider &&
-          typeof existingSession.provider.request === "function"
-        ) {
-          try {
-            await existingSession.provider.request({
-              method: "wallet_revokePermissions",
-              params: [{ eth_accounts: {} }],
-            });
-            debugWalletLog("provider_permissions_revoked", {
+        for (const target of disconnectTargets) {
+          if (typeof target.disconnect === "function") {
+            await target.disconnect();
+            debugWalletLog("provider_disconnect_called", {
               source,
               venueId,
               provider: existingSession.providerLabel,
             });
-          } catch {
-            debugWalletLog("provider_disconnect_not_supported", {
-              source,
-              venueId,
-              provider: existingSession.providerLabel,
-            });
+            continue;
+          }
+
+          if (
+            existingSession.providerKind === "evm" &&
+            "request" in target &&
+            typeof target.request === "function"
+          ) {
+            try {
+              await target.request({
+                method: "wallet_revokePermissions",
+                params: [{ eth_accounts: {} }],
+              });
+              debugWalletLog("provider_permissions_revoked", {
+                source,
+                venueId,
+                provider: existingSession.providerLabel,
+              });
+            } catch {
+              debugWalletLog("provider_disconnect_not_supported", {
+                source,
+                venueId,
+                provider: existingSession.providerLabel,
+              });
+            }
           }
         }
       } catch (error) {
@@ -585,7 +601,8 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
     venueId: VenueId,
     providerLabel: string,
     providerKind: WalletProviderKind,
-    provider: EthereumProvider | SolanaProvider
+    provider: EthereumProvider | SolanaProvider,
+    disconnectTargets?: Array<EthereumProvider | SolanaProvider>
   ) => {
     const cleanups: Array<() => void> = [];
     const subscribe = (event: string, handler: (...args: unknown[]) => void) => {
@@ -652,6 +669,7 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
       providerLabel,
       providerKind,
       provider,
+      disconnectTargets,
       cleanup: () => {
         cleanups.forEach((cleanup) => cleanup());
       },
@@ -793,7 +811,8 @@ export default function VenuesPanel({ hlWallet, onHlWalletChange }: Props) {
         activeVenue.id,
         providerLabel,
         providerLabel === "MetaMask" || providerLabel === "Rabby" || providerLabel === "Coinbase Wallet" ? "evm" : "solana",
-        result.provider
+        result.provider,
+        result.disconnectTargets
       );
 
       syncWalletConnection(activeVenue.id, providerLabel, result.address, "connected");
