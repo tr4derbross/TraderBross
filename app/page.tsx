@@ -23,9 +23,9 @@ const featureCards = [
 const footerLinks = [
   { label: "X", href: "https://x.com/traderbross" },
   { label: "Telegram", href: "https://t.me/traderbross" },
-  { label: "Privacy", href: "#" },
-  { label: "Terms", href: "#" },
-  { label: "Contact", href: "mailto:contact@traderbross.com" },
+  { label: "Privacy", href: "/privacy" },
+  { label: "Terms", href: "/terms" },
+  { label: "Contact", href: "mailto:Nikokaya24@gmail.com" },
 ];
 
 export default function HomePage() {
@@ -327,17 +327,23 @@ export default function HomePage() {
           </div>
 
           <nav className="flex flex-wrap gap-x-5 gap-y-2">
-            {footerLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                target={link.href.startsWith("http") ? "_blank" : undefined}
-                rel={link.href.startsWith("http") ? "noreferrer" : undefined}
-                className="transition-colors hover:text-zinc-200"
-              >
-                {link.label}
-              </a>
-            ))}
+            {footerLinks.map((link) =>
+              link.href.startsWith("/") ? (
+                <Link key={link.label} href={link.href} className="transition-colors hover:text-zinc-200">
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  target={link.href.startsWith("http") ? "_blank" : undefined}
+                  rel={link.href.startsWith("http") ? "noreferrer" : undefined}
+                  className="transition-colors hover:text-zinc-200"
+                >
+                  {link.label}
+                </a>
+              )
+            )}
           </nav>
         </footer>
       </section>
