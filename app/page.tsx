@@ -31,9 +31,9 @@ const footerLinks = [
 export default function HomePage() {
   return (
     <main className="landing-shell min-h-screen text-[var(--text-primary)]">
-      <section className="mx-auto flex w-full max-w-7xl flex-col px-5 pb-10 pt-6 sm:px-8 lg:px-10">
-        <header className="landing-topbar panel-shell flex items-center justify-between rounded-2xl border px-4 py-3">
-          <div className="flex items-center gap-3">
+      <section className="mx-auto flex w-full max-w-7xl flex-col px-4 pb-10 pt-4 sm:px-6 sm:pt-6 lg:px-10">
+        <header className="landing-topbar panel-shell flex flex-col gap-4 rounded-2xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
             <BrandMark className="h-auto w-[138px] sm:w-[160px]" />
             <div className="hidden sm:block">
               <div className="text-[10px] uppercase tracking-[0.28em] text-amber-200/80">TraderBross</div>
@@ -41,7 +41,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <a
               href="https://t.me/traderbross"
               target="_blank"
@@ -68,13 +68,13 @@ export default function HomePage() {
           </div>
         </header>
 
-        <section className="grid gap-10 py-12 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
+        <section className="grid gap-8 py-10 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:gap-10 lg:py-12">
           <div className="max-w-2xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[rgba(212,161,31,0.16)] bg-[rgba(212,161,31,0.08)] px-3 py-1 text-[10px] uppercase tracking-[0.24em] text-amber-200">
               <Shield className="h-3.5 w-3.5" />
               News-first trading workflow
             </div>
-            <h1 className="max-w-xl text-5xl font-semibold tracking-[-0.04em] text-[#f8f3e5] sm:text-6xl">
+            <h1 className="max-w-xl text-4xl font-semibold tracking-[-0.04em] text-[#f8f3e5] sm:text-5xl lg:text-6xl">
               Trade the news faster
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-[var(--text-secondary)] sm:text-lg">
@@ -111,7 +111,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="landing-hero-card panel-shell relative overflow-hidden rounded-[28px] border p-5 sm:p-6">
+          <div className="landing-hero-card panel-shell relative overflow-hidden rounded-[24px] border p-4 sm:rounded-[28px] sm:p-6">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(212,161,31,0.15),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(245,239,225,0.06),transparent_32%)]" />
             <div className="relative z-10 grid gap-3 sm:grid-cols-2">
               <div className="panel-shell-alt rounded-2xl p-4">
@@ -152,8 +152,8 @@ export default function HomePage() {
           })}
         </section>
 
-        <section className="py-10">
-          <div className="mb-5 flex items-center justify-between gap-3">
+        <section className="py-8 sm:py-10">
+          <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="text-[10px] uppercase tracking-[0.24em] text-amber-200">Terminal preview</div>
               <h2 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-[#f8f3e5]">
@@ -168,7 +168,7 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="landing-preview panel-shell overflow-hidden rounded-[30px] border p-3 sm:p-4">
+          <div className="landing-preview panel-shell overflow-hidden rounded-[24px] border p-2.5 sm:rounded-[30px] sm:p-4">
             <div className="landing-preview-shell rounded-[24px] border border-[rgba(212,161,31,0.14)] bg-[linear-gradient(180deg,rgba(18,16,12,0.96),rgba(6,6,6,0.98))] p-3">
               <div className="mb-3 flex items-center justify-between rounded-2xl border border-[rgba(212,161,31,0.1)] bg-black/20 px-4 py-2">
                 <div className="text-[10px] uppercase tracking-[0.26em] text-amber-200">TraderBross terminal</div>
@@ -177,7 +177,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="grid gap-3 lg:grid-cols-[0.28fr_0.5fr_0.22fr]">
+              <div className="grid gap-3 md:grid-cols-[0.34fr_0.66fr] xl:grid-cols-[0.28fr_0.5fr_0.22fr]">
                 <div className="panel-shell-alt rounded-2xl p-3">
                   <div className="mb-3 flex items-center justify-between">
                     <span className="text-[10px] uppercase tracking-[0.22em] text-amber-200">News feed</span>
@@ -199,14 +199,14 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <div className="panel-shell-alt rounded-2xl p-3">
+                <div className="panel-shell-alt rounded-2xl p-3 md:col-span-1">
                   <div className="mb-3 flex items-center justify-between">
                     <span className="text-[10px] uppercase tracking-[0.22em] text-amber-200">Chart workspace</span>
                     <span className="rounded-full border border-[rgba(212,161,31,0.12)] px-2 py-0.5 text-[9px] text-zinc-300">
                       BTCUSDT
                     </span>
                   </div>
-                  <div className="relative h-[360px] overflow-hidden rounded-[22px] border border-[rgba(212,161,31,0.08)] bg-[linear-gradient(180deg,#0a0a0b,#050505)]">
+                  <div className="relative h-[260px] overflow-hidden rounded-[22px] border border-[rgba(212,161,31,0.08)] bg-[linear-gradient(180deg,#0a0a0b,#050505)] sm:h-[320px] lg:h-[360px]">
                     <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:56px_56px] opacity-30" />
                     <div className="absolute left-0 right-0 top-10 mx-6 h-px border-t border-dashed border-red-300/40" />
                     <div className="absolute left-0 right-0 top-28 mx-6 h-px border-t border-dashed border-emerald-300/40" />
@@ -225,7 +225,7 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <div className="panel-shell-alt rounded-2xl p-3">
+                <div className="panel-shell-alt rounded-2xl p-3 md:col-span-2 xl:col-span-1">
                   <div className="mb-3 flex items-center justify-between">
                     <span className="text-[10px] uppercase tracking-[0.22em] text-amber-200">Execution</span>
                     <span className="text-[10px] text-zinc-500">Ready</span>
@@ -261,7 +261,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="grid gap-6 py-10 lg:grid-cols-[0.95fr_1.05fr]">
+        <section className="grid gap-6 py-8 lg:grid-cols-[0.95fr_1.05fr] lg:py-10">
           <div className="panel-shell-alt rounded-3xl p-6">
             <div className="text-[10px] uppercase tracking-[0.24em] text-amber-200">Why TraderBross</div>
             <h2 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-[#f8f3e5]">
@@ -287,7 +287,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="panel-shell landing-cta overflow-hidden rounded-[30px] border px-6 py-8 sm:px-8 sm:py-10">
+        <section className="panel-shell landing-cta overflow-hidden rounded-[24px] border px-5 py-7 sm:rounded-[30px] sm:px-8 sm:py-10">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-2xl">
               <div className="text-[10px] uppercase tracking-[0.24em] text-amber-200">Get started</div>
