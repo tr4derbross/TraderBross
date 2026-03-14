@@ -19,6 +19,7 @@ export const dydxAdapter: VenueAdapter = {
   id: "dydx",
   venueType: "wallet",
   marketDataLabel: "dYdX Indexer",
+  supportsOrderPlacement: false,
   getTicker,
   subscribeTicker: createPollingSubscribe(getTicker, 5000),
   getBalance: async (connection) => {
@@ -54,6 +55,8 @@ export const dydxAdapter: VenueAdapter = {
   },
   placeOrder: notEnabledAction("dYdX execution is not enabled yet."),
   cancelOrder: notEnabledAction("dYdX execution is not enabled yet."),
+  setLeverage: notEnabledAction("dYdX leverage configuration is not enabled yet."),
+  setMarginMode: notEnabledAction("dYdX margin mode configuration is not enabled yet."),
   testConnection: async (connection) => {
     if (!connection?.walletAddress) {
       return disconnectedResult("Connect a wallet or address before testing dYdX.");

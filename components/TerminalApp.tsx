@@ -20,6 +20,8 @@ import { useTradingState } from "@/hooks/useTradingState";
 import type { ActiveVenueState, TradingVenueConnectionStatus, TradingVenueType } from "@/lib/active-venue";
 import { getVenueAdapter } from "@/lib/venues";
 import type { VenueConnectionInput } from "@/lib/venues/types";
+import { validateExecutionRequest } from "@/lib/execution-validation";
+import type { NewsTradePreset } from "@/lib/news-trade";
 import {
   connectWalletByLabel,
   disconnectWalletSession,
@@ -83,6 +85,7 @@ type HeaderCexCredentials = {
 
 type HeaderCexCredentialMap = Record<Extract<HeaderPlatform, "okx" | "bybit" | "binance">, HeaderCexCredentials>;
 type HeaderCexPlatform = keyof HeaderCexCredentialMap;
+type NewsTradeIntent = NewsTradePreset & { sourceItemId: string };
 
 const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
   {
@@ -231,6 +234,7 @@ export default function TerminalApp() {
   const [headerCexCredentials, setHeaderCexCredentials] = useState<HeaderCexCredentialMap>(
     EMPTY_HEADER_CEX_CREDENTIALS
   );
+  const [newsTradeIntent, setNewsTradeIntent] = useState<NewsTradeIntent | null>(null);
   const [activeVenueState, setActiveVenueState] = useState<ActiveVenueState>({
     venueId: "hyperliquid",
     venueType: "wallet",
@@ -493,6 +497,20 @@ export default function TerminalApp() {
     }
   };
 
+  const handleNewsQuickTrade = (preset: NewsTradePreset, item: NewsItem) => {
+    setSelectedItem(item);
+    setActiveSymbol(preset.symbol);
+    setRightTab("trade");
+    setNewsTradeIntent({
+      ...preset,
+      sourceItemId: item.id,
+    });
+
+    if (!showDesktopLayout) {
+      setMobileWorkspaceTab("tools");
+    }
+  };
+
   const tabs: { id: RightTab; label: string }[] = [
     { id: "trade", label: "Trade" },
     { id: "dex", label: "DEX" },
@@ -568,18 +586,24 @@ export default function TerminalApp() {
       tpPrice?: number,
       slPrice?: number
     ) => {
-      if (!ticker || marginAmount <= 0 || leverage <= 0) {
-        return { ok: false, message: "Invalid order input." };
-      }
-
-      if (activeVenueState.connectionStatus !== "connected") {
-        return {
-          ok: false,
-          message: `${activeVenueState.venueId.toUpperCase()} is not connected.`,
-        };
-      }
-
       const adapter = getVenueAdapter(activeVenueState.venueId);
+      const validation = validateExecutionRequest(activeVenueState, adapter, {
+        ticker,
+        side,
+        type,
+        marginAmount,
+        leverage,
+        marginMode,
+        limitPrice,
+        tpPrice,
+        slPrice,
+        balance,
+      });
+
+      if (!validation.ok) {
+        return { ok: false, message: validation.message };
+      }
+
       const connection = buildActiveVenueConnection();
 
       const result = await adapter.placeOrder(
@@ -600,7 +624,7 @@ export default function TerminalApp() {
         ? { ok: true, message: `${adapter.id.toUpperCase()} accepted the order request.` }
         : { ok: false, message: result.message };
     },
-    [activeVenueState.connectionStatus, activeVenueState.venueId, buildActiveVenueConnection]
+    [activeVenueState, balance, buildActiveVenueConnection]
   );
 
   const disconnectHeaderWallet = useCallback(async () => {
@@ -782,6 +806,7 @@ export default function TerminalApp() {
       <NewsFeed
         onSelectItem={handleSelectItem}
         onTickerSelect={handleTickerRoute}
+        onQuickTrade={handleNewsQuickTrade}
         selectedItem={selectedItem}
         onNewItem={(item) => checkNewsAgainstAlerts(item)}
       />
@@ -824,12 +849,14 @@ export default function TerminalApp() {
         <TradingPanel
           activeVenueState={activeVenueState}
           selectedNews={selectedItem}
+          newsTradeIntent={newsTradeIntent}
           balance={balance}
           positions={positions}
           prices={activeVenuePriceMap}
           marketDataSourceLabel={activeVenueMarketLabel}
           onActiveSymbolChange={setActiveSymbol}
           onPlaceOrder={routeOrderThroughVenue}
+          onConsumeNewsTradeIntent={() => setNewsTradeIntent(null)}
         />
       )}
 

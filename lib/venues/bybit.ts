@@ -18,12 +18,15 @@ export const bybitAdapter: VenueAdapter = {
   id: "bybit",
   venueType: "cex",
   marketDataLabel: "Bybit Linear",
+  supportsOrderPlacement: false,
   getTicker,
   subscribeTicker: createPollingSubscribe(getTicker, 5000),
   getBalance: emptyBalance,
   getPositions: emptyPositions,
   placeOrder: notEnabledAction("Bybit execution is not enabled yet."),
   cancelOrder: notEnabledAction("Bybit execution is not enabled yet."),
+  setLeverage: notEnabledAction("Bybit leverage configuration is not enabled yet."),
+  setMarginMode: notEnabledAction("Bybit margin mode configuration is not enabled yet."),
   testConnection: async (connection) =>
     fetchJson("/api/venues/validate", {
       method: "POST",
