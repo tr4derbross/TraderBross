@@ -13,6 +13,7 @@ import PriceChart from "@/components/PriceChart";
 import AlertPanel from "@/components/AlertPanel";
 import TradingPanel from "@/components/TradingPanel";
 import BottomPanel from "@/components/BottomPanel";
+import TradingActivityDrawer from "@/components/TradingActivityDrawer";
 import HyperliquidPanel from "@/components/HyperliquidPanel";
 import DydxPanel from "@/components/DydxPanel";
 import VenuesPanel from "@/components/VenuesPanel";
@@ -1025,7 +1026,7 @@ export default function TerminalApp() {
 
           {showBottomPanel && (
             <div className={isMobile ? "" : "pt-2"}>
-              <BottomPanel
+              <TradingActivityDrawer
                 positions={positions}
                 orders={orders}
                 balance={balance}
