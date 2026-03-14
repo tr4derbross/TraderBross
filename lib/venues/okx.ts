@@ -8,10 +8,62 @@ import {
   notEnabledAction,
 } from "@/lib/venues/shared";
 
+const PERP_MAP: Record<string, string> = {
+  BTC: "BTC-USDT-SWAP",
+  ETH: "ETH-USDT-SWAP",
+  SOL: "SOL-USDT-SWAP",
+  BNB: "BNB-USDT-SWAP",
+  XRP: "XRP-USDT-SWAP",
+  DOGE: "DOGE-USDT-SWAP",
+  AVAX: "AVAX-USDT-SWAP",
+  LINK: "LINK-USDT-SWAP",
+  ARB: "ARB-USDT-SWAP",
+  OP: "OP-USDT-SWAP",
+  NEAR: "NEAR-USDT-SWAP",
+  INJ: "INJ-USDT-SWAP",
+  DOT: "DOT-USDT-SWAP",
+};
+
 const getTicker: VenueAdapter["getTicker"] = async (symbol) => {
   const quotes = await fetchJson<Array<{ symbol: string; price: number }>>("/api/okx?type=quotes");
   const quote = quotes.find((item) => item.symbol === symbol);
   return quote ? normalizeQuoteTicker(symbol, quote.price, "OKX Perpetuals") : null;
+};
+
+const subscribeTicker: VenueAdapter["subscribeTicker"] = (symbol, onTick) => {
+  const instId = PERP_MAP[symbol];
+  const fallback = createPollingSubscribe(getTicker, 5000);
+  if (!instId || typeof WebSocket === "undefined") {
+    return fallback(symbol, onTick);
+  }
+
+  const socket = new WebSocket("wss://ws.okx.com:8443/ws/v5/public");
+
+  socket.onopen = () => {
+    socket.send(
+      JSON.stringify({
+        op: "subscribe",
+        args: [{ channel: "tickers", instId }],
+      })
+    );
+  };
+
+  socket.onmessage = (event) => {
+    try {
+      const payload = JSON.parse(event.data) as { data?: Array<{ last?: string }> };
+      const price = Number(payload.data?.[0]?.last);
+      if (!Number.isFinite(price)) return;
+      onTick(normalizeQuoteTicker(symbol, price, "OKX Perpetuals"));
+    } catch {
+      // ignore malformed frames
+    }
+  };
+
+  socket.onerror = () => {
+    socket.close();
+  };
+
+  return () => socket.close();
 };
 
 export const okxAdapter: VenueAdapter = {
@@ -20,7 +72,7 @@ export const okxAdapter: VenueAdapter = {
   marketDataLabel: "OKX Perpetuals",
   supportsOrderPlacement: false,
   getTicker,
-  subscribeTicker: createPollingSubscribe(getTicker, 5000),
+  subscribeTicker,
   getBalance: emptyBalance,
   getPositions: emptyPositions,
   placeOrder: notEnabledAction("OKX execution is not enabled yet."),

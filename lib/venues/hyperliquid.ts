@@ -15,13 +15,55 @@ const getTicker: VenueAdapter["getTicker"] = async (symbol) => {
   return asset ? normalizeQuoteTicker(symbol, asset.markPx, "Hyperliquid Mark Price") : null;
 };
 
+const subscribeTicker: VenueAdapter["subscribeTicker"] = (symbol, onTick) => {
+  const fallback = createPollingSubscribe(getTicker, 5000);
+  if (typeof WebSocket === "undefined") {
+    return fallback(symbol, onTick);
+  }
+
+  const socket = new WebSocket("wss://api.hyperliquid.xyz/ws");
+
+  socket.onopen = () => {
+    socket.send(
+      JSON.stringify({
+        method: "subscribe",
+        subscription: { type: "allMids" },
+      })
+    );
+  };
+
+  socket.onmessage = (event) => {
+    try {
+      const payload = JSON.parse(event.data) as {
+        channel?: string;
+        data?: Record<string, string> | { mids?: Record<string, string> };
+      };
+      const mids =
+        payload.channel === "allMids"
+          ? ("mids" in (payload.data ?? {}) ? (payload.data as { mids?: Record<string, string> }).mids : (payload.data as Record<string, string>))
+          : null;
+      const price = Number(mids?.[symbol]);
+      if (!Number.isFinite(price)) return;
+      onTick(normalizeQuoteTicker(symbol, price, "Hyperliquid Mark Price"));
+    } catch {
+      // ignore malformed frames
+    }
+  };
+
+  socket.onerror = () => {
+    socket.close();
+  };
+
+  return () => socket.close();
+};
+
 export const hyperliquidAdapter: VenueAdapter = {
   id: "hyperliquid",
   venueType: "wallet",
   marketDataLabel: "Hyperliquid Mark Price",
   supportsOrderPlacement: false,
   getTicker,
-  subscribeTicker: createPollingSubscribe(getTicker, 5000),
+  subscribeTicker,
   getBalance: async (connection) => {
     if (!connection?.walletAddress) return null;
     const account = await fetchJson<{ balance: number; withdrawable?: number }>(
