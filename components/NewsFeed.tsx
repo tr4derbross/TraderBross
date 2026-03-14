@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { NewsItem } from "@/lib/mock-data";
+import type { NewsTradePreset } from "@/lib/news-trade";
 import { useNews, SourceFilter } from "@/hooks/useNews";
 import NewsCard from "./NewsCard";
 import FilterBar from "./FilterBar";
@@ -12,9 +13,16 @@ type Props = {
   selectedItem: NewsItem | null;
   onNewItem?: (item: NewsItem) => void;
   onTickerSelect?: (ticker: string, item: NewsItem) => void;
+  onQuickTrade?: (preset: NewsTradePreset, item: NewsItem) => void;
 };
 
-export default function NewsFeed({ onSelectItem, selectedItem, onNewItem, onTickerSelect }: Props) {
+export default function NewsFeed({
+  onSelectItem,
+  selectedItem,
+  onNewItem,
+  onTickerSelect,
+  onQuickTrade,
+}: Props) {
   const [sector, setSector] = useState("All");
   const [ticker, setTicker] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -121,6 +129,7 @@ export default function NewsFeed({ onSelectItem, selectedItem, onNewItem, onTick
               isNew={newIds.has(item.id)}
               onSelect={onSelectItem}
               onTickerSelect={onTickerSelect}
+              onQuickTrade={onQuickTrade}
               selected={selectedItem?.id === item.id}
             />
           ))

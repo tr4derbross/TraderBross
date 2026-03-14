@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { NewsItem } from "@/lib/mock-data";
+import { buildNewsTradePresets, type NewsTradePreset } from "@/lib/news-trade";
 import {
   TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Loader2,
   ArrowRightLeft, ExternalLink,
@@ -12,6 +13,7 @@ type Props = {
   isNew?: boolean;
   onSelect: (item: NewsItem) => void;
   onTickerSelect?: (ticker: string, item: NewsItem) => void;
+  onQuickTrade?: (preset: NewsTradePreset, item: NewsItem) => void;
   selected: boolean;
 };
 
@@ -118,8 +120,9 @@ function ImportanceBadge({ importance }: { importance?: NewsItem["importance"] }
 }
 
 // ─── Whale Card ───────────────────────────────────────────────────────────────
-function WhaleCard({ item, isNew, onSelect, selected }: Props) {
+function WhaleCard({ item, isNew, onSelect, onQuickTrade, selected }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const quickPresets = buildNewsTradePresets(item);
   const sentimentColor =
     item.sentiment === "bullish" ? "border-l-green-500" :
     item.sentiment === "bearish" ? "border-l-red-500" :
@@ -172,6 +175,24 @@ function WhaleCard({ item, isNew, onSelect, selected }: Props) {
         </div>
       </div>
 
+      {quickPresets.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {quickPresets.map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onQuickTrade?.(preset, item);
+              }}
+              className="rounded-full border border-[rgba(212,161,31,0.18)] bg-[rgba(212,161,31,0.08)] px-2 py-1 text-[10px] font-bold text-amber-100 transition-colors hover:border-[rgba(212,161,31,0.32)] hover:bg-[rgba(212,161,31,0.14)]"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {expanded && (
         <div className="mt-2 space-y-1.5 border-t border-zinc-800 pt-2">
           {item.whaleFrom && item.whaleTo && (
@@ -204,8 +225,9 @@ function WhaleCard({ item, isNew, onSelect, selected }: Props) {
 }
 
 // ─── Social / Tweet Card ──────────────────────────────────────────────────────
-function SocialCard({ item, isNew, onSelect, onTickerSelect, selected }: Props) {
+function SocialCard({ item, isNew, onSelect, onTickerSelect, onQuickTrade, selected }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const quickPresets = buildNewsTradePresets(item);
   const catColor = CATEGORY_COLORS[item.authorCategory || "analyst"] || CATEGORY_COLORS.analyst;
 
   return (
@@ -261,6 +283,24 @@ function SocialCard({ item, isNew, onSelect, onTickerSelect, selected }: Props) 
         </div>
       </div>
 
+      {quickPresets.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {quickPresets.map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onQuickTrade?.(preset, item);
+              }}
+              className="rounded-full border border-[rgba(212,161,31,0.18)] bg-[rgba(212,161,31,0.08)] px-2 py-1 text-[10px] font-bold text-amber-100 transition-colors hover:border-[rgba(212,161,31,0.32)] hover:bg-[rgba(212,161,31,0.14)]"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {expanded && item.summary && item.summary !== item.headline && (
         <div className="mt-2 border-t border-zinc-800 pt-2">
           <p className="text-[11px] text-zinc-400 leading-relaxed">{item.summary}</p>
@@ -282,7 +322,7 @@ function SocialCard({ item, isNew, onSelect, onTickerSelect, selected }: Props) 
 }
 
 // ─── Standard News Card ───────────────────────────────────────────────────────
-function NewsCardInner({ item, isNew, onSelect, onTickerSelect, selected }: Props) {
+function NewsCardInner({ item, isNew, onSelect, onTickerSelect, onQuickTrade, selected }: Props) {
   const [loadingSentiment, setLoadingSentiment] = useState(false);
   const [sentiment, setSentiment] = useState<{
     score: string; confidence: number; reason: string;
@@ -292,6 +332,7 @@ function NewsCardInner({ item, isNew, onSelect, onTickerSelect, selected }: Prop
       : null
   );
   const [expanded, setExpanded] = useState(false);
+  const quickPresets = buildNewsTradePresets(item);
 
   const fetchSentiment = async () => {
     if (sentiment || loadingSentiment) return;
@@ -357,6 +398,24 @@ function NewsCardInner({ item, isNew, onSelect, onTickerSelect, selected }: Prop
           ) : null}
         </div>
       </div>
+
+      {quickPresets.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {quickPresets.map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onQuickTrade?.(preset, item);
+              }}
+              className="rounded-full border border-[rgba(212,161,31,0.18)] bg-[rgba(212,161,31,0.08)] px-2 py-1 text-[10px] font-bold text-amber-100 transition-colors hover:border-[rgba(212,161,31,0.32)] hover:bg-[rgba(212,161,31,0.14)]"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {expanded && (
         <div className="mt-2 space-y-1.5">
