@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import { NewsItem, AVAILABLE_TICKERS } from "@/lib/mock-data";
 import { useAlerts } from "@/hooks/useAlerts";
 import { useBinanceWs } from "@/hooks/useBinanceWs";
+import { useVenueMarketData } from "@/hooks/useVenueMarketData";
+import { getTickerDisplayPrice } from "@/lib/market-data/shared";
 import TickerTape from "@/components/TickerTape";
 import NewsFeed from "@/components/NewsFeed";
 import PriceChart from "@/components/PriceChart";
@@ -218,7 +220,6 @@ function ResizeDivider({ onDrag }: { onDrag: (dx: number) => void }) {
 
 export default function TerminalApp() {
   const [selectedItem, setSelectedItem] = useState<NewsItem | null>(null);
-  const [chartTicker, setChartTicker] = useState("BTC");
   const [rightTab, setRightTab] = useState<RightTab>("trade");
   const [dexSubTab, setDexSubTab] = useState<DexSubTab>("hl");
   const [hlWallet, setHlWallet] = useState("");
@@ -378,10 +379,9 @@ export default function TerminalApp() {
       ...prev,
       venueId: headerPlatform,
       venueType: nextVenueType,
-      activeSymbol: chartTicker,
       connectionStatus: nextConnectionStatus,
     }));
-  }, [chartTicker, headerConnection, headerPlatform]);
+  }, [headerConnection, headerPlatform]);
 
   useEffect(() => {
     return () => {
@@ -425,6 +425,10 @@ export default function TerminalApp() {
   }, [headerConnectOpen]);
 
   const { prices: wsPrices, quotes: wsQuotes, connected: wsConnected } = useBinanceWs();
+  const { ticker: activeVenueTicker, connectionState: activeVenueFeedState } = useVenueMarketData(
+    activeVenueState.venueId,
+    activeVenueState.activeSymbol
+  );
 
   useEffect(() => {
     const loadVenueMarketData = async () => {
@@ -534,11 +538,20 @@ export default function TerminalApp() {
   const selectedHeaderCredentials =
     selectedHeaderCexPlatform ? headerCexCredentials[selectedHeaderCexPlatform] : null;
   const activeVenuePriceMap =
-    venueMarketPrices[activeVenueState.venueId] ?? (activeVenueState.venueId === "binance" ? wsPrices : {});
+    {
+      ...(venueMarketPrices[activeVenueState.venueId] ?? (activeVenueState.venueId === "binance" ? wsPrices : {})),
+      ...(activeVenueTicker
+        ? {
+            [activeVenueTicker.symbol]:
+              getTickerDisplayPrice(activeVenueTicker) ??
+              venueMarketPrices[activeVenueState.venueId]?.[activeVenueTicker.symbol] ??
+              0,
+          }
+        : {}),
+    };
   const activeVenueMarketLabel = getVenueAdapter(activeVenueState.venueId).marketDataLabel;
 
   const setActiveSymbol = useCallback((symbol: string) => {
-    setChartTicker(symbol);
     setActiveVenueState((prev) => ({
       ...prev,
       activeSymbol: symbol,
@@ -818,12 +831,16 @@ export default function TerminalApp() {
       className={`panel-shell soft-divider flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border ${extraClassName}`}
     >
       <PriceChart
-        defaultTicker={chartTicker}
-        key={chartTicker}
+        activeVenue={activeVenueState.venueId}
+        activeSymbol={activeVenueState.activeSymbol}
+        marketDataSourceLabel={activeVenueMarketLabel}
+        liveTickerPrice={getTickerDisplayPrice(activeVenueTicker) ?? undefined}
+        liveFeedConnected={activeVenueFeedState === "connected"}
         positions={positions}
         orders={orders}
         onUpdatePositionTpSl={updatePositionTpSl}
         onPlaceOrder={placeOrder}
+        onTickerChange={setActiveSymbol}
       />
     </div>
   );
@@ -897,7 +914,7 @@ export default function TerminalApp() {
         <WatchlistPanel
           quotes={wsQuotes}
           prices={prices}
-          activeTicker={chartTicker}
+          activeTicker={activeVenueState.activeSymbol}
           onSelectTicker={(ticker) => {
             setActiveSymbol(ticker);
             setRightTab("trade");
