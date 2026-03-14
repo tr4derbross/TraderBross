@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AVAILABLE_TICKERS, NewsItem } from "@/lib/mock-data";
+import type { ActiveVenueState } from "@/lib/active-venue";
 import {
   Side,
   OrderType,
@@ -15,11 +16,13 @@ import {
 import { TrendingUp, TargetIcon, Sparkles, Percent, Shield, Gauge } from "lucide-react";
 
 type Props = {
-  activeTicker: string;
+  activeVenueState: ActiveVenueState;
   selectedNews?: NewsItem | null;
   balance: number;
   positions: Position[];
   prices: Record<string, number>;
+  marketDataSourceLabel: string;
+  onActiveSymbolChange: (symbol: string) => void;
   onPlaceOrder: (
     ticker: string,
     side: Side,
@@ -30,7 +33,7 @@ type Props = {
     limitPrice?: number,
     tpPrice?: number,
     slPrice?: number,
-  ) => boolean | void;
+  ) => Promise<{ ok: boolean; message: string }>;
 };
 
 type TradeSuggestion = {
@@ -142,14 +145,15 @@ function calcTargetPercent(side: Side, entry: number, targetPrice: number, targe
 }
 
 export default function TradingPanel({
-  activeTicker,
+  activeVenueState,
   selectedNews = null,
   balance,
   positions,
   prices,
+  marketDataSourceLabel,
+  onActiveSymbolChange,
   onPlaceOrder,
 }: Props) {
-  const [ticker, setTicker] = useState(activeTicker);
   const [panelMode, setPanelMode] = useState<PanelMode>("advanced");
   const [orderType, setOrderType] = useState<OrderType>("market");
   const [side, setSide] = useState<Side>("long");
@@ -163,10 +167,9 @@ export default function TradingPanel({
   const [slPrice, setSlPrice] = useState("");
   const [tpPercent, setTpPercent] = useState("");
   const [slPercent, setSlPercent] = useState("");
-
-  useEffect(() => {
-    setTicker(activeTicker);
-  }, [activeTicker]);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [submitFeedback, setSubmitFeedback] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const ticker = activeVenueState.activeSymbol;
 
   const currentPrice = prices[ticker] ?? getBasePrice(ticker);
   const execPrice = orderType === "market" ? currentPrice : parseFloat(limitPrice) || currentPrice;
@@ -264,9 +267,26 @@ export default function TradingPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [side, execPrice]);
 
-  const handleSubmit = () => {
-    if (tpError || slError) return;
-    const ok = onPlaceOrder(
+  const handleSubmit = async () => {
+    if (tpError || slError) {
+      setSubmitFeedback({ type: "err", text: "Fix TP/SL inputs before submitting." });
+      return;
+    }
+    if (margin <= 0) {
+      setSubmitFeedback({ type: "err", text: "Enter a valid margin amount." });
+      return;
+    }
+    if (activeVenueState.connectionStatus !== "connected") {
+      setSubmitFeedback({
+        type: "err",
+        text: `Connect ${activeVenueState.venueId.toUpperCase()} before sending an order.`,
+      });
+      return;
+    }
+
+    setIsSubmittingOrder(true);
+    setSubmitFeedback(null);
+    const result = await onPlaceOrder(
       ticker,
       side,
       orderType,
@@ -277,13 +297,17 @@ export default function TradingPanel({
       tpSlEnabled && tpNum > 0 ? tpNum : undefined,
       tpSlEnabled && slNum > 0 ? slNum : undefined
     );
-    if (ok !== false) {
+    setIsSubmittingOrder(false);
+    if (result.ok) {
+      setSubmitFeedback({ type: "ok", text: result.message });
       setMarginUSD("");
       setTpPrice("");
       setSlPrice("");
       setTpPercent("");
       setSlPercent("");
+      return;
     }
+    setSubmitFeedback({ type: "err", text: result.message });
   };
 
   return (
@@ -299,6 +323,19 @@ export default function TradingPanel({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <div className="terminal-chip hidden rounded-lg px-2 py-1 md:block">
+            <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Venue</div>
+            <div className="mt-0.5 flex items-center gap-1.5 text-[10px]">
+              <span className="font-bold text-amber-200">{activeVenueState.venueId.toUpperCase()}</span>
+              <span className="rounded-full border border-white/8 bg-white/[0.03] px-1.5 py-0.5 text-[8px] uppercase tracking-[0.14em] text-zinc-400">
+                {activeVenueState.connectionStatus.replaceAll("_", " ")}
+              </span>
+            </div>
+          </div>
+          <div className="terminal-chip hidden rounded-lg px-2 py-1 lg:block">
+            <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Market Data Source</div>
+            <div className="mt-0.5 text-[10px] font-semibold text-[#f3ead7]">{marketDataSourceLabel}</div>
+          </div>
           <div className="terminal-chip flex rounded-lg p-0.5">
             {(["basic", "advanced"] as PanelMode[]).map((mode) => (
               <button
@@ -378,7 +415,7 @@ export default function TradingPanel({
               <select
                 className="terminal-input rounded-xl px-3 py-2 text-xs text-amber-300 outline-none"
                 value={ticker}
-                onChange={(e) => setTicker(e.target.value)}
+                onChange={(e) => onActiveSymbolChange(e.target.value)}
               >
                 {AVAILABLE_TICKERS.map((t) => (
                   <option key={t} value={t} className="bg-zinc-900">
@@ -389,7 +426,10 @@ export default function TradingPanel({
 
               <div className="text-right">
                 <div className="text-sm font-bold text-white">${fmt(currentPrice)}</div>
-                <div className="text-[10px] text-zinc-500">Live mark</div>
+                <div className="text-[10px] text-zinc-500">Live mark from {marketDataSourceLabel}</div>
+                <div className="mt-0.5 text-[10px] text-amber-200">
+                  {activeVenueState.venueId.toUpperCase()} · {activeVenueState.venueType.toUpperCase()}
+                </div>
                 {existingPos && (
                   <div
                     className={`mt-0.5 text-[10px] font-bold ${
@@ -749,16 +789,32 @@ export default function TradingPanel({
             </div>
           )}
 
+          {submitFeedback && (
+            <div
+              className={`rounded-xl border px-3 py-2 text-[10px] ${
+                submitFeedback.type === "ok"
+                  ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
+                  : "border-rose-400/20 bg-rose-500/10 text-rose-200"
+              }`}
+            >
+              {submitFeedback.text}
+            </div>
+          )}
+
           <button
-            onClick={handleSubmit}
-            disabled={margin <= 0 || margin + fee > balance || tpError || slError}
+            onClick={() => void handleSubmit()}
+            disabled={isSubmittingOrder || margin <= 0 || margin + fee > balance || tpError || slError}
             className={`w-full rounded-xl py-2 text-[11px] font-bold uppercase tracking-[0.14em] transition disabled:cursor-not-allowed disabled:opacity-40 ${
               side === "long"
                 ? "bg-[linear-gradient(180deg,#157a5d,#0e5f48)] text-white hover:brightness-110"
                 : "bg-[linear-gradient(180deg,#942e2e,#6e2020)] text-white hover:brightness-110"
             }`}
           >
-            {side === "long" ? `Long ${ticker} ${leverage}x` : `Short ${ticker} ${leverage}x`}
+            {isSubmittingOrder
+              ? `Submitting to ${activeVenueState.venueId.toUpperCase()}...`
+              : side === "long"
+                ? `Long ${ticker} ${leverage}x`
+                : `Short ${ticker} ${leverage}x`}
             {orderType !== "market" && ` · ${orderType.toUpperCase()}`}
             {tpSlEnabled && (tpNum > 0 || slNum > 0) && " + TP/SL"}
           </button>

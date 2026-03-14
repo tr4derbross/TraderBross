@@ -17,6 +17,9 @@ import VenuesPanel from "@/components/VenuesPanel";
 import WatchlistPanel from "@/components/WatchlistPanel";
 import BrandMark from "@/components/BrandMark";
 import { useTradingState } from "@/hooks/useTradingState";
+import type { ActiveVenueState, TradingVenueConnectionStatus, TradingVenueType } from "@/lib/active-venue";
+import { getVenueAdapter } from "@/lib/venues";
+import type { VenueConnectionInput } from "@/lib/venues/types";
 import {
   connectWalletByLabel,
   disconnectWalletSession,
@@ -228,6 +231,15 @@ export default function TerminalApp() {
   const [headerCexCredentials, setHeaderCexCredentials] = useState<HeaderCexCredentialMap>(
     EMPTY_HEADER_CEX_CREDENTIALS
   );
+  const [activeVenueState, setActiveVenueState] = useState<ActiveVenueState>({
+    venueId: "hyperliquid",
+    venueType: "wallet",
+    activeSymbol: "BTC",
+    connectionStatus: "disconnected",
+  });
+  const [venueMarketPrices, setVenueMarketPrices] = useState<
+    Partial<Record<ActiveVenueState["venueId"], Record<string, number>>>
+  >({});
   const { checkNewsAgainstAlerts } = useAlerts();
   const headerControlRef = useRef<HTMLDivElement | null>(null);
   const headerPanelRef = useRef<HTMLDivElement | null>(null);
@@ -353,6 +365,21 @@ export default function TerminalApp() {
   }, [headerCexCredentials]);
 
   useEffect(() => {
+    const venueMeta = HEADER_PLATFORMS.find((platform) => platform.id === headerPlatform) ?? HEADER_PLATFORMS[0];
+    const nextConnectionStatus: TradingVenueConnectionStatus =
+      headerConnection.platform === headerPlatform ? headerConnection.status : "disconnected";
+    const nextVenueType: TradingVenueType = venueMeta.type;
+
+    setActiveVenueState((prev) => ({
+      ...prev,
+      venueId: headerPlatform,
+      venueType: nextVenueType,
+      activeSymbol: chartTicker,
+      connectionStatus: nextConnectionStatus,
+    }));
+  }, [chartTicker, headerConnection, headerPlatform]);
+
+  useEffect(() => {
     return () => {
       headerWalletSessionRef.current = null;
     };
@@ -394,6 +421,40 @@ export default function TerminalApp() {
   }, [headerConnectOpen]);
 
   const { prices: wsPrices, quotes: wsQuotes, connected: wsConnected } = useBinanceWs();
+
+  useEffect(() => {
+    const loadVenueMarketData = async () => {
+      const [okxRes, bybitRes, hyperliquidRes, dydxRes] = await Promise.allSettled([
+        Promise.all(
+          AVAILABLE_TICKERS.map(async (symbol) => [symbol, await getVenueAdapter("okx").getTicker(symbol)] as const)
+        ),
+        Promise.all(
+          AVAILABLE_TICKERS.map(async (symbol) => [symbol, await getVenueAdapter("bybit").getTicker(symbol)] as const)
+        ),
+        Promise.all(
+          AVAILABLE_TICKERS.map(async (symbol) => [symbol, await getVenueAdapter("hyperliquid").getTicker(symbol)] as const)
+        ),
+        Promise.all(
+          AVAILABLE_TICKERS.map(async (symbol) => [symbol, await getVenueAdapter("dydx").getTicker(symbol)] as const)
+        ),
+      ]);
+
+      const quoteMap = (entries: Array<readonly [string, { price: number } | null]>) =>
+        Object.fromEntries(entries.filter(([, quote]) => quote).map(([symbol, quote]) => [symbol, quote!.price]));
+
+      setVenueMarketPrices({
+        binance: wsPrices,
+        okx: okxRes.status === "fulfilled" ? quoteMap(okxRes.value) : {},
+        bybit: bybitRes.status === "fulfilled" ? quoteMap(bybitRes.value) : {},
+        hyperliquid: hyperliquidRes.status === "fulfilled" ? quoteMap(hyperliquidRes.value) : {},
+        dydx: dydxRes.status === "fulfilled" ? quoteMap(dydxRes.value) : {},
+      });
+    };
+
+    void loadVenueMarketData();
+    const intervalId = setInterval(loadVenueMarketData, 15_000);
+    return () => clearInterval(intervalId);
+  }, [wsPrices]);
   const {
     balance,
     positions,
@@ -411,7 +472,7 @@ export default function TerminalApp() {
     if (item.ticker.length > 0) {
       const match = item.ticker.find((t) => AVAILABLE_TICKERS.includes(t));
       if (match) {
-        setChartTicker(match);
+        setActiveSymbol(match);
         setRightTab("trade");
         if (showDesktopLayout) {
           setMobileWorkspaceTab("chart");
@@ -424,7 +485,7 @@ export default function TerminalApp() {
 
   const handleTickerRoute = (ticker: string, item: NewsItem) => {
     setSelectedItem(item);
-    setChartTicker(ticker);
+    setActiveSymbol(ticker);
     setRightTab("trade");
 
     if (!showDesktopLayout) {
@@ -454,6 +515,93 @@ export default function TerminalApp() {
     : null;
   const selectedHeaderCredentials =
     selectedHeaderCexPlatform ? headerCexCredentials[selectedHeaderCexPlatform] : null;
+  const activeVenuePriceMap =
+    venueMarketPrices[activeVenueState.venueId] ?? (activeVenueState.venueId === "binance" ? wsPrices : {});
+  const activeVenueMarketLabel = getVenueAdapter(activeVenueState.venueId).marketDataLabel;
+
+  const setActiveSymbol = useCallback((symbol: string) => {
+    setChartTicker(symbol);
+    setActiveVenueState((prev) => ({
+      ...prev,
+      activeSymbol: symbol,
+    }));
+  }, []);
+
+  const buildActiveVenueConnection = useCallback((): VenueConnectionInput | undefined => {
+    if (activeVenueState.venueType === "cex" && selectedHeaderCexPlatform && selectedHeaderCredentials) {
+      return {
+        apiKey: selectedHeaderCredentials.apiKey.trim(),
+        apiSecret: selectedHeaderCredentials.apiSecret.trim(),
+        passphrase: selectedHeaderCredentials.passphrase.trim(),
+      };
+    }
+
+    if (activeVenueState.venueType === "wallet") {
+      return {
+        walletAddress:
+          headerConnection.platform === activeVenueState.venueId ? headerConnection.address : undefined,
+        walletProvider:
+          headerConnection.platform === activeVenueState.venueId ? headerConnection.walletLabel : undefined,
+      };
+    }
+
+    return undefined;
+  }, [
+    activeVenueState.venueId,
+    activeVenueState.venueType,
+    headerConnection.address,
+    headerConnection.platform,
+    headerConnection.walletLabel,
+    selectedHeaderCexPlatform,
+    selectedHeaderCredentials,
+  ]);
+
+  const routeOrderThroughVenue = useCallback(
+    async (
+      ticker: string,
+      side: "long" | "short",
+      type: "market" | "limit" | "stop",
+      marginAmount: number,
+      leverage: number,
+      marginMode: "isolated" | "cross",
+      limitPrice?: number,
+      tpPrice?: number,
+      slPrice?: number
+    ) => {
+      if (!ticker || marginAmount <= 0 || leverage <= 0) {
+        return { ok: false, message: "Invalid order input." };
+      }
+
+      if (activeVenueState.connectionStatus !== "connected") {
+        return {
+          ok: false,
+          message: `${activeVenueState.venueId.toUpperCase()} is not connected.`,
+        };
+      }
+
+      const adapter = getVenueAdapter(activeVenueState.venueId);
+      const connection = buildActiveVenueConnection();
+
+      const result = await adapter.placeOrder(
+        {
+          symbol: ticker,
+          side,
+          type,
+          marginAmount,
+          leverage,
+          limitPrice,
+          tpPrice,
+          slPrice,
+        },
+        connection
+      );
+
+      return result.ok
+        ? { ok: true, message: `${adapter.id.toUpperCase()} accepted the order request.` }
+        : { ok: false, message: result.message };
+    },
+    [activeVenueState.connectionStatus, activeVenueState.venueId, buildActiveVenueConnection]
+  );
 
   const disconnectHeaderWallet = useCallback(async () => {
     const activeSession = headerWalletSessionRef.current;
@@ -589,21 +737,11 @@ export default function TerminalApp() {
     });
 
     try {
-      const response = await fetch("/api/venues/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          venueId: selectedHeaderCexPlatform,
-          apiKey: selectedHeaderCredentials.apiKey.trim(),
-          apiSecret: selectedHeaderCredentials.apiSecret.trim(),
-          passphrase: selectedHeaderCredentials.passphrase.trim(),
-        }),
+      const result = await getVenueAdapter(selectedHeaderCexPlatform).testConnection({
+        apiKey: selectedHeaderCredentials.apiKey.trim(),
+        apiSecret: selectedHeaderCredentials.apiSecret.trim(),
+        passphrase: selectedHeaderCredentials.passphrase.trim(),
       });
-      const result = (await response.json().catch(() => ({}))) as {
-        ok?: boolean;
-        message?: string;
-        detail?: string;
-      };
 
       if (result.ok) {
         setHeaderConnection({
@@ -684,12 +822,14 @@ export default function TerminalApp() {
 
       {rightTab === "trade" && (
         <TradingPanel
-          activeTicker={chartTicker}
+          activeVenueState={activeVenueState}
           selectedNews={selectedItem}
           balance={balance}
           positions={positions}
-          prices={prices}
-          onPlaceOrder={placeOrder}
+          prices={activeVenuePriceMap}
+          marketDataSourceLabel={activeVenueMarketLabel}
+          onActiveSymbolChange={setActiveSymbol}
+          onPlaceOrder={routeOrderThroughVenue}
         />
       )}
 
@@ -732,7 +872,7 @@ export default function TerminalApp() {
           prices={prices}
           activeTicker={chartTicker}
           onSelectTicker={(ticker) => {
-            setChartTicker(ticker);
+            setActiveSymbol(ticker);
             setRightTab("trade");
             setMobileWorkspaceTab("chart");
           }}
