@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Maximize2, Minimize2, Newspaper } from "lucide-react";
 import { AVAILABLE_TICKERS } from "@/lib/mock-data";
+import type { TradingVenueId } from "@/lib/active-venue";
 import { MarginMode, Order, OrderType, Position, Side } from "@/hooks/useTradingState";
 
 type FundingVenue = {
@@ -27,10 +28,15 @@ type ChartType = "candles" | "line";
 type ChartMenu = { x: number; y: number; price: number } | null;
 
 type Props = {
-  defaultTicker?: string;
+  activeVenue: TradingVenueId;
+  activeSymbol: string;
+  marketDataSourceLabel: string;
+  liveTickerPrice?: number;
+  liveFeedConnected?: boolean;
   positions?: Position[];
   orders?: Order[];
   onUpdatePositionTpSl?: (posId: string, tp: number | undefined, sl: number | undefined) => void;
+  onTickerChange?: (ticker: string) => void;
   onPlaceOrder?: (
     ticker: string,
     side: Side,
@@ -101,10 +107,15 @@ function isValidProtectiveLevel(
 }
 
 export default function PriceChart({
-  defaultTicker = "BTC",
+  activeVenue,
+  activeSymbol,
+  marketDataSourceLabel,
+  liveTickerPrice,
+  liveFeedConnected = false,
   positions = [],
   orders = [],
   onUpdatePositionTpSl,
+  onTickerChange,
   onPlaceOrder,
 }: Props) {
   const chartShellRef = useRef<HTMLDivElement>(null);
@@ -118,8 +129,8 @@ export default function PriceChart({
   const tpLineRef = useRef<unknown>(null);
   const slLineRef = useRef<unknown>(null);
   const openOrderLinesRef = useRef<unknown[]>([]);
+  const ticker = activeSymbol;
 
-  const [ticker, setTicker] = useState(defaultTicker);
   const [timeframe, setTimeframe] = useState<Timeframe>("1D");
   const [chartType, setChartType] = useState<ChartType>("candles");
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -217,6 +228,12 @@ export default function PriceChart({
       window.removeEventListener("click", closeMenu);
     };
   }, []);
+
+  useEffect(() => {
+    setMenu(null);
+    setDragTarget(null);
+    setHoveredBar(null);
+  }, [activeVenue, ticker]);
 
   useEffect(() => {
     let active = true;
@@ -391,8 +408,14 @@ export default function PriceChart({
     let active = true;
     const { interval, limit } = TF_CONFIG[timeframe];
     setIsLoadingPrices(true);
+    const endpoint =
+      activeVenue === "okx"
+        ? `/api/okx?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
+        : activeVenue === "bybit"
+          ? `/api/bybit?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
+          : `/api/prices?ticker=${ticker}&interval=${interval}&limit=${limit}`;
 
-    fetch(`/api/prices?ticker=${ticker}&interval=${interval}&limit=${limit}`)
+    fetch(endpoint)
       .then((response) => response.json())
       .then((payload: PriceData[]) => {
         if (!active) return;
@@ -409,7 +432,24 @@ export default function PriceChart({
     return () => {
       active = false;
     };
-  }, [ticker, timeframe]);
+  }, [activeVenue, ticker, timeframe]);
+
+  useEffect(() => {
+    if (!liveTickerPrice || !Number.isFinite(liveTickerPrice)) return;
+
+    setPriceData((prev) => {
+      if (prev.length === 0) return prev;
+      const next = [...prev];
+      const last = next[next.length - 1];
+      next[next.length - 1] = {
+        ...last,
+        close: liveTickerPrice,
+        high: Math.max(last.high, liveTickerPrice),
+        low: Math.min(last.low, liveTickerPrice),
+      };
+      return next;
+    });
+  }, [liveTickerPrice]);
 
   useEffect(() => {
     if (!chartReady || !mainSeriesRef.current || !volumeSeriesRef.current || !chartRef.current) return;
@@ -671,7 +711,7 @@ export default function PriceChart({
           <select
             className="cursor-pointer bg-transparent text-sm font-bold text-white outline-none"
             value={ticker}
-            onChange={(event) => setTicker(event.target.value)}
+            onChange={(event) => onTickerChange?.(event.target.value)}
           >
             {AVAILABLE_TICKERS.map((item) => (
               <option key={item} value={item} className="bg-[#0d0d14]">
