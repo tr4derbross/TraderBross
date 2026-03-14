@@ -18,12 +18,15 @@ export const binanceAdapter: VenueAdapter = {
   id: "binance",
   venueType: "cex",
   marketDataLabel: "Binance Futures",
+  supportsOrderPlacement: false,
   getTicker,
   subscribeTicker: createPollingSubscribe(getTicker, 3000),
   getBalance: emptyBalance,
   getPositions: emptyPositions,
   placeOrder: notEnabledAction("Binance execution is not enabled yet."),
   cancelOrder: notEnabledAction("Binance execution is not enabled yet."),
+  setLeverage: notEnabledAction("Binance leverage configuration is not enabled yet."),
+  setMarginMode: notEnabledAction("Binance margin mode configuration is not enabled yet."),
   testConnection: async (connection) =>
     fetchJson("/api/venues/validate", {
       method: "POST",

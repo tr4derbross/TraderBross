@@ -48,10 +48,26 @@ export type VenueOrderInput = {
   slPrice?: number;
 };
 
+export type VenueLeverageInput = {
+  symbol: string;
+  leverage: number;
+};
+
+export type VenueMarginModeInput = {
+  symbol: string;
+  marginMode: "isolated" | "cross";
+};
+
+export type VenueActionResult = {
+  ok: boolean;
+  message: string;
+};
+
 export type VenueAdapter = {
   id: TradingVenueId;
   venueType: TradingVenueType;
   marketDataLabel: string;
+  supportsOrderPlacement: boolean;
   getTicker: (symbol: string) => Promise<VenueTicker | null>;
   subscribeTicker: (
     symbol: string,
@@ -59,7 +75,12 @@ export type VenueAdapter = {
   ) => Promise<() => void> | (() => void);
   getBalance: (connection?: VenueConnectionInput) => Promise<VenueBalance | null>;
   getPositions: (connection?: VenueConnectionInput) => Promise<VenuePosition[]>;
-  placeOrder: (input: VenueOrderInput, connection?: VenueConnectionInput) => Promise<{ ok: boolean; message: string }>;
-  cancelOrder: (orderId: string, connection?: VenueConnectionInput) => Promise<{ ok: boolean; message: string }>;
+  placeOrder: (input: VenueOrderInput, connection?: VenueConnectionInput) => Promise<VenueActionResult>;
+  cancelOrder: (orderId: string, connection?: VenueConnectionInput) => Promise<VenueActionResult>;
+  setLeverage: (input: VenueLeverageInput, connection?: VenueConnectionInput) => Promise<VenueActionResult>;
+  setMarginMode: (
+    input: VenueMarginModeInput,
+    connection?: VenueConnectionInput
+  ) => Promise<VenueActionResult>;
   testConnection: (connection?: VenueConnectionInput) => Promise<VenueConnectionTestResult>;
 };

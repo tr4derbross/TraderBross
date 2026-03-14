@@ -17,11 +17,13 @@ import {
 import type { NewsItem } from "@/lib/mock-data";
 import type { ActiveVenueState } from "@/lib/active-venue";
 import type { MarginMode, OrderType, Position, Side } from "@/hooks/useTradingState";
+import type { NewsTradePreset } from "@/lib/news-trade";
 import { getBasePrice, MAKER_FEE, TAKER_FEE } from "@/hooks/useTradingState";
 
 type Props = {
   activeVenueState: ActiveVenueState;
   selectedNews?: NewsItem | null;
+  newsTradeIntent?: (NewsTradePreset & { sourceItemId: string }) | null;
   balance: number;
   positions: Position[];
   prices: Record<string, number>;
@@ -38,10 +40,11 @@ type Props = {
     tpPrice?: number,
     slPrice?: number
   ) => Promise<{ ok: boolean; message: string }>;
+  onConsumeNewsTradeIntent?: () => void;
 };
 
 type FeedbackState = {
-  tone: "success" | "error";
+  tone: "success" | "error" | "info";
   message: string;
 };
 
@@ -90,12 +93,14 @@ function connectionLabel(status: ActiveVenueState["connectionStatus"]) {
 export default function TradingPanel({
   activeVenueState,
   selectedNews,
+  newsTradeIntent,
   balance,
   positions,
   prices,
   marketDataSourceLabel,
   onActiveSymbolChange,
   onPlaceOrder,
+  onConsumeNewsTradeIntent,
 }: Props) {
   const ticker = activeVenueState.activeSymbol;
   const currentPrice = prices[ticker] ?? getBasePrice(ticker);
@@ -117,6 +122,33 @@ export default function TradingPanel({
   useEffect(() => {
     setLimitPrice(currentPrice);
   }, [ticker, currentPrice]);
+
+  useEffect(() => {
+    if (!newsTradeIntent || newsTradeIntent.symbol !== ticker) return;
+
+    setSide(newsTradeIntent.side);
+    setOrderType(newsTradeIntent.orderType);
+
+    if (newsTradeIntent.tpPercent) {
+      setTpEnabled(true);
+      updateTpPercent(newsTradeIntent.tpPercent);
+    } else {
+      setTpEnabled(false);
+      setTpPercent("");
+      setTpPriceInput("");
+    }
+
+    if (newsTradeIntent.slPercent) {
+      setSlEnabled(true);
+      updateSlPercent(newsTradeIntent.slPercent);
+    } else {
+      setSlEnabled(false);
+      setSlPercent("");
+      setSlPriceInput("");
+    }
+
+    onConsumeNewsTradeIntent?.();
+  }, [newsTradeIntent, onConsumeNewsTradeIntent, ticker]);
 
   const effectivePrice = orderType === "market" ? currentPrice : limitPrice || currentPrice;
   const feeRate = orderType === "limit" ? MAKER_FEE : TAKER_FEE;
@@ -216,7 +248,10 @@ export default function TradingPanel({
     }
 
     setIsSubmittingOrder(true);
-    setSubmitFeedback(null);
+    setSubmitFeedback({
+      tone: "info",
+      message: `Submitting to ${activeVenueState.venueId.toUpperCase()}...`,
+    });
 
     try {
       const result = await onPlaceOrder(
@@ -268,12 +303,15 @@ export default function TradingPanel({
             </p>
           </div>
 
-          <div
-            className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${connectionTone(
-              activeVenueState.connectionStatus
-            )}`}
-          >
-            {connectionLabel(activeVenueState.connectionStatus)}
+          <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2 text-right">
+            <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Connection Status</div>
+            <div
+              className={`mt-1 inline-flex rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${connectionTone(
+                activeVenueState.connectionStatus
+              )}`}
+            >
+              {connectionLabel(activeVenueState.connectionStatus)}
+            </div>
           </div>
         </div>
 
@@ -281,7 +319,7 @@ export default function TradingPanel({
           <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
             <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-500">
               <Layers3 className="h-3.5 w-3.5 text-amber-200" />
-              Venue
+              Execution Venue
             </div>
             <div className="mt-1 text-[12px] font-semibold text-[#f3ead7]">
               {activeVenueState.venueId.toUpperCase()}
@@ -686,6 +724,45 @@ export default function TradingPanel({
             </section>
           )}
 
+          {selectedNews && (
+            <section className="rounded-2xl border border-[rgba(212,161,31,0.12)] bg-black/20 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                    Quick News Trade
+                  </div>
+                  <div className="mt-1 text-[13px] font-semibold text-[#f5efe1]">
+                    Fast preset aligned to the selected headline
+                  </div>
+                </div>
+                <span className="rounded-full border border-[rgba(212,161,31,0.18)] bg-[rgba(212,161,31,0.08)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-amber-100">
+                  {side.toUpperCase()} {ticker}
+                </span>
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+                  <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Preset Type</div>
+                  <div className="mt-1 text-[12px] font-semibold text-[#f3ead7]">
+                    {orderType.toUpperCase()} reaction
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+                  <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">TP Preset</div>
+                  <div className="mt-1 text-[12px] font-semibold text-[#f3ead7]">
+                    {tpEnabled && tpPercent ? `${tpPercent}%` : "Manual / Off"}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+                  <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">SL Preset</div>
+                  <div className="mt-1 text-[12px] font-semibold text-[#f3ead7]">
+                    {slEnabled && slPercent ? `${slPercent}%` : "Manual / Off"}
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
           <section className="rounded-2xl border border-white/6 bg-[rgba(10,12,16,0.88)] p-3">
             <div className="flex items-center gap-2">
               <Gauge className="h-4 w-4 text-amber-200" />
@@ -731,11 +808,15 @@ export default function TradingPanel({
                 className={`mt-3 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[11px] ${
                   submitFeedback.tone === "success"
                     ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-100"
-                    : "border-rose-400/20 bg-rose-500/10 text-rose-100"
+                    : submitFeedback.tone === "info"
+                      ? "border-amber-400/20 bg-amber-500/10 text-amber-100"
+                      : "border-rose-400/20 bg-rose-500/10 text-rose-100"
                 }`}
               >
                 {submitFeedback.tone === "success" ? (
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                ) : submitFeedback.tone === "info" ? (
+                  <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
                 ) : (
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 )}

@@ -19,6 +19,7 @@ export const hyperliquidAdapter: VenueAdapter = {
   id: "hyperliquid",
   venueType: "wallet",
   marketDataLabel: "Hyperliquid Mark Price",
+  supportsOrderPlacement: false,
   getTicker,
   subscribeTicker: createPollingSubscribe(getTicker, 5000),
   getBalance: async (connection) => {
@@ -55,6 +56,8 @@ export const hyperliquidAdapter: VenueAdapter = {
   },
   placeOrder: notEnabledAction("Hyperliquid execution is not enabled yet."),
   cancelOrder: notEnabledAction("Hyperliquid execution is not enabled yet."),
+  setLeverage: notEnabledAction("Hyperliquid leverage configuration is not enabled yet."),
+  setMarginMode: notEnabledAction("Hyperliquid margin mode configuration is not enabled yet."),
   testConnection: async (connection) => {
     if (!connection?.walletAddress) {
       return disconnectedResult("Connect a wallet before testing Hyperliquid.");

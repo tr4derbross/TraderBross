@@ -18,12 +18,15 @@ export const okxAdapter: VenueAdapter = {
   id: "okx",
   venueType: "cex",
   marketDataLabel: "OKX Perpetuals",
+  supportsOrderPlacement: false,
   getTicker,
   subscribeTicker: createPollingSubscribe(getTicker, 5000),
   getBalance: emptyBalance,
   getPositions: emptyPositions,
   placeOrder: notEnabledAction("OKX execution is not enabled yet."),
   cancelOrder: notEnabledAction("OKX execution is not enabled yet."),
+  setLeverage: notEnabledAction("OKX leverage configuration is not enabled yet."),
+  setMarginMode: notEnabledAction("OKX margin mode configuration is not enabled yet."),
   testConnection: async (connection) =>
     fetchJson("/api/venues/validate", {
       method: "POST",
