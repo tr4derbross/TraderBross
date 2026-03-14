@@ -1,8 +1,11 @@
 import type {
   VenueAdapter,
+  VenueActionResult,
   VenueBalance,
   VenueConnectionInput,
   VenueConnectionTestResult,
+  VenueLeverageInput,
+  VenueMarginModeInput,
   VenueOrderInput,
   VenuePosition,
   VenueTicker,
@@ -35,8 +38,11 @@ export function createPollingSubscribe(
   };
 }
 
-export function notEnabledAction(message: string) {
-  return async (_input?: VenueOrderInput | string, _connection?: VenueConnectionInput) => ({
+export function notEnabledAction<TInput = void>(message: string) {
+  return async (
+    _input?: TInput,
+    _connection?: VenueConnectionInput
+  ): Promise<VenueActionResult> => ({
     ok: false,
     message,
   });
