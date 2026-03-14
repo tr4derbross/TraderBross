@@ -57,28 +57,28 @@ export default function WatchlistPanel({ quotes, prices, onSelectTicker, activeT
   const available = AVAILABLE_TICKERS.filter((t) => !watchlist.includes(t));
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-800 bg-zinc-950 shrink-0">
+      <div className="panel-header soft-divider flex shrink-0 items-center justify-between border-b px-3 py-2.5">
         <div className="flex items-center gap-2">
-          <Star className="w-3.5 h-3.5 text-amber-400" />
-          <span className="text-xs font-bold text-amber-400 tracking-wider uppercase">Watchlist</span>
+          <Star className="h-3.5 w-3.5 text-amber-400" />
+          <span className="brand-section-title text-xs font-bold tracking-wider uppercase">Watchlist</span>
         </div>
         <button
           onClick={() => setAdding((v) => !v)}
-          className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+          className="brand-badge inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] transition hover:border-[rgba(212,161,31,0.24)] hover:text-amber-100"
         >
-          <Plus className="w-3 h-3" />
+          <Plus className="h-3 w-3" />
           Add
         </button>
       </div>
 
       {/* Add ticker dropdown */}
       {adding && (
-        <div className="px-3 py-2 border-b border-zinc-800 bg-zinc-900/60">
-          <div className="flex gap-1">
+        <div className="border-b border-[rgba(212,161,31,0.08)] bg-[rgba(18,16,13,0.72)] px-3 py-2.5">
+          <div className="flex gap-1.5">
             <select
-              className="flex-1 bg-zinc-900 border border-zinc-700 text-xs text-white px-2 py-1 rounded outline-none"
+              className="terminal-input min-h-[34px] flex-1 rounded-lg px-2.5 py-1 text-xs text-white outline-none"
               value={addTicker}
               onChange={(e) => setAddTicker(e.target.value)}
               autoFocus
@@ -91,24 +91,24 @@ export default function WatchlistPanel({ quotes, prices, onSelectTicker, activeT
             <button
               onClick={handleAdd}
               disabled={!addTicker}
-              className="px-3 py-1 text-[10px] bg-amber-500 disabled:bg-zinc-700 text-black disabled:text-zinc-500 rounded font-bold transition-colors"
+              className="brand-chip-active rounded-lg px-3 py-1.5 text-[10px] font-bold transition-colors disabled:opacity-40"
             >
               Add
             </button>
             <button
               onClick={() => { setAdding(false); setAddTicker(""); }}
-              className="px-2 py-1 text-[10px] bg-zinc-800 text-zinc-400 rounded hover:text-white transition-colors"
+              className="terminal-chip rounded-lg px-2 py-1.5 text-[10px] text-zinc-400 transition-colors hover:text-white"
             >
-              <X className="w-3 h-3" />
+              <X className="h-3 w-3" />
             </button>
           </div>
         </div>
       )}
 
       {/* Watchlist table */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {/* Column headers */}
-        <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-1 text-[9px] text-zinc-600 border-b border-zinc-800/40 sticky top-0 bg-zinc-950">
+        <div className="sticky top-0 grid grid-cols-[1fr_auto_auto] gap-2 border-b border-[rgba(212,161,31,0.08)] bg-[rgba(10,10,10,0.96)] px-3 py-1.5 text-[9px] text-zinc-600 backdrop-blur">
           <span>Symbol</span>
           <span className="text-right">Price</span>
           <span className="text-right pr-5">24h</span>
@@ -130,15 +130,17 @@ export default function WatchlistPanel({ quotes, prices, onSelectTicker, activeT
               <div
                 key={ticker}
                 onClick={() => onSelectTicker(ticker)}
-                className={`group flex items-center px-3 py-2 cursor-pointer border-b border-zinc-800/30 transition-colors ${
-                  isActive ? "bg-zinc-800/60" : "hover:bg-zinc-900/50"
+                className={`group flex cursor-pointer items-center border-b border-[rgba(212,161,31,0.06)] px-3 py-2.5 transition-all duration-200 ${
+                  isActive
+                    ? "bg-[rgba(212,161,31,0.08)] shadow-[inset_2px_0_0_rgba(212,161,31,0.7)]"
+                    : "hover:bg-[rgba(212,161,31,0.04)]"
                 }`}
               >
                 {/* Symbol + indicator */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    {isActive && <div className="w-1 h-1 rounded-full bg-amber-400" />}
-                    <span className={`text-xs font-bold ${isActive ? "text-amber-400" : "text-white"}`}>
+                    {isActive && <div className="h-1.5 w-1.5 rounded-full bg-amber-400" />}
+                    <span className={`text-xs font-bold tracking-[0.06em] ${isActive ? "text-amber-300" : "text-white"}`}>
                       {ticker}
                     </span>
                     <span className="text-[9px] text-zinc-600">USDT</span>
@@ -146,17 +148,17 @@ export default function WatchlistPanel({ quotes, prices, onSelectTicker, activeT
                 </div>
 
                 {/* Price */}
-                <div className="text-right mr-3">
+                <div className="mr-3 text-right">
                   <span className={`text-xs font-mono ${isUp ? "text-green-400" : "text-red-400"}`}>
                     ${fmt(price)}
                   </span>
                 </div>
 
                 {/* 24h change */}
-                <div className="flex items-center gap-0.5 w-14 justify-end">
+                <div className="flex w-14 items-center justify-end gap-0.5">
                   {isUp
-                    ? <TrendingUp className="w-2.5 h-2.5 text-green-400 shrink-0" />
-                    : <TrendingDown className="w-2.5 h-2.5 text-red-400 shrink-0" />}
+                    ? <TrendingUp className="h-2.5 w-2.5 shrink-0 text-green-400" />
+                    : <TrendingDown className="h-2.5 w-2.5 shrink-0 text-red-400" />}
                   <span className={`text-[10px] font-bold ${isUp ? "text-green-400" : "text-red-400"}`}>
                     {isUp ? "+" : ""}{changePct.toFixed(2)}%
                   </span>
@@ -165,9 +167,9 @@ export default function WatchlistPanel({ quotes, prices, onSelectTicker, activeT
                 {/* Remove button */}
                 <button
                   onClick={(e) => { e.stopPropagation(); removeTicker(ticker); }}
-                  className="ml-1 opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all"
+                  className="ml-1 rounded-full p-1 text-zinc-600 opacity-0 transition-all hover:bg-white/[0.04] hover:text-red-400 group-hover:opacity-100"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="h-3 w-3" />
                 </button>
               </div>
             );
@@ -176,7 +178,7 @@ export default function WatchlistPanel({ quotes, prices, onSelectTicker, activeT
       </div>
 
       {/* Footer stats */}
-      <div className="px-3 py-1.5 border-t border-zinc-800 bg-zinc-950 shrink-0">
+      <div className="panel-header soft-divider shrink-0 border-t px-3 py-2">
         <div className="flex justify-between text-[9px] text-zinc-600">
           <span>{watchlist.length} symbols</span>
           <span>

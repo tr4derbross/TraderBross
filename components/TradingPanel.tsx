@@ -285,28 +285,28 @@ export default function TradingPanel({
       <div className="panel-header soft-divider shrink-0 border-b px-3 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <div className="rounded-xl border border-[rgba(212,161,31,0.18)] bg-[rgba(212,161,31,0.08)] p-2 text-amber-200">
+            <div className="flex items-center gap-2.5">
+              <div className="rounded-xl border border-[rgba(212,161,31,0.18)] bg-[rgba(212,161,31,0.08)] p-2 text-amber-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 <CandlestickChart className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+                <div className="text-[9px] font-bold uppercase tracking-[0.22em] text-zinc-500">
                   Execution
                 </div>
-                <div className="truncate text-sm font-semibold text-[#f5efe1]">
+                <div className="truncate text-[15px] font-semibold text-[#f5efe1]">
                   {ticker} Perp Setup
                 </div>
               </div>
             </div>
-            <p className="mt-2 max-w-[26rem] text-[11px] leading-5 text-zinc-400">
+            <p className="mt-2 max-w-[24rem] text-[11px] leading-5 text-zinc-500">
               Venue-aware execution workspace aligned to the active platform and market data source.
             </p>
           </div>
 
-          <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2 text-right">
-            <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Connection Status</div>
+          <div className="terminal-surface-soft min-w-[120px] px-3 py-2.5 text-right">
+            <div className="text-[9px] uppercase tracking-[0.16em] text-zinc-500">Connection Status</div>
             <div
-              className={`mt-1 inline-flex rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${connectionTone(
+              className={`mt-1.5 inline-flex rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${connectionTone(
                 activeVenueState.connectionStatus
               )}`}
             >
@@ -316,30 +316,30 @@ export default function TradingPanel({
         </div>
 
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+          <div className="terminal-surface-soft px-3 py-3">
             <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-500">
               <Layers3 className="h-3.5 w-3.5 text-amber-200" />
               Execution Venue
             </div>
-            <div className="mt-1 text-[12px] font-semibold text-[#f3ead7]">
+            <div className="mt-1.5 text-[13px] font-semibold text-[#f3ead7]">
               {activeVenueState.venueId.toUpperCase()}
             </div>
           </div>
-          <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+          <div className="terminal-surface-soft px-3 py-3">
             <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-500">
               <Activity className="h-3.5 w-3.5 text-amber-200" />
               Market Data Source
             </div>
-            <div className="mt-1 truncate text-[12px] font-semibold text-[#f3ead7]">
+            <div className="mt-1.5 truncate text-[13px] font-semibold text-[#f3ead7]">
               {marketDataSourceLabel}
             </div>
           </div>
-          <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+          <div className="terminal-surface-soft px-3 py-3">
             <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-500">
               <Wallet2 className="h-3.5 w-3.5 text-amber-200" />
               Available Balance
             </div>
-            <div className="mt-1 text-[12px] font-semibold text-[#f3ead7]">
+            <div className="mt-1.5 text-[13px] font-semibold text-[#f3ead7]">
               ${balance.toLocaleString("en-US", { maximumFractionDigits: 2 })}
             </div>
           </div>
@@ -348,19 +348,19 @@ export default function TradingPanel({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         <div className="space-y-3">
-          <section className="rounded-2xl border border-white/6 bg-[rgba(10,12,16,0.88)] p-3">
+          <section className="terminal-section">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">
                   Market
                 </div>
-                <div className="mt-1 text-[13px] font-semibold text-[#f5efe1]">
+                <div className="mt-1 text-[14px] font-semibold text-[#f5efe1]">
                   Symbol and live mark
                 </div>
               </div>
-              <div className="rounded-xl border border-[rgba(212,161,31,0.16)] bg-[rgba(212,161,31,0.08)] px-3 py-2 text-right">
+              <div className="terminal-surface-soft min-w-[108px] px-3 py-2.5 text-right">
                 <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Live Mark</div>
-                <div className="mt-1 text-[14px] font-semibold text-[#f3ead7]">
+                <div className="mt-1 text-[15px] font-semibold text-[#f3ead7]">
                   ${toFixedPrice(currentPrice)}
                 </div>
               </div>
@@ -387,13 +387,13 @@ export default function TradingPanel({
               </label>
 
               <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+                <div className="terminal-surface-soft px-3 py-2.5">
                   <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Notional</div>
                   <div className="mt-1 text-[12px] font-semibold text-[#f3ead7]">
                     ${notional.toLocaleString("en-US", { maximumFractionDigits: 2 })}
                   </div>
                 </div>
-                <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+                <div className="terminal-surface-soft px-3 py-2.5">
                   <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Size</div>
                   <div className="mt-1 text-[12px] font-semibold text-[#f3ead7]">
                     {quantity.toLocaleString("en-US", { maximumFractionDigits: 4 })}
@@ -403,17 +403,17 @@ export default function TradingPanel({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/6 bg-[rgba(10,12,16,0.88)] p-3">
+          <section className="terminal-section">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">
                   Order Setup
                 </div>
-                <div className="mt-1 text-[13px] font-semibold text-[#f5efe1]">
+                <div className="mt-1 text-[14px] font-semibold text-[#f5efe1]">
                   Structured execution controls
                 </div>
               </div>
-              <div className="rounded-full border border-white/6 bg-black/20 px-2.5 py-1 text-[9px] uppercase tracking-[0.14em] text-zinc-400">
+              <div className="terminal-surface-soft rounded-full px-2.5 py-1 text-[9px] uppercase tracking-[0.14em] text-zinc-400">
                 {activeVenueState.venueType === "cex" ? "CEX" : "DEX"} routing
               </div>
             </div>
@@ -552,21 +552,21 @@ export default function TradingPanel({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/6 bg-[rgba(10,12,16,0.88)] p-3">
+          <section className="terminal-section">
             <div className="flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 text-amber-200" />
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">
                   TP / SL Engine
                 </div>
-                <div className="mt-1 text-[13px] font-semibold text-[#f5efe1]">
-                  Risk management controls
+                <div className="mt-1 text-[14px] font-semibold text-[#f5efe1]">
+                  Compact risk controls
                 </div>
               </div>
             </div>
 
-            <div className="mt-3 grid gap-3 xl:grid-cols-2">
-              <div className="rounded-xl border border-emerald-500/10 bg-emerald-500/[0.03] p-3">
+            <div className="mt-3 grid gap-2.5 xl:grid-cols-2">
+              <div className="rounded-xl border border-emerald-500/10 bg-emerald-500/[0.03] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-[11px] font-semibold text-emerald-100">
                     <Target className="h-4 w-4" />
@@ -591,7 +591,7 @@ export default function TradingPanel({
                     />
                   </button>
                 </div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="mt-2.5 grid gap-2 sm:grid-cols-[0.8fr_1.2fr]">
                   <input
                     type="number"
                     min="0"
@@ -615,7 +615,7 @@ export default function TradingPanel({
                     } disabled:opacity-45`}
                   />
                 </div>
-                <div className="mt-2 grid grid-cols-3 gap-2">
+                <div className="mt-2 grid grid-cols-3 gap-1.5">
                   {TP_PRESETS.map((value) => (
                     <button
                       key={value}
@@ -630,7 +630,7 @@ export default function TradingPanel({
                 </div>
               </div>
 
-              <div className="rounded-xl border border-rose-500/10 bg-rose-500/[0.03] p-3">
+              <div className="rounded-xl border border-rose-500/10 bg-rose-500/[0.03] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-[11px] font-semibold text-rose-100">
                     <AlertTriangle className="h-4 w-4" />
@@ -655,7 +655,7 @@ export default function TradingPanel({
                     />
                   </button>
                 </div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="mt-2.5 grid gap-2 sm:grid-cols-[0.8fr_1.2fr]">
                   <input
                     type="number"
                     min="0"
@@ -679,7 +679,7 @@ export default function TradingPanel({
                     } disabled:opacity-45`}
                   />
                 </div>
-                <div className="mt-2 grid grid-cols-3 gap-2">
+                <div className="mt-2 grid grid-cols-3 gap-1.5">
                   {SL_PRESETS.map((value) => (
                     <button
                       key={value}
@@ -695,18 +695,42 @@ export default function TradingPanel({
               </div>
             </div>
 
-            <div className="mt-3 rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">
+            <div className="terminal-surface-soft mt-2.5 flex items-center justify-between gap-3 px-3 py-2.5">
+              <div>
+                <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">
                   Risk / Reward
                 </div>
-                <div className="text-[12px] font-semibold text-[#f3ead7]">{riskReward}</div>
+                <div className="mt-0.5 text-[10px] text-zinc-500">Live ratio from current TP/SL inputs</div>
               </div>
+              <div className="text-[13px] font-semibold text-[#f3ead7]">{riskReward}</div>
             </div>
           </section>
 
+          {submitFeedback && (
+            <section className="terminal-surface-soft px-3 py-2.5">
+              <div
+                className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[11px] ${
+                  submitFeedback.tone === "success"
+                    ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-100"
+                    : submitFeedback.tone === "info"
+                      ? "border-amber-400/20 bg-amber-500/10 text-amber-100"
+                      : "border-rose-400/20 bg-rose-500/10 text-rose-100"
+                }`}
+              >
+                {submitFeedback.tone === "success" ? (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                ) : submitFeedback.tone === "info" ? (
+                  <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                )}
+                <span>{submitFeedback.message}</span>
+              </div>
+            </section>
+          )}
+
           {selectedNews && (
-            <section className="rounded-2xl border border-[rgba(212,161,31,0.12)] bg-[rgba(212,161,31,0.05)] p-3">
+            <section className="terminal-section border-[rgba(212,161,31,0.12)] bg-[rgba(212,161,31,0.05)]">
               <div className="flex items-start gap-2">
                 <Newspaper className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" />
                 <div className="min-w-0">
@@ -725,7 +749,7 @@ export default function TradingPanel({
           )}
 
           {selectedNews && (
-            <section className="rounded-2xl border border-[rgba(212,161,31,0.12)] bg-black/20 p-3">
+            <section className="terminal-section border-[rgba(212,161,31,0.12)] bg-black/20">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
@@ -741,19 +765,19 @@ export default function TradingPanel({
               </div>
 
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+                <div className="terminal-surface-soft px-3 py-2.5">
                   <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Preset Type</div>
                   <div className="mt-1 text-[12px] font-semibold text-[#f3ead7]">
                     {orderType.toUpperCase()} reaction
                   </div>
                 </div>
-                <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+                <div className="terminal-surface-soft px-3 py-2.5">
                   <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">TP Preset</div>
                   <div className="mt-1 text-[12px] font-semibold text-[#f3ead7]">
                     {tpEnabled && tpPercent ? `${tpPercent}%` : "Manual / Off"}
                   </div>
                 </div>
-                <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+                <div className="terminal-surface-soft px-3 py-2.5">
                   <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">SL Preset</div>
                   <div className="mt-1 text-[12px] font-semibold text-[#f3ead7]">
                     {slEnabled && slPercent ? `${slPercent}%` : "Manual / Off"}
@@ -763,66 +787,45 @@ export default function TradingPanel({
             </section>
           )}
 
-          <section className="rounded-2xl border border-white/6 bg-[rgba(10,12,16,0.88)] p-3">
+          <section className="terminal-section">
             <div className="flex items-center gap-2">
               <Gauge className="h-4 w-4 text-amber-200" />
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">
                   Summary
                 </div>
-                <div className="mt-1 text-[13px] font-semibold text-[#f5efe1]">
+                <div className="mt-1 text-[14px] font-semibold text-[#f5efe1]">
                   Execution readiness
                 </div>
               </div>
             </div>
 
             <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+              <div className="terminal-surface-soft px-3 py-2.5">
                 <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Entry Price</div>
                 <div className="mt-1 text-[12px] font-semibold text-[#f3ead7]">
                   ${toFixedPrice(effectivePrice)}
                 </div>
               </div>
-              <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+              <div className="terminal-surface-soft px-3 py-2.5">
                 <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Fees</div>
                 <div className="mt-1 text-[12px] font-semibold text-[#f3ead7]">
                   ${feeEstimate.toLocaleString("en-US", { maximumFractionDigits: 2 })}
                 </div>
               </div>
-              <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+              <div className="terminal-surface-soft px-3 py-2.5">
                 <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Post-Trade Buffer</div>
                 <div className="mt-1 text-[12px] font-semibold text-[#f3ead7]">
                   ${availableAfterFees.toLocaleString("en-US", { maximumFractionDigits: 2 })}
                 </div>
               </div>
-              <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
+              <div className="terminal-surface-soft px-3 py-2.5">
                 <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Open Position</div>
                 <div className="mt-1 text-[12px] font-semibold text-[#f3ead7]">
                   {openPosition ? `${openPosition.side.toUpperCase()} @ ${toFixedPrice(openPosition.entryPrice)}` : "None"}
                 </div>
               </div>
             </div>
-
-            {submitFeedback && (
-              <div
-                className={`mt-3 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[11px] ${
-                  submitFeedback.tone === "success"
-                    ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-100"
-                    : submitFeedback.tone === "info"
-                      ? "border-amber-400/20 bg-amber-500/10 text-amber-100"
-                      : "border-rose-400/20 bg-rose-500/10 text-rose-100"
-                }`}
-              >
-                {submitFeedback.tone === "success" ? (
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                ) : submitFeedback.tone === "info" ? (
-                  <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
-                ) : (
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                )}
-                <span>{submitFeedback.message}</span>
-              </div>
-            )}
 
             <button
               type="button"
