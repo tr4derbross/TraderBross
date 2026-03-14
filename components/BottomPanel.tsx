@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Position, Order, calcPnl, calcRoe, EquityPoint } from "@/hooks/useTradingState";
-import { X, ChevronUp, ChevronDown, TrendingUp, PencilLine } from "lucide-react";
+import { X, ChevronUp, TrendingUp, PencilLine } from "lucide-react";
 
 type Props = {
   positions: Position[];
@@ -12,6 +12,9 @@ type Props = {
   onClosePosition: (id: string) => void;
   onCancelOrder: (id: string) => void;
   onUpdatePositionTpSl: (posId: string, tpPrice: number | undefined, slPrice: number | undefined) => void;
+  drawerMode?: "half" | "full";
+  onCollapse?: () => void;
+  onExpand?: () => void;
 };
 
 function fmt(n: number) {
@@ -175,9 +178,11 @@ export default function BottomPanel({
   onClosePosition,
   onCancelOrder,
   onUpdatePositionTpSl,
+  drawerMode = "half",
+  onCollapse,
+  onExpand,
 }: Props) {
   const [tab, setTab] = useState<"positions" | "openorders" | "history" | "pnl">("positions");
-  const [collapsed, setCollapsed] = useState(false);
   const [editingPosId, setEditingPosId] = useState<string | null>(null);
   const [draftTp, setDraftTp] = useState("");
   const [draftSl, setDraftSl] = useState("");
@@ -264,12 +269,8 @@ export default function BottomPanel({
   };
 
   return (
-    <div
-      className={`panel-shell soft-divider shrink-0 flex flex-col rounded-xl border transition-all duration-200 ${
-        collapsed ? "h-8" : "h-[220px]"
-      }`}
-    >
-      <div className="panel-header soft-divider flex h-10 shrink-0 items-center gap-1 rounded-t-xl border-b px-3">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="panel-header soft-divider flex h-10 shrink-0 items-center gap-1 border-b px-3">
         <div className="mr-4 flex gap-0">
           {(
             [
@@ -283,10 +284,9 @@ export default function BottomPanel({
               key={key}
               onClick={() => {
                 setTab(key);
-                setCollapsed(false);
               }}
               className={`border-b-2 px-3 py-0.5 text-[11px] transition-colors ${
-                tab === key && !collapsed
+                tab === key
                   ? "border-[rgba(212,161,31,0.72)] text-[#f5efe1]"
                   : "border-transparent text-zinc-500 hover:text-zinc-300"
               }`}
@@ -296,7 +296,7 @@ export default function BottomPanel({
           ))}
         </div>
 
-        {!collapsed && positions.length > 0 && tab !== "pnl" && (
+        {positions.length > 0 && tab !== "pnl" && (
           <div className="ml-2 flex items-center gap-3 text-[10px]">
             <span className="text-zinc-500">Unrealized PnL:</span>
             <span className={totalUnrealizedPnL >= 0 ? "font-bold text-emerald-300" : "font-bold text-red-300"}>
@@ -312,14 +312,21 @@ export default function BottomPanel({
               ${balance.toLocaleString("en-US", { maximumFractionDigits: 2 })}
             </span>
           </span>
-          <button onClick={() => setCollapsed((c) => !c)} className="text-zinc-600 hover:text-zinc-400">
-            {collapsed ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          <button
+            type="button"
+            onClick={onExpand}
+            className="text-zinc-600 hover:text-zinc-400"
+            title={drawerMode === "full" ? "Switch to half height" : "Expand activity panel"}
+          >
+            <ChevronUp className={`h-3.5 w-3.5 transition-transform ${drawerMode === "full" ? "rotate-180" : ""}`} />
+          </button>
+          <button type="button" onClick={onCollapse} className="text-zinc-600 hover:text-zinc-400" title="Collapse">
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
 
-      {!collapsed && (
-        <div className={`flex-1 overflow-auto ${tab === "pnl" ? "flex flex-col" : ""}`}>
+      <div className={`flex-1 overflow-auto ${tab === "pnl" ? "flex flex-col" : ""}`}>
           {tab === "positions" && (
             <table className="w-full border-collapse text-[11px]">
               <thead>
@@ -599,8 +606,7 @@ export default function BottomPanel({
           )}
 
           {tab === "pnl" && <EquityChart history={equityHistory} />}
-        </div>
-      )}
+      </div>
     </div>
   );
 }
