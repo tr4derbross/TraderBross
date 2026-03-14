@@ -63,16 +63,16 @@ export default function NewsFeed({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Panel header */}
-      <div className="flex items-center justify-between border-b border-[rgba(212,161,31,0.12)] bg-[linear-gradient(180deg,rgba(21,18,14,0.96),rgba(10,10,10,0.94))] px-3 py-2">
+      <div className="panel-header soft-divider flex items-center justify-between border-b px-3 py-2.5">
         <div className="flex items-center gap-2">
           <Activity className="h-3.5 w-3.5 text-amber-200" />
           <span className="brand-section-title text-xs font-bold tracking-wider uppercase">
             {sourceLabel[sourceFilter]}
           </span>
         </div>
-        <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+        <div className="flex items-center gap-2.5 text-[10px] text-zinc-500">
           {liveCount > 0 && (
             <span className="text-amber-200 animate-pulse">+{liveCount} live</span>
           )}
@@ -102,7 +102,7 @@ export default function NewsFeed({
       />
 
       {/* Feed */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center h-32 text-zinc-600 text-xs">
             Loading...
