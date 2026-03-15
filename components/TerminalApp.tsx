@@ -18,6 +18,10 @@ import HyperliquidPanel from "@/components/HyperliquidPanel";
 import DydxPanel from "@/components/DydxPanel";
 import VenuesPanel from "@/components/VenuesPanel";
 import WatchlistPanel from "@/components/WatchlistPanel";
+import ChatPanel from "@/components/ChatPanel";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import { FearGreedPill } from "@/components/FearGreedWidget";
+import { useFearGreed } from "@/hooks/useFearGreed";
 import BrandMark from "@/components/BrandMark";
 import MarketStatsBar from "@/components/MarketStatsBar";
 import { useTradingState } from "@/hooks/useTradingState";
@@ -46,7 +50,7 @@ import {
   Unplug,
 } from "lucide-react";
 
-type RightTab = "trade" | "dex" | "alerts" | "connect" | "watch";
+type RightTab = "trade" | "dex" | "alerts" | "connect" | "watch" | "ai";
 type DexSubTab = "hl" | "dydx";
 type WorkspaceTab = "news" | "chart" | "tools";
 type HeaderPlatform = "hyperliquid" | "dydx" | "okx" | "bybit" | "binance";
@@ -427,6 +431,7 @@ export default function TerminalApp() {
   }, [headerConnectOpen]);
 
   const { prices: wsPrices, quotes: wsQuotes, connected: wsConnected } = useBinanceWs();
+  const { data: fearGreedData } = useFearGreed();
   const { ticker: activeVenueTicker, connectionState: activeVenueFeedState } = useVenueMarketData(
     activeVenueState.venueId,
     activeVenueState.activeSymbol
@@ -523,6 +528,7 @@ export default function TerminalApp() {
     { id: "connect", label: "Venues" },
     { id: "watch", label: "Watch" },
     { id: "alerts", label: "Alerts" },
+    { id: "ai", label: "AI" },
   ];
 
   const isMobile = viewportWidth < 768;
@@ -816,7 +822,16 @@ export default function TerminalApp() {
     selectedHeaderPlatform.label,
   ]);
 
+  const handleAskAI = useCallback(
+    (item: NewsItem) => {
+      handleSelectItem(item);
+      setRightTab("ai");
+    },
+    [handleSelectItem]
+  );
+
   const renderNewsPanel = () => (
+    <ErrorBoundary label="News Feed">
     <div className="panel-shell soft-divider flex h-full min-h-0 flex-col overflow-hidden border xl:rounded-l-xl xl:border-r-0">
       <NewsFeed
         onSelectItem={handleSelectItem}
@@ -824,8 +839,10 @@ export default function TerminalApp() {
         onQuickTrade={handleNewsQuickTrade}
         selectedItem={selectedItem}
         onNewItem={(item) => checkNewsAgainstAlerts(item)}
+        onAskAI={handleAskAI}
       />
     </div>
+    </ErrorBoundary>
   );
 
   const renderChartPanel = (extraClassName = "") => (
@@ -847,6 +864,12 @@ export default function TerminalApp() {
     </div>
   );
 
+  const renderChartPanelWrapped = (extraClassName = "") => (
+    <ErrorBoundary label="Price Chart">
+      {renderChartPanel(extraClassName)}
+    </ErrorBoundary>
+  );
+
   const renderRightPanel = () => (
     <div className="panel-shell soft-divider flex h-full min-h-0 flex-col overflow-hidden border xl:rounded-r-xl xl:border-l-0">
       <div className="panel-header soft-divider shrink-0 border-b">
@@ -856,9 +879,22 @@ export default function TerminalApp() {
               key={tab.id}
               onClick={() => setRightTab(tab.id)}
               data-active={rightTab === tab.id}
-              className="accent-tab shrink-0 rounded-lg px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.2em] transition-colors hover:text-zinc-300"
+              className={`accent-tab shrink-0 rounded-lg px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.2em] transition-colors hover:text-zinc-300 ${
+                tab.id === "ai"
+                  ? rightTab === "ai"
+                    ? "text-amber-300"
+                    : "text-amber-600 hover:text-amber-300"
+                  : ""
+              }`}
             >
-              {tab.label}
+              {tab.id === "ai" ? (
+                <span className="inline-flex items-center gap-1">
+                  <span>✦</span>
+                  {tab.label}
+                </span>
+              ) : (
+                tab.label
+              )}
             </button>
           ))}
         </div>
@@ -910,28 +946,69 @@ export default function TerminalApp() {
         </div>
       )}
 
-      {rightTab === "connect" && <VenuesPanel hlWallet={hlWallet} onHlWalletChange={setHlWallet} />}
-
-      {rightTab === "watch" && (
-        <WatchlistPanel
-          quotes={wsQuotes}
-          prices={prices}
-          activeTicker={activeVenueState.activeSymbol}
-          onSelectTicker={(ticker) => {
-            setActiveSymbol(ticker);
-            setRightTab("trade");
-            setMobileWorkspaceTab("chart");
-          }}
-        />
+      {rightTab === "connect" && (
+        <ErrorBoundary label="Venues">
+          <div className="tab-content-enter min-h-0 flex-1 overflow-hidden">
+            <VenuesPanel hlWallet={hlWallet} onHlWalletChange={setHlWallet} />
+          </div>
+        </ErrorBoundary>
       )}
 
-      {rightTab === "alerts" && <AlertPanel />}
+      {rightTab === "watch" && (
+        <ErrorBoundary label="Watchlist">
+          <div className="tab-content-enter min-h-0 flex-1 overflow-hidden">
+            <WatchlistPanel
+              quotes={wsQuotes}
+              prices={prices}
+              activeTicker={activeVenueState.activeSymbol}
+              onSelectTicker={(ticker) => {
+                setActiveSymbol(ticker);
+                setRightTab("trade");
+                setMobileWorkspaceTab("chart");
+              }}
+            />
+          </div>
+        </ErrorBoundary>
+      )}
+
+      {rightTab === "alerts" && (
+        <ErrorBoundary label="Alerts">
+          <div className="tab-content-enter min-h-0 flex-1 overflow-hidden">
+            <AlertPanel />
+          </div>
+        </ErrorBoundary>
+      )}
+
+      {rightTab === "ai" && (
+        <ErrorBoundary label="AI Chat">
+          <div className="tab-content-enter min-h-0 flex-1 overflow-hidden">
+            <ChatPanel
+              context={{
+                ticker: activeVenueState.activeSymbol,
+                price: getTickerDisplayPrice(activeVenueTicker)
+                  ? String(getTickerDisplayPrice(activeVenueTicker))
+                  : undefined,
+                fearGreed: fearGreedData
+                  ? { value: fearGreedData.value, label: fearGreedData.label }
+                  : undefined,
+                recentNews: selectedItem
+                  ? [{ headline: selectedItem.headline, sentiment: selectedItem.sentiment ?? undefined }]
+                  : undefined,
+              }}
+            />
+          </div>
+        </ErrorBoundary>
+      )}
     </div>
   );
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-black">
       <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-3 py-3 sm:px-4 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
+        {/* Fear & Greed pill — left of center */}
+        <div className="absolute left-3 top-1/2 z-10 -translate-y-1/2 sm:left-4">
+          <FearGreedPill compact />
+        </div>
         <div className="relative z-10 flex items-center justify-center px-2">
           <BrandMark className="mx-auto" />
         </div>
@@ -1000,7 +1077,7 @@ export default function TerminalApp() {
 
               <ResizeDivider onDrag={resizeNews} />
 
-              {renderChartPanel()}
+              {renderChartPanelWrapped()}
 
               <ResizeDivider onDrag={resizeRight} />
 
@@ -1011,7 +1088,7 @@ export default function TerminalApp() {
           ) : isTablet ? (
             <>
               <div className="min-h-0 flex-[1.15] overflow-hidden">
-                {renderChartPanel("rounded-xl")}
+                {renderChartPanelWrapped("rounded-xl")}
               </div>
               <div className="grid min-h-0 flex-1 gap-2 md:grid-cols-2">
                 <div className="min-h-0 overflow-hidden">{renderNewsPanel()}</div>
@@ -1337,7 +1414,12 @@ export default function TerminalApp() {
                       </div>
                       <div className="mt-2 text-[10px] text-zinc-400">
                         {headerActionMessage ||
-                          "Credentials stay inside this header flow and are stored locally for MVP setup only."}
+                          "Credentials are stored in your browser's localStorage — for production use, set them in .env.local on the server instead."}
+                      </div>
+                      {/* Security reminder */}
+                      <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-500/12 bg-amber-500/5 px-2 py-1.5 text-[9px] text-amber-400/70">
+                        <span className="mt-0.5 shrink-0">⚠</span>
+                        <span>Never use keys with withdrawal permissions. Restrict by IP in exchange settings.</span>
                       </div>
                       {headerConnection.platform === headerPlatform && headerConnection.status === "failed" && (
                         <div className="mt-2 text-[10px] text-rose-200">

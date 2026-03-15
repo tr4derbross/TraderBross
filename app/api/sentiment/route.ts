@@ -1,26 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { classifyText } from "@/lib/ai-providers";
+
+const SYSTEM_PROMPT =
+  'You are a financial news sentiment analyzer. Respond ONLY with a JSON object: {"score":"bullish"|"bearish"|"neutral","confidence":0-100,"reason":"one sentence"}';
 
 export async function POST(request: NextRequest) {
   const { headline, summary } = await request.json();
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return NextResponse.json(mockSentiment(headline));
-
   try {
-    const client = new Anthropic({ apiKey });
-    const msg = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 150,
-      system:
-        'You are a financial news sentiment analyzer. Respond ONLY with a JSON object: {"score":"bullish"|"bearish"|"neutral","confidence":0-100,"reason":"one sentence"}',
-      messages: [
-        { role: "user", content: `Headline: ${headline}\nSummary: ${summary}` },
-      ],
-    });
-    const text = msg.content[0].type === "text" ? msg.content[0].text : "{}";
+    const text = await classifyText(
+      `Headline: ${headline}\nSummary: ${summary ?? ""}`,
+      SYSTEM_PROMPT
+    );
+
     const jsonMatch = text.match(/\{[\s\S]*?\}/);
-    const result = JSON.parse(jsonMatch?.[0] ?? "{}");
+    if (!jsonMatch) throw new Error("No JSON in response");
+    const result = JSON.parse(jsonMatch[0]) as {
+      score: string;
+      confidence: number;
+      reason: string;
+    };
     return NextResponse.json(result);
   } catch {
     return NextResponse.json(mockSentiment(headline));
@@ -30,26 +29,12 @@ export async function POST(request: NextRequest) {
 function mockSentiment(headline: string) {
   const lower = headline.toLowerCase();
   const bullishWords = [
-    "beats",
-    "surges",
-    "record",
-    "approval",
-    "wins",
-    "upgrades",
-    "buyback",
-    "growth",
-    "rally",
+    "beats", "surges", "record", "approval", "wins", "upgrades",
+    "buyback", "growth", "rally", "pump", "ath", "partnership",
   ];
   const bearishWords = [
-    "miss",
-    "drops",
-    "fall",
-    "warns",
-    "cuts",
-    "decline",
-    "below",
-    "layoffs",
-    "concern",
+    "miss", "drops", "fall", "warns", "cuts", "decline",
+    "below", "layoffs", "concern", "crash", "dump", "ban", "hack",
   ];
 
   const bullScore = bullishWords.filter((w) => lower.includes(w)).length;
@@ -67,11 +52,10 @@ function mockSentiment(headline: string) {
       confidence: 60 + Math.floor(Math.random() * 25),
       reason: "Negative catalyst detected in headline",
     };
-  } else {
-    return {
-      score: "neutral",
-      confidence: 50 + Math.floor(Math.random() * 20),
-      reason: "Mixed or unclear market impact",
-    };
   }
+  return {
+    score: "neutral",
+    confidence: 50 + Math.floor(Math.random() * 20),
+    reason: "Mixed or unclear market impact",
+  };
 }

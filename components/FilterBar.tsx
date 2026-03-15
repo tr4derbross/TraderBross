@@ -1,20 +1,39 @@
 "use client";
 
 import { SECTORS, AVAILABLE_TICKERS } from "@/lib/mock-data";
-import { SourceFilter } from "@/hooks/useNews";
-import { Search, X, Newspaper, Twitter, Waves } from "lucide-react";
+import { SourceFilter, ImportanceFilter, SentimentFilter } from "@/hooks/useNews";
+import { Search, X, Newspaper, Twitter, Waves, TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 type Props = {
   sector: string;
   ticker: string;
   keyword: string;
   sourceFilter: SourceFilter;
+  importanceFilter: ImportanceFilter;
+  sentimentFilter: SentimentFilter;
   onSector: (s: string) => void;
   onTicker: (t: string) => void;
   onKeyword: (k: string) => void;
   onSource: (s: SourceFilter) => void;
+  onImportance: (i: ImportanceFilter) => void;
+  onSentiment: (s: SentimentFilter) => void;
   counts: { news: number; whale: number; social: number; all: number };
 };
+
+const IMPORTANCE_OPTIONS: { key: ImportanceFilter; label: string; style: string }[] = [
+  { key: "all", label: "All", style: "text-zinc-400 border-transparent" },
+  { key: "breaking", label: "🔴 Breaking", style: "text-rose-300 border-rose-500/30 bg-rose-500/10" },
+  { key: "market-moving", label: "⚡ Mover", style: "text-amber-300 border-amber-500/30 bg-amber-500/10" },
+  { key: "watch", label: "👁 Watch", style: "text-zinc-300 border-zinc-600/40 bg-zinc-700/20" },
+  { key: "noise", label: "Noise", style: "text-zinc-600 border-transparent" },
+];
+
+const SENTIMENT_OPTIONS: { key: SentimentFilter; label: string; icon: React.ReactNode; style: string }[] = [
+  { key: "all", label: "All", icon: null, style: "text-zinc-400" },
+  { key: "bullish", label: "Bull", icon: <TrendingUp className="h-3 w-3" />, style: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10" },
+  { key: "bearish", label: "Bear", icon: <TrendingDown className="h-3 w-3" />, style: "text-rose-400 border-rose-500/30 bg-rose-500/10" },
+  { key: "neutral", label: "Neut", icon: <Minus className="h-3 w-3" />, style: "text-zinc-400 border-zinc-600/30 bg-zinc-700/20" },
+];
 
 const SOURCE_TABS: { key: SourceFilter; label: string; icon: React.ReactNode; color: string }[] = [
   { key: "all", label: "All", icon: null, color: "text-amber-50" },
@@ -28,10 +47,14 @@ export default function FilterBar({
   ticker,
   keyword,
   sourceFilter,
+  importanceFilter,
+  sentimentFilter,
   onSector,
   onTicker,
   onKeyword,
   onSource,
+  onImportance,
+  onSentiment,
   counts,
 }: Props) {
   return (
@@ -127,6 +150,46 @@ export default function FilterBar({
               {ticker} ×
             </span>
           )}
+        </div>
+      </div>
+
+      {/* Importance + Sentiment quick filters */}
+      <div className="flex items-center gap-2 overflow-x-auto border-t border-[rgba(212,161,31,0.07)] px-3 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <span className="shrink-0 text-[9px] uppercase tracking-[0.18em] text-zinc-600">Impact</span>
+        <div className="flex shrink-0 gap-1">
+          {IMPORTANCE_OPTIONS.map(({ key, label, style }) => (
+            <button
+              key={key}
+              onClick={() => onImportance(key)}
+              className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-medium transition-all ${
+                importanceFilter === key
+                  ? `${style} opacity-100`
+                  : "border-transparent text-zinc-600 hover:text-zinc-400"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mx-1 h-3 w-px shrink-0 bg-zinc-800" />
+
+        <span className="shrink-0 text-[9px] uppercase tracking-[0.18em] text-zinc-600">Sent.</span>
+        <div className="flex shrink-0 gap-1">
+          {SENTIMENT_OPTIONS.map(({ key, label, icon, style }) => (
+            <button
+              key={key}
+              onClick={() => onSentiment(key)}
+              className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-medium transition-all ${
+                sentimentFilter === key
+                  ? `${style} opacity-100`
+                  : "border-transparent text-zinc-600 hover:text-zinc-400"
+              }`}
+            >
+              {icon}
+              {label}
+            </button>
+          ))}
         </div>
       </div>
     </div>

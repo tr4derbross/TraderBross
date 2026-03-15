@@ -4,20 +4,25 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { MOCK_NEWS, MOCK_SOCIAL, MOCK_WHALES, NewsItem } from "@/lib/mock-data";
 
 export type SourceFilter = "all" | "news" | "social" | "whale";
+export type ImportanceFilter = "all" | "breaking" | "market-moving" | "watch" | "noise";
+export type SentimentFilter = "all" | "bullish" | "bearish" | "neutral";
 
 interface UseNewsOptions {
   sector?: string;
   ticker?: string;
   keyword?: string;
   sourceFilter?: SourceFilter;
+  importanceFilter?: ImportanceFilter;
+  sentimentFilter?: SentimentFilter;
 }
 
-export function useNews({ sector, ticker, keyword, sourceFilter = "all" }: UseNewsOptions) {
+export function useNews({ sector, ticker, keyword, sourceFilter = "all", importanceFilter = "all", sentimentFilter = "all" }: UseNewsOptions) {
   const [newsItems, setNewsItems] = useState<NewsItem[]>(() => MOCK_NEWS);
   const [whaleItems, setWhaleItems] = useState<NewsItem[]>(() => MOCK_WHALES);
   const [socialItems, setSocialItems] = useState<NewsItem[]>(() => MOCK_SOCIAL);
   const [loading, setLoading] = useState(false);
   const [liveCount, setLiveCount] = useState(0);
+  const [isLive, setIsLive] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
 
@@ -33,9 +38,11 @@ export function useNews({ sector, ticker, keyword, sourceFilter = "all" }: UseNe
     fetch(`/api/news?${params}`, { signal: controller.signal, cache: "no-store" })
       .then((r) => r.json())
       .then((data: NewsItem[]) => {
-        setNewsItems(
-          data.map((n) => ({ ...n, timestamp: new Date(n.timestamp), type: n.type || "news" }))
-        );
+        const mapped = data.map((n) => ({ ...n, timestamp: new Date(n.timestamp), type: n.type || "news" }));
+        setNewsItems(mapped);
+        // Heuristic: if data contains non-mock IDs or has > 3 items with real URLs, it's live
+        const hasRealData = mapped.some((n) => n.url && n.url !== "#" && !n.id.startsWith("mock-"));
+        setIsLive(hasRealData);
         setLoading(false);
       })
       .catch(() => setLoading(false))
@@ -155,11 +162,18 @@ export function useNews({ sector, ticker, keyword, sourceFilter = "all" }: UseNe
   if (sector && sector !== "All") {
     filtered = filtered.filter((n) => n.sector.includes(sector));
   }
+  if (importanceFilter && importanceFilter !== "all") {
+    filtered = filtered.filter((n) => n.importance === importanceFilter);
+  }
+  if (sentimentFilter && sentimentFilter !== "all") {
+    filtered = filtered.filter((n) => n.sentiment === sentimentFilter);
+  }
 
   return {
     news: filtered,
     loading,
     liveCount,
+    isLive,
     refreshNews,
     counts: {
       news: newsItems.length,

@@ -12,6 +12,7 @@ import {
   Loader2,
   ArrowRightLeft,
   ExternalLink,
+  Sparkles,
 } from "lucide-react";
 
 type Props = {
@@ -20,6 +21,7 @@ type Props = {
   onSelect: (item: NewsItem) => void;
   onTickerSelect?: (ticker: string, item: NewsItem) => void;
   onQuickTrade?: (preset: NewsTradePreset, item: NewsItem) => void;
+  onAskAI?: (item: NewsItem) => void;
   selected: boolean;
 };
 
@@ -360,7 +362,7 @@ function SocialCard({ item, isNew, onSelect, onTickerSelect, onQuickTrade, selec
   );
 }
 
-function NewsCardInner({ item, isNew, onSelect, onTickerSelect, onQuickTrade, selected }: Props) {
+function NewsCardInner({ item, isNew, onSelect, onTickerSelect, onQuickTrade, onAskAI, selected }: Props) {
   const [loadingSentiment, setLoadingSentiment] = useState(false);
   const [sentiment, setSentiment] = useState<{
     score: string;
@@ -459,17 +461,32 @@ function NewsCardInner({ item, isNew, onSelect, onTickerSelect, onQuickTrade, se
               AI: {sentiment.reason}
             </p>
           )}
-          {item.url && item.url !== "#" && (
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-[10px] text-green-500 hover:text-green-400"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <ExternalLink className="h-3 w-3" /> Read Article
-            </a>
-          )}
+          <div className="flex items-center gap-2 pt-0.5">
+            {item.url && item.url !== "#" && (
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[10px] text-green-500 hover:text-green-400"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <ExternalLink className="h-3 w-3" /> Read Article
+              </a>
+            )}
+            {onAskAI && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAskAI(item);
+                }}
+                className="ml-auto inline-flex items-center gap-1 rounded-full border border-amber-400/20 bg-amber-500/8 px-2.5 py-1 text-[10px] font-medium text-amber-300 transition-colors hover:border-amber-400/40 hover:bg-amber-500/14 hover:text-amber-200"
+              >
+                <Sparkles className="h-3 w-3" />
+                Ask AI
+              </button>
+            )}
+          </div>
         </div>
       )}
     </CardShell>
