@@ -28,7 +28,7 @@ export function useNews({ sector, ticker, keyword, sourceFilter = "all" }: UseNe
     if (ticker) params.set("ticker", ticker);
     if (keyword) params.set("keyword", keyword);
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 4000);
+    const timeoutId = window.setTimeout(() => controller.abort(), 12_000);
 
     fetch(`/api/news?${params}`, { signal: controller.signal, cache: "no-store" })
       .then((r) => r.json())
@@ -106,7 +106,11 @@ export function useNews({ sector, ticker, keyword, sourceFilter = "all" }: UseNe
           id: `live-${Date.now()}-${++counter}`,
           type: "news",
         };
-        setNewsItems((prev) => [item, ...prev.slice(0, 49)]);
+        setNewsItems((prev) => {
+          const key = item.headline.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 70);
+          if (prev.some((n) => n.headline.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 70) === key)) return prev;
+          return [item, ...prev.slice(0, 49)];
+        });
         setLiveCount((c) => c + 1);
       }
     };

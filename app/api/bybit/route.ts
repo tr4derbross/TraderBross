@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { withCache } from "@/lib/server-cache";
 
 const BYBIT_BASE = "https://api.bybit.com";
 
@@ -70,14 +71,18 @@ export async function POST(req: NextRequest) {
 
 async function getQuotes() {
   try {
-    const res = await fetch(
-      `${BYBIT_BASE}/v5/market/tickers?category=linear`,
-      { cache: "no-store" }
-    );
-    if (!res.ok) throw new Error(`Bybit ${res.status}`);
-    const { result } = await res.json() as {
-      result: { list: Array<{ symbol: string; lastPrice: string; price24hPcnt: string; prevPrice24h: string }> }
-    };
+    const result = await withCache("bybit:quotes", 20_000, async () => {
+      const res = await fetch(
+        `${BYBIT_BASE}/v5/market/tickers?category=linear`,
+        { cache: "no-store", signal: AbortSignal.timeout(5000) }
+      );
+      if (!res.ok) throw new Error(`Bybit ${res.status}`);
+      const json = await res.json() as {
+        result: { list: Array<{ symbol: string; lastPrice: string; price24hPcnt: string; prevPrice24h: string }> }
+      };
+      return json.result;
+    });
+    if (!result) throw new Error("no data");
 
     const reverseMap = Object.fromEntries(Object.entries(PERP_MAP).map(([t, s]) => [s, t]));
     return NextResponse.json(

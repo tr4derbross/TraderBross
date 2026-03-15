@@ -108,6 +108,45 @@ async function fetchSubstackFeeds(): Promise<NewsItem[]> {
     .flatMap((r) => r.value);
 }
 
+// ─── Reddit RSS (free, no key needed) ────────────────────────────────────────
+const REDDIT_FEEDS = [
+  { url: "https://www.reddit.com/r/CryptoCurrency/hot/.rss?limit=10", community: "r/CryptoCurrency" },
+  { url: "https://www.reddit.com/r/Bitcoin/hot/.rss?limit=10",        community: "r/Bitcoin" },
+  { url: "https://www.reddit.com/r/ethfinance/hot/.rss?limit=8",      community: "r/ethfinance" },
+];
+
+async function fetchRedditFeeds(): Promise<NewsItem[]> {
+  const results = await Promise.allSettled(
+    REDDIT_FEEDS.map(async ({ url, community }) => {
+      const items = await fetchRSS(url, 10_000);
+      return items
+        .filter((item) => item.title && !item.title.toLowerCase().startsWith("[meta]"))
+        .map((item): NewsItem => {
+          const text = item.title + " " + (item.description || "");
+          return {
+            id: `social-reddit-${community}-${item.guid.slice(-12)}`,
+            headline: item.title.slice(0, 200),
+            summary: item.description?.replace(/<[^>]+>/g, "").slice(0, 300) || item.title,
+            source: community,
+            ticker: inferTickersFromText(text, ["BTC"]),
+            sector: "Crypto",
+            timestamp: item.pubDate ? new Date(item.pubDate) : new Date(),
+            url: item.link,
+            type: "social",
+            author: item.author,
+            authorHandle: community,
+            authorCategory: "analyst",
+            sentiment: "neutral",
+          };
+        });
+    })
+  );
+
+  return results
+    .filter((r): r is PromiseFulfilledResult<NewsItem[]> => r.status === "fulfilled")
+    .flatMap((r) => r.value);
+}
+
 // ─── Custom RSS feeds from env (SOCIAL_RSS_URLS=url1,url2,...) ───────────────
 async function fetchCustomSocialFeeds(): Promise<NewsItem[]> {
   const raw = process.env.SOCIAL_RSS_URLS;
@@ -141,13 +180,14 @@ async function fetchCustomSocialFeeds(): Promise<NewsItem[]> {
 }
 
 export async function GET() {
-  const [nitterItems, substackItems, customItems] = await Promise.all([
+  const [nitterItems, substackItems, customItems, redditItems] = await Promise.all([
     fetchNitterFeeds(),
     fetchSubstackFeeds(),
     fetchCustomSocialFeeds(),
+    fetchRedditFeeds(),
   ]);
 
-  const all = [...nitterItems, ...substackItems, ...customItems];
+  const all = [...nitterItems, ...substackItems, ...customItems, ...redditItems];
 
   if (all.length === 0) {
     // Return mock social data if no real feeds configured

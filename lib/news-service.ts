@@ -354,7 +354,7 @@ async function fetchCryptoCompareNews(): Promise<NewsItem[]> {
 async function fetchAllRSSFeeds(): Promise<NewsItem[]> {
   const results = await Promise.allSettled(
     RSS_NEWS_FEEDS.map(async (feed) => {
-      const items = await fetchRSS(feed.url);
+      const items = await fetchRSS(feed.url, 6_000);
       return items.map((item): NewsItem => {
         const text = `${item.title} ${item.description}`;
         const sourceTier = getSourceTier(feed.name);

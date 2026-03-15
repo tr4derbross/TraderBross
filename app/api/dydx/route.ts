@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withCache } from "@/lib/server-cache";
 
 const DYDX_INDEXER = "https://indexer.dydx.trade/v4";
 
@@ -40,12 +41,18 @@ export async function GET(req: NextRequest) {
 
 async function getMarkets() {
   try {
-    const res = await fetch(`${DYDX_INDEXER}/perpetualMarkets`, {
-      next: { revalidate: 30 },
-    });
-    if (!res.ok) throw new Error(`dYdX ${res.status}`);
-
-    const { markets } = await res.json() as { markets: Record<string, DyDxMarket> };
+    const { markets } = await withCache<{ markets: Record<string, DyDxMarket> }>(
+      "dydx:markets",
+      20_000,
+      async () => {
+        const res = await fetch(`${DYDX_INDEXER}/perpetualMarkets`, {
+          cache: "no-store",
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!res.ok) throw new Error(`dYdX ${res.status}`);
+        return res.json();
+      }
+    );
 
     const assets = Object.entries(markets)
       .filter(([, m]) => {

@@ -19,6 +19,7 @@ import DydxPanel from "@/components/DydxPanel";
 import VenuesPanel from "@/components/VenuesPanel";
 import WatchlistPanel from "@/components/WatchlistPanel";
 import BrandMark from "@/components/BrandMark";
+import MarketStatsBar from "@/components/MarketStatsBar";
 import { useTradingState } from "@/hooks/useTradingState";
 import type { ActiveVenueState, TradingVenueConnectionStatus, TradingVenueType } from "@/lib/active-venue";
 import { getVenueAdapter } from "@/lib/venues";
@@ -960,6 +961,7 @@ export default function TerminalApp() {
       <div className="px-2 pt-2">
         <div className="panel-shell soft-divider overflow-hidden rounded-xl border">
           <TickerTape quotes={wsQuotes} />
+          <MarketStatsBar />
         </div>
       </div>
 

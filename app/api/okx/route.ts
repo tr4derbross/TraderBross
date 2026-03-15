@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { withCache } from "@/lib/server-cache";
 
 const OKX_BASE = "https://www.okx.com";
 
@@ -69,13 +70,15 @@ export async function POST(req: NextRequest) {
 
 async function getQuotes() {
   try {
-    const res = await fetch(
-      `${OKX_BASE}/api/v5/market/tickers?instType=SWAP`,
-      { cache: "no-store" }
-    );
-    if (!res.ok) throw new Error(`OKX ${res.status}`);
-    const { data } = await res.json() as { data: Array<{ instId: string; last: string; open24h: string; volCcy24h: string }> };
-
+    const data = await withCache("okx:quotes", 20_000, async () => {
+      const res = await fetch(
+        `${OKX_BASE}/api/v5/market/tickers?instType=SWAP`,
+        { cache: "no-store", signal: AbortSignal.timeout(5000) }
+      );
+      if (!res.ok) throw new Error(`OKX ${res.status}`);
+      return (await res.json() as { data: Array<{ instId: string; last: string; open24h: string; volCcy24h: string }> }).data;
+    });
+    if (!data) throw new Error("no data");
     const reverseMap = Object.fromEntries(Object.entries(PERP_MAP).map(([t, id]) => [id, t]));
     return NextResponse.json(
       data
