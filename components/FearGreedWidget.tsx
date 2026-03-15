@@ -119,13 +119,17 @@ export function FearGreedPill({ compact = false }: FearGreedWidgetProps) {
 
   return (
     <div
-      className="flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold cursor-default select-none"
-      style={{ borderColor: `${color}40`, background: `${color}10`, color }}
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold cursor-default select-none tracking-wide"
+      style={{ borderColor: `${color}50`, background: `${color}15`, color }}
       title={`Fear & Greed: ${data.value} — ${data.label}`}
     >
-      <span>{emoji}</span>
+      <span className="text-sm leading-none">{emoji}</span>
       <span>{data.value}</span>
-      {!compact && <span className="opacity-70">{data.label}</span>}
+      {!compact && (
+        <span className="opacity-80 text-[10px] font-semibold hidden sm:inline">
+          {data.label}
+        </span>
+      )}
     </div>
   );
 }

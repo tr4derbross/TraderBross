@@ -148,7 +148,7 @@ export default function NewsFeed({
           </div>
         ) : (
           <ErrorBoundary label="News Feed" fullHeight={false}>
-            <div className="panel-fade-in">
+            <div className="panel-fade-in" suppressHydrationWarning>
               {news.map((item) => (
                 <NewsCard
                   key={item.id}
