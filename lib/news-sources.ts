@@ -16,42 +16,22 @@ export interface SocialAccountConfig {
 
 // ─── Free RSS News Feeds (no API key needed) ──────────────────────────────────
 export const RSS_NEWS_FEEDS: RSSFeedConfig[] = [
-  {
-    id: "cointelegraph",
-    name: "CoinTelegraph",
-    url: "https://cointelegraph.com/rss",
-    sector: "Crypto",
-  },
-  {
-    id: "coindesk",
-    name: "CoinDesk",
-    url: "https://www.coindesk.com/arc/outboundfeeds/rss",
-    sector: "Bitcoin",
-  },
-  {
-    id: "decrypt",
-    name: "Decrypt",
-    url: "https://decrypt.co/feed",
-    sector: "DeFi",
-  },
-  {
-    id: "bitcoinmagazine",
-    name: "Bitcoin Magazine",
-    url: "https://bitcoinmagazine.com/.rss/full/",
-    sector: "Bitcoin",
-  },
-  {
-    id: "theblock",
-    name: "The Block",
-    url: "https://www.theblock.co/rss.xml",
-    sector: "Crypto",
-  },
-  {
-    id: "cryptobriefing",
-    name: "Crypto Briefing",
-    url: "https://cryptobriefing.com/feed/",
-    sector: "Crypto",
-  },
+  // Tier 1
+  { id: "cointelegraph",    name: "CoinTelegraph",   url: "https://cointelegraph.com/rss",                          sector: "Crypto" },
+  { id: "coindesk",         name: "CoinDesk",         url: "https://www.coindesk.com/arc/outboundfeeds/rss",         sector: "Bitcoin" },
+  { id: "decrypt",          name: "Decrypt",          url: "https://decrypt.co/feed",                                sector: "DeFi" },
+  { id: "bitcoinmagazine",  name: "Bitcoin Magazine", url: "https://bitcoinmagazine.com/.rss/full/",                 sector: "Bitcoin" },
+  { id: "theblock",         name: "The Block",        url: "https://www.theblock.co/rss.xml",                        sector: "Crypto" },
+  { id: "cryptobriefing",   name: "Crypto Briefing",  url: "https://cryptobriefing.com/feed/",                       sector: "Crypto" },
+  // Additional free sources
+  { id: "cryptopanic-rss",  name: "CryptoPanic",      url: "https://cryptopanic.com/news/rss/",                      sector: "Crypto" },
+  { id: "beincrypto",       name: "BeInCrypto",       url: "https://beincrypto.com/feed/",                           sector: "Crypto" },
+  { id: "bitcoincom",       name: "Bitcoin.com",      url: "https://news.bitcoin.com/feed/",                         sector: "Bitcoin" },
+  { id: "cryptoslate",      name: "CryptoSlate",      url: "https://cryptoslate.com/feed/",                          sector: "Crypto" },
+  { id: "utoday",           name: "U.Today",          url: "https://u.today/rss",                                    sector: "Crypto" },
+  { id: "ambcrypto",        name: "AMBCrypto",        url: "https://ambcrypto.com/feed/",                            sector: "Crypto" },
+  { id: "blockworks",       name: "Blockworks",       url: "https://blockworks.co/feed",                             sector: "Institutional" },
+  { id: "dailyhodl",        name: "The Daily Hodl",   url: "https://dailyhodl.com/feed/",                            sector: "Crypto" },
 ];
 
 // ─── CryptoCompare News API (100K requests/month free) ────────────────────────

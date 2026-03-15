@@ -22,7 +22,14 @@ export async function GET() {
 
       send({ type: "connected" });
 
-      const seed = await getNewsItems({ limit: 30 });
+      // Try seeding up to 3 times before falling back to mock
+      let seed: NewsItem[] = [];
+      for (let attempt = 0; attempt < 3 && seed.length === 0; attempt++) {
+        try {
+          seed = await getNewsItems({ limit: 30 });
+        } catch { /* retry */ }
+      }
+
       for (const item of seed) {
         seenKeys.add(toSeenKey(item));
       }
@@ -30,7 +37,7 @@ export async function GET() {
       const pollNews = async () => {
         try {
           const news = await getNewsItems({ limit: 20 });
-          const fresh = news.filter((item) => !seenKeys.has(toSeenKey(item))).slice(0, 4);
+          const fresh = news.filter((item) => !seenKeys.has(toSeenKey(item))).slice(0, 5);
           for (const item of fresh) {
             seenKeys.add(toSeenKey(item));
             send({ type: "news", item });
@@ -47,12 +54,14 @@ export async function GET() {
       };
 
       if (seed.length > 0) {
-        intervals.push(setInterval(pollNews, 30_000));
+        // Real news: poll every 60s for fresh articles
+        intervals.push(setInterval(pollNews, 60_000));
       } else {
-        intervals.push(setInterval(pollMock, 8_000 + Math.random() * 7_000));
+        // Fallback: slower mock interval to reduce noise
+        intervals.push(setInterval(pollMock, 20_000 + Math.random() * 10_000));
       }
 
-      intervals.push(setInterval(() => send({ type: "ping" }), 20_000));
+      intervals.push(setInterval(() => send({ type: "ping" }), 25_000));
     },
     cancel() {
       closed = true;

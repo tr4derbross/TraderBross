@@ -142,11 +142,13 @@ export default function TradingActivityDrawer({
       className="panel-shell soft-divider shrink-0 overflow-hidden border transition-[height] duration-200 ease-out"
       style={{ height: drawerHeight }}
     >
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={handleBarClick}
         onDoubleClick={handleBarDoubleClick}
-        className="panel-header soft-divider relative flex h-[42px] w-full shrink-0 items-center justify-between border-b px-3 text-left"
+        onKeyDown={(e) => e.key === "Enter" && handleBarClick()}
+        className="panel-header soft-divider relative flex h-[42px] w-full shrink-0 cursor-pointer items-center justify-between border-b px-3 text-left"
       >
         <div className="absolute left-1/2 top-1.5 h-1 w-14 -translate-x-1/2 rounded-full bg-white/10" />
         <div className="flex min-w-0 flex-col">
@@ -180,7 +182,7 @@ export default function TradingActivityDrawer({
             />
           </span>
         </div>
-      </button>
+      </div>
 
       {mode !== "closed" && (
         <div className="flex h-[calc(100%-42px)] min-h-0 flex-col overflow-hidden">

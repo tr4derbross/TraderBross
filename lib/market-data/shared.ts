@@ -204,7 +204,7 @@ export function createPollingMarketDataAdapter(
       await push();
       const intervalId = window.setInterval(() => {
         void push();
-      }, 5000);
+      }, 15_000);
       intervalMap.set(symbol, intervalId);
     },
     async unsubscribeTicker(connection, symbol, onTicker) {

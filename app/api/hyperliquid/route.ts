@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withCache } from "@/lib/server-cache";
 
 const HL_INFO = "https://api.hyperliquid.xyz/info";
 
@@ -42,15 +43,21 @@ export async function GET(request: NextRequest) {
 
 async function getMarket() {
   try {
-    const res = await fetch(HL_INFO, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "metaAndAssetCtxs" }),
-      next: { revalidate: 30 },
-    });
-    if (!res.ok) throw new Error(`HL ${res.status}`);
-
-    const [meta, ctxs]: [{ universe: HLUniverse[] }, HLAssetCtx[]] = await res.json();
+    const [meta, ctxs] = await withCache<[{ universe: HLUniverse[] }, HLAssetCtx[]]>(
+      "hl:market",
+      15_000,
+      async () => {
+        const res = await fetch(HL_INFO, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "metaAndAssetCtxs" }),
+          cache: "no-store",
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!res.ok) throw new Error(`HL ${res.status}`);
+        return res.json();
+      }
+    );
     const assetIndex: Record<string, number> = {};
     const assets = [];
 

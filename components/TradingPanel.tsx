@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { AVAILABLE_TICKERS, type NewsItem } from "@/lib/mock-data";
@@ -154,12 +154,20 @@ export default function TradingPanel({
   const requiredBalance = margin + estimatedFee;
   const existingPos = positions.find((position) => position.ticker === ticker);
   const liqPrice = margin > 0 ? calcLiqPrice(side, execPrice, leverage) : null;
-  const statusTone =
+
+  const statusColor =
     activeVenueState.connectionStatus === "connected"
-      ? "text-emerald-300"
+      ? "bg-emerald-500"
       : activeVenueState.connectionStatus === "testing"
-        ? "text-amber-300"
-        : "text-red-300";
+        ? "bg-amber-400"
+        : "bg-red-500";
+
+  const statusTextColor =
+    activeVenueState.connectionStatus === "connected"
+      ? "text-emerald-400"
+      : activeVenueState.connectionStatus === "testing"
+        ? "text-amber-400"
+        : "text-red-400";
 
   useEffect(() => {
     if (!tpEnabled) {
@@ -239,90 +247,98 @@ export default function TradingPanel({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto p-3">
-      <section className="tb-panel-soft p-3">
-        <div className="flex items-center justify-between gap-3 text-[10px] uppercase tracking-[0.18em] text-zinc-500">
-          <span>Execution</span>
-          <span className={statusTone}>{activeVenueState.connectionStatus.replaceAll("_", " ")}</span>
-        </div>
-        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-[11px] sm:grid-cols-4">
-          <div>
-            <div className="tb-kpi-label">Execution Venue</div>
-            <div className="tb-kpi-value">{activeVenueState.venueId.toUpperCase()}</div>
-          </div>
-          <div>
-            <div className="tb-kpi-label">Market Data Source</div>
-            <div className="tb-kpi-value truncate text-[10px] text-zinc-300">{marketDataSourceLabel}</div>
-          </div>
-          <div>
-            <div className="tb-kpi-label">Connection Status</div>
-            <div className={`tb-kpi-value ${statusTone}`}>{activeVenueState.connectionStatus.replaceAll("_", " ")}</div>
-          </div>
-          <div>
-            <div className="tb-kpi-label">Balance</div>
-            <div className="tb-kpi-value text-amber-200">${balance.toLocaleString("en-US", { maximumFractionDigits: 2 })}</div>
-          </div>
-        </div>
-      </section>
+    <div className="flex h-full min-h-0 flex-col gap-px overflow-y-auto">
 
-      <section className="tb-panel-soft mt-3 p-3">
+      {/* ── Header Bar: venue + status + balance ── */}
+      <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-zinc-800/60">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold tracking-widest text-zinc-200 uppercase">
+            {activeVenueState.venueId}
+          </span>
+          <span className="flex items-center gap-1.5 rounded-full border border-zinc-700/50 bg-zinc-900 px-2 py-0.5">
+            <span className={`h-1.5 w-1.5 rounded-full ${statusColor}`} />
+            <span className={`text-[10px] capitalize ${statusTextColor}`}>
+              {activeVenueState.connectionStatus.replaceAll("_", " ")}
+            </span>
+          </span>
+        </div>
+        <div className="text-right">
+          <div className="text-[9px] uppercase tracking-widest text-zinc-600">Balance</div>
+          <div className="text-[12px] font-semibold text-amber-300">
+            ${balance.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Market Summary ── */}
+      <div className="px-3 py-2.5 border-b border-zinc-800/60">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="tb-section-title">Market Summary</div>
-            <div className="mt-2 flex items-center gap-2">
-              <select className="tb-select min-w-0 flex-1" value={ticker} onChange={(e) => handleTickerChange(e.target.value)}>
-                {FUTURES_TICKERS.map((value) => (
-                  <option key={value} value={value} className="bg-zinc-950">
-                    {value}/USDT Perp
-                  </option>
-                ))}
-              </select>
-              <span className="rounded-full border border-zinc-800 bg-zinc-950/80 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-zinc-400">
-                {marginMode}
-              </span>
-            </div>
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <select
+              className="w-full rounded-lg border border-zinc-700/60 bg-zinc-900 px-2.5 py-1.5 text-[12px] font-medium text-zinc-100 outline-none transition focus:border-zinc-500 hover:border-zinc-600"
+              value={ticker}
+              onChange={(e) => handleTickerChange(e.target.value)}
+            >
+              {FUTURES_TICKERS.map((value) => (
+                <option key={value} value={value} className="bg-zinc-950">
+                  {value}/USDT Perp
+                </option>
+              ))}
+            </select>
             {selectedNews && (
-              <div className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-zinc-400">{selectedNews.headline}</div>
+              <p className="line-clamp-2 text-[10px] leading-relaxed text-zinc-500">{selectedNews.headline}</p>
             )}
           </div>
-          <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">Mark Price</div>
-            <div className="mt-1 text-xl font-semibold text-zinc-100">${fmt(currentPrice)}</div>
-            <div className="mt-1 text-[11px] text-zinc-500">{activeVenueState.venueType === "cex" ? "Perpetual" : "Venue Context"}</div>
+          <div className="shrink-0 text-right">
+            <div className="text-[9px] uppercase tracking-widest text-zinc-600">Mark</div>
+            <div className="text-[18px] font-bold tabular-nums text-zinc-100">${fmt(currentPrice)}</div>
+            <div className="text-[10px] text-zinc-600">{activeVenueState.venueType === "cex" ? "Perp" : "Venue"}</div>
           </div>
         </div>
 
         {existingPos && (
-          <div className="mt-3 rounded-xl border border-zinc-800/80 bg-zinc-950/55 px-3 py-2 text-[11px] text-zinc-300">
-            Open {existingPos.side.toUpperCase()} | {existingPos.leverage}x | {fmt(existingPos.amount)} {ticker}
+          <div className="mt-2 flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1.5 text-[10px]">
+            <span className={`font-semibold ${existingPos.side === "long" ? "text-emerald-400" : "text-red-400"}`}>
+              {existingPos.side.toUpperCase()}
+            </span>
+            <span className="text-zinc-500">·</span>
+            <span className="text-zinc-400">{existingPos.leverage}x</span>
+            <span className="text-zinc-500">·</span>
+            <span className="text-zinc-400">{fmt(existingPos.amount)} {ticker}</span>
           </div>
         )}
-      </section>
+      </div>
 
-      <section className="tb-panel mt-3 flex-1 p-3">
-        <div className="tb-section-title">Order Ticket</div>
+      {/* ── Order Ticket ── */}
+      <div className="flex flex-1 flex-col gap-3 px-3 py-3">
 
-        <div className="mt-3 grid grid-cols-3 gap-1 rounded-2xl bg-zinc-950/80 p-1">
+        {/* Order type tabs */}
+        <div className="grid grid-cols-3 gap-0.5 rounded-lg bg-zinc-900 p-0.5">
           {(["market", "limit", "stop"] as TicketType[]).map((value) => (
             <button
               key={value}
               type="button"
               onClick={() => setTicketType(value)}
-              className={`tb-segment ${ticketType === value ? "tb-segment-active" : ""}`}
+              className={`rounded-md py-1.5 text-[11px] font-medium capitalize transition-all ${
+                ticketType === value
+                  ? "bg-zinc-700 text-zinc-100 shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
             >
               {value}
             </button>
           ))}
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        {/* Long / Short */}
+        <div className="grid grid-cols-2 gap-1.5">
           <button
             type="button"
             onClick={() => setSide("long")}
-            className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
+            className={`rounded-lg py-2.5 text-[13px] font-bold transition-all ${
               side === "long"
-                ? "border-emerald-500/70 bg-emerald-500/15 text-emerald-200"
-                : "border-zinc-800 bg-zinc-950/70 text-zinc-500 hover:text-emerald-200"
+                ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/50"
+                : "bg-zinc-900 text-zinc-600 hover:bg-zinc-800 hover:text-emerald-400"
             }`}
           >
             Long
@@ -330,30 +346,57 @@ export default function TradingPanel({
           <button
             type="button"
             onClick={() => setSide("short")}
-            className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
+            className={`rounded-lg py-2.5 text-[13px] font-bold transition-all ${
               side === "short"
-                ? "border-red-500/70 bg-red-500/15 text-red-200"
-                : "border-zinc-800 bg-zinc-950/70 text-zinc-500 hover:text-red-200"
+                ? "bg-red-500/20 text-red-300 ring-1 ring-red-500/50"
+                : "bg-zinc-900 text-zinc-600 hover:bg-zinc-800 hover:text-red-400"
             }`}
           >
             Short
           </button>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        {/* Limit / Stop price */}
+        {(ticketType === "limit" || ticketType === "stop") && (
           <div>
-            <label className="tb-section-title">Margin</label>
-            <input type="number" className="tb-input mt-1" placeholder="0.00 USDT" value={marginUSD} onChange={(e) => setMarginUSD(e.target.value)} />
+            <label className="mb-1 block text-[10px] uppercase tracking-widest text-zinc-600">
+              {ticketType === "stop" ? "Trigger Price" : "Limit Price"}
+            </label>
+            <input
+              type="number"
+              className="w-full rounded-lg border border-zinc-700/60 bg-zinc-900 px-3 py-1.5 text-[12px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500"
+              placeholder={fmt(currentPrice)}
+              value={limitPrice}
+              onChange={(e) => setLimitPrice(e.target.value)}
+            />
+          </div>
+        )}
+
+        {/* Margin + Leverage */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="mb-1 block text-[10px] uppercase tracking-widest text-zinc-600">Margin (USDT)</label>
+            <input
+              type="number"
+              className="w-full rounded-lg border border-zinc-700/60 bg-zinc-900 px-3 py-1.5 text-[12px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500"
+              placeholder="0.00"
+              value={marginUSD}
+              onChange={(e) => setMarginUSD(e.target.value)}
+            />
           </div>
           <div>
-            <label className="tb-section-title">Leverage</label>
-            <div className="mt-1 grid grid-cols-5 gap-1">
+            <label className="mb-1 block text-[10px] uppercase tracking-widest text-zinc-600">Leverage</label>
+            <div className="grid grid-cols-5 gap-0.5">
               {LEVERAGE_PRESETS.map((value) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setLeverage(value)}
-                  className={`tb-chip text-[10px] ${leverage === value ? "tb-chip-active" : ""}`}
+                  className={`rounded-md py-1.5 text-[10px] font-semibold transition-all ${
+                    leverage === value
+                      ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40"
+                      : "bg-zinc-900 text-zinc-600 hover:bg-zinc-800 hover:text-zinc-300"
+                  }`}
                 >
                   {value}x
                 </button>
@@ -362,16 +405,21 @@ export default function TradingPanel({
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        {/* Mode + Notional */}
+        <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="tb-section-title">Mode</label>
-            <div className="mt-1 grid grid-cols-2 gap-1 rounded-2xl bg-zinc-950/80 p-1">
+            <label className="mb-1 block text-[10px] uppercase tracking-widest text-zinc-600">Mode</label>
+            <div className="grid grid-cols-2 gap-0.5 rounded-lg bg-zinc-900 p-0.5">
               {(["isolated", "cross"] as MarginMode[]).map((mode) => (
                 <button
                   key={mode}
                   type="button"
                   onClick={() => setMarginMode(mode)}
-                  className={`tb-segment ${marginMode === mode ? "tb-segment-active" : ""}`}
+                  className={`rounded-md py-1 text-[10px] font-medium capitalize transition-all ${
+                    marginMode === mode
+                      ? "bg-zinc-700 text-zinc-100"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
                 >
                   {mode}
                 </button>
@@ -379,88 +427,148 @@ export default function TradingPanel({
             </div>
           </div>
           <div>
-            <label className="tb-section-title">Notional</label>
-            <div className="tb-input mt-1 flex items-center justify-between text-sm text-zinc-200">
-              <span>${fmt(notional)}</span>
-              <span className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">{fmt(quantity)} {ticker}</span>
+            <label className="mb-1 block text-[10px] uppercase tracking-widest text-zinc-600">Notional</label>
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1.5">
+              <div className="text-[12px] font-medium text-zinc-200">${fmt(notional)}</div>
+              <div className="text-[10px] text-zinc-600">{fmt(quantity)} {ticker}</div>
             </div>
           </div>
         </div>
 
-        {(ticketType === "limit" || ticketType === "stop") && (
-          <div className="mt-3">
-            <label className="tb-section-title">{ticketType === "stop" ? "Trigger Price" : "Limit Price"}</label>
-            <input type="number" className="tb-input mt-1" placeholder={`${fmt(currentPrice)}`} value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} />
-          </div>
-        )}
-
-        <div className="mt-3 rounded-2xl border border-zinc-800/80 bg-zinc-950/55 p-3">
+        {/* TP / SL accordion */}
+        <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/40">
           <button
             type="button"
             onClick={() => setAdvancedOpen((open) => !open)}
-            className="flex w-full items-center justify-between text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-300"
+            className="flex w-full items-center justify-between px-3 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500 hover:text-zinc-400 transition-colors"
           >
-            <span className="inline-flex items-center gap-2">
-              <SlidersHorizontal className="h-3.5 w-3.5 text-amber-200" />
-              TP / SL and Advanced
+            <span className="flex items-center gap-1.5">
+              <SlidersHorizontal className="h-3 w-3 text-amber-400/80" />
+              TP / SL
             </span>
-            <ChevronDown className={`h-4 w-4 transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${advancedOpen ? "rotate-180" : ""}`} />
           </button>
 
           {advancedOpen && (
-            <div className="mt-3 grid gap-3">
-              <div className="grid grid-cols-[auto,1fr] items-center gap-2">
-                <button type="button" onClick={() => setTpEnabled((v) => !v)} className={`tb-chip ${tpEnabled ? "tb-chip-active" : ""}`}>TP</button>
-                <div className="grid grid-cols-2 gap-2">
-                  <input type="number" className="tb-input" disabled={!tpEnabled} placeholder="TP price" value={tpPrice} onChange={(e) => handleTpPriceChange(e.target.value)} />
-                  <input type="number" className="tb-input" disabled={!tpEnabled} placeholder="TP %" value={tpPercent} onChange={(e) => setTpPercent(e.target.value)} />
-                </div>
+            <div className="border-t border-zinc-800/60 px-3 pb-3 pt-2.5 space-y-2">
+              {/* TP row */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTpEnabled((v) => !v)}
+                  className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold transition-all ${
+                    tpEnabled
+                      ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40"
+                      : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  TP
+                </button>
+                <input
+                  type="number"
+                  className="flex-1 rounded-lg border border-zinc-700/60 bg-zinc-900 px-2.5 py-1.5 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40"
+                  disabled={!tpEnabled}
+                  placeholder="Price"
+                  value={tpPrice}
+                  onChange={(e) => handleTpPriceChange(e.target.value)}
+                />
+                <input
+                  type="number"
+                  className="w-16 rounded-lg border border-zinc-700/60 bg-zinc-900 px-2.5 py-1.5 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40"
+                  disabled={!tpEnabled}
+                  placeholder="%"
+                  value={tpPercent}
+                  onChange={(e) => setTpPercent(e.target.value)}
+                />
               </div>
-              <div className="grid grid-cols-[auto,1fr] items-center gap-2">
-                <button type="button" onClick={() => setSlEnabled((v) => !v)} className={`tb-chip ${slEnabled ? "tb-chip-active" : ""}`}>SL</button>
-                <div className="grid grid-cols-2 gap-2">
-                  <input type="number" className="tb-input" disabled={!slEnabled} placeholder="SL price" value={slPrice} onChange={(e) => handleSlPriceChange(e.target.value)} />
-                  <input type="number" className="tb-input" disabled={!slEnabled} placeholder="SL %" value={slPercent} onChange={(e) => setSlPercent(e.target.value)} />
-                </div>
+              {/* SL row */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSlEnabled((v) => !v)}
+                  className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold transition-all ${
+                    slEnabled
+                      ? "bg-red-500/20 text-red-300 ring-1 ring-red-500/40"
+                      : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  SL
+                </button>
+                <input
+                  type="number"
+                  className="flex-1 rounded-lg border border-zinc-700/60 bg-zinc-900 px-2.5 py-1.5 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40"
+                  disabled={!slEnabled}
+                  placeholder="Price"
+                  value={slPrice}
+                  onChange={(e) => handleSlPriceChange(e.target.value)}
+                />
+                <input
+                  type="number"
+                  className="w-16 rounded-lg border border-zinc-700/60 bg-zinc-900 px-2.5 py-1.5 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40"
+                  disabled={!slEnabled}
+                  placeholder="%"
+                  value={slPercent}
+                  onChange={(e) => setSlPercent(e.target.value)}
+                />
               </div>
             </div>
           )}
         </div>
 
-        <div className="mt-3 rounded-2xl border border-zinc-800/80 bg-zinc-950/55 p-3 text-[11px] text-zinc-400">
-          <div className="flex items-center justify-between"><span>Required Balance</span><span className="text-zinc-200">${fmt(requiredBalance)}</span></div>
-          <div className="mt-1 flex items-center justify-between"><span>Estimated Fee</span><span className="text-zinc-200">${fmt(estimatedFee)}</span></div>
-          <div className="mt-1 flex items-center justify-between"><span>Liquidation</span><span className="text-zinc-200">{liqPrice ? `$${fmt(liqPrice)}` : "-"}</span></div>
-          <div className="mt-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-zinc-500">
-            <Shield className="h-3.5 w-3.5 text-amber-200" />
+        {/* Order summary */}
+        <div className="rounded-lg border border-zinc-800/60 bg-zinc-900/30 px-3 py-2.5 space-y-1">
+          <div className="flex items-center justify-between text-[10px]">
+            <span className="text-zinc-600">Required</span>
+            <span className="font-medium text-zinc-300">${fmt(requiredBalance)}</span>
+          </div>
+          <div className="flex items-center justify-between text-[10px]">
+            <span className="text-zinc-600">Fee ({(feeRate * 100).toFixed(3)}%)</span>
+            <span className="font-medium text-zinc-300">${fmt(estimatedFee)}</span>
+          </div>
+          <div className="flex items-center justify-between text-[10px]">
+            <span className="text-zinc-600">Liquidation</span>
+            <span className="font-medium text-zinc-300">{liqPrice ? `$${fmt(liqPrice)}` : "—"}</span>
+          </div>
+          <div className="flex items-center gap-1.5 pt-0.5 text-[9px] uppercase tracking-widest text-zinc-700">
+            <Shield className="h-3 w-3 text-amber-500/60" />
             {riskNote}
           </div>
         </div>
 
+        {/* Status message */}
         {submitMessage && (
-          <div className={`mt-3 rounded-xl border px-3 py-2 text-[11px] ${submitState === "failure" ? "border-red-500/25 bg-red-500/10 text-red-200" : submitState === "success" ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200" : "border-zinc-800 bg-zinc-950/60 text-zinc-300"}`}>
-            <div className="flex items-center gap-2">
-              {submitState === "submitting" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {submitState === "success" && <CheckCircle2 className="h-3.5 w-3.5" />}
-              {submitState === "failure" && <AlertTriangle className="h-3.5 w-3.5" />}
-              <span>{submitMessage}</span>
-            </div>
+          <div
+            className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-[11px] ${
+              submitState === "failure"
+                ? "border-red-500/20 bg-red-500/8 text-red-300"
+                : submitState === "success"
+                  ? "border-emerald-500/20 bg-emerald-500/8 text-emerald-300"
+                  : "border-zinc-800 bg-zinc-900/50 text-zinc-400"
+            }`}
+          >
+            {submitState === "submitting" && <Loader2 className="mt-px h-3.5 w-3.5 shrink-0 animate-spin" />}
+            {submitState === "success" && <CheckCircle2 className="mt-px h-3.5 w-3.5 shrink-0" />}
+            {submitState === "failure" && <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />}
+            <span className="leading-relaxed">{submitMessage}</span>
           </div>
         )}
 
+        {/* Submit */}
         <button
           type="button"
           onClick={handleSubmit}
           disabled={submitDisabled}
-          className={`mt-3 w-full rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
+          className={`w-full rounded-lg py-3 text-[13px] font-bold tracking-wide transition-all disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600 ${
             side === "long"
-              ? "bg-emerald-500/90 text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-500"
-              : "bg-red-500/90 text-white hover:bg-red-400 disabled:bg-zinc-800 disabled:text-zinc-500"
+              ? "bg-emerald-500 text-zinc-950 hover:bg-emerald-400 active:bg-emerald-600"
+              : "bg-red-500 text-white hover:bg-red-400 active:bg-red-600"
           }`}
         >
-          {submitState === "submitting" ? "Submitting..." : `${side === "long" ? "Open Long" : "Open Short"} on ${activeVenueState.venueId.toUpperCase()}`}
+          {submitState === "submitting"
+            ? "Submitting…"
+            : `${side === "long" ? "Open Long" : "Open Short"} · ${activeVenueState.venueId.toUpperCase()}`}
         </button>
-      </section>
+      </div>
     </div>
   );
 }
