@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { NewsItem } from "@/lib/mock-data";
 import type { NewsTradePreset } from "@/lib/news-trade";
-import { useNews, SourceFilter } from "@/hooks/useNews";
+import { useNews, SourceFilter, ImportanceFilter, SentimentFilter } from "@/hooks/useNews";
 import NewsCard from "./NewsCard";
 import FilterBar from "./FilterBar";
-import { Activity, RefreshCw } from "lucide-react";
+import { Activity, RefreshCw, Radio, Database } from "lucide-react";
+import { NewsFeedSkeleton } from "@/components/Skeleton";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 type Props = {
   onSelectItem: (item: NewsItem) => void;
@@ -14,6 +16,7 @@ type Props = {
   onNewItem?: (item: NewsItem) => void;
   onTickerSelect?: (ticker: string, item: NewsItem) => void;
   onQuickTrade?: (preset: NewsTradePreset, item: NewsItem) => void;
+  onAskAI?: (item: NewsItem) => void;
 };
 
 export default function NewsFeed({
@@ -22,19 +25,24 @@ export default function NewsFeed({
   onNewItem,
   onTickerSelect,
   onQuickTrade,
+  onAskAI,
 }: Props) {
   const [sector, setSector] = useState("All");
   const [ticker, setTicker] = useState("");
   const [keyword, setKeyword] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [importanceFilter, setImportanceFilter] = useState<ImportanceFilter>("all");
+  const [sentimentFilter, setSentimentFilter] = useState<SentimentFilter>("all");
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const prevLengthRef = useRef(0);
 
-  const { news, loading, liveCount, counts, refreshNews } = useNews({
+  const { news, loading, liveCount, counts, refreshNews, isLive } = useNews({
     sector,
     ticker,
     keyword,
     sourceFilter,
+    importanceFilter,
+    sentimentFilter,
   });
 
   useEffect(() => {
@@ -71,10 +79,25 @@ export default function NewsFeed({
           <span className="brand-section-title text-xs font-bold tracking-wider uppercase">
             {sourceLabel[sourceFilter]}
           </span>
+          {/* Live / Mock badge */}
+          {isLive ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/8 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400">
+              <span className="live-dot h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              LIVE
+            </span>
+          ) : (
+            <span className="mock-badge inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold">
+              <Database className="h-2.5 w-2.5" />
+              DEMO
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2.5 text-[10px] text-zinc-500">
           {liveCount > 0 && (
-            <span className="text-amber-200 animate-pulse">+{liveCount} live</span>
+            <span className="inline-flex items-center gap-1 text-amber-200">
+              <Radio className="h-2.5 w-2.5 animate-pulse" />
+              +{liveCount}
+            </span>
           )}
           <button
             type="button"
@@ -94,19 +117,21 @@ export default function NewsFeed({
         ticker={ticker}
         keyword={keyword}
         sourceFilter={sourceFilter}
+        importanceFilter={importanceFilter}
+        sentimentFilter={sentimentFilter}
         onSector={setSector}
         onTicker={setTicker}
         onKeyword={setKeyword}
         onSource={setSourceFilter}
+        onImportance={setImportanceFilter}
+        onSentiment={setSentimentFilter}
         counts={counts}
       />
 
       {/* Feed */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {loading ? (
-          <div className="flex items-center justify-center h-32 text-zinc-600 text-xs">
-            Loading...
-          </div>
+          <NewsFeedSkeleton />
         ) : news.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-32 gap-2 text-zinc-600 text-xs">
             <span>No items matching filters</span>
@@ -122,17 +147,22 @@ export default function NewsFeed({
             )}
           </div>
         ) : (
-          news.map((item) => (
-            <NewsCard
-              key={item.id}
-              item={item}
-              isNew={newIds.has(item.id)}
-              onSelect={onSelectItem}
-              onTickerSelect={onTickerSelect}
-              onQuickTrade={onQuickTrade}
-              selected={selectedItem?.id === item.id}
-            />
-          ))
+          <ErrorBoundary label="News Feed" fullHeight={false}>
+            <div className="panel-fade-in">
+              {news.map((item) => (
+                <NewsCard
+                  key={item.id}
+                  item={item}
+                  isNew={newIds.has(item.id)}
+                  onSelect={onSelectItem}
+                  onTickerSelect={onTickerSelect}
+                  onQuickTrade={onQuickTrade}
+                  onAskAI={onAskAI}
+                  selected={selectedItem?.id === item.id}
+                />
+              ))}
+            </div>
+          </ErrorBoundary>
         )}
       </div>
     </div>
