@@ -259,14 +259,14 @@ export default function TerminalApp() {
   const headerWalletSessionRef = useRef<ConnectedWalletSession | null>(null);
 
   const [newsWidth, setNewsWidth] = useState(370);
-  const [rightWidth, setRightWidth] = useState(295);
+  const [rightWidth, setRightWidth] = useState(340);
 
   const resizeNews = useCallback(
     (dx: number) => setNewsWidth((w) => Math.max(240, Math.min(580, w + dx))),
     []
   );
   const resizeRight = useCallback(
-    (dx: number) => setRightWidth((w) => Math.max(250, Math.min(480, w - dx))),
+    (dx: number) => setRightWidth((w) => Math.max(280, Math.min(520, w - dx))),
     []
   );
 
