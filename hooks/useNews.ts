@@ -141,8 +141,10 @@ export function useNews({ sector, ticker, keyword, sourceFilter = "all", importa
       filtered = socialItems;
       break;
     default:
-      filtered = allItems.sort(
-        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      filtered = [...allItems].sort(
+        (a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime() ||
+          a.id.localeCompare(b.id)
       );
   }
 

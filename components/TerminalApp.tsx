@@ -24,6 +24,7 @@ import { FearGreedPill } from "@/components/FearGreedWidget";
 import { useFearGreed } from "@/hooks/useFearGreed";
 import BrandMark from "@/components/BrandMark";
 import MarketStatsBar from "@/components/MarketStatsBar";
+import MarketSessionBar from "@/components/MarketSessionBar";
 import { useTradingState } from "@/hooks/useTradingState";
 import type { ActiveVenueState, TradingVenueConnectionStatus, TradingVenueType } from "@/lib/active-venue";
 import { getVenueAdapter } from "@/lib/venues";
@@ -1007,26 +1008,61 @@ export default function TerminalApp() {
       <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-3 py-3 sm:px-4 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
         {/* Fear & Greed pill — left of center */}
         <div className="absolute left-3 top-1/2 z-10 -translate-y-1/2 sm:left-4">
-          <FearGreedPill compact />
+          <FearGreedPill />
         </div>
+
+        {/* Center brand */}
         <div className="relative z-10 flex items-center justify-center px-2">
-          <BrandMark className="mx-auto" />
+          <div className="relative">
+            <BrandMark className="mx-auto" />
+            {/* Live data indicator */}
+            {wsConnected && (
+              <span
+                className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full px-2 py-[2px]"
+                style={{
+                  background: "rgba(16,185,129,0.08)",
+                  border: "1px solid rgba(16,185,129,0.2)",
+                }}
+              >
+                <span className="h-1 w-1 rounded-full status-dot-online live-dot" />
+                <span className="text-[8px] font-bold tracking-[0.18em] text-emerald-500 uppercase hidden sm:inline">
+                  Live
+                </span>
+              </span>
+            )}
+          </div>
         </div>
+
+        {/* Right: wallet connect */}
         <div ref={headerControlRef} className="absolute right-3 top-1/2 z-10 -translate-y-1/2 sm:right-4">
           <div className="panel-shell-alt flex items-center gap-1.5 rounded-2xl px-2 py-1.5">
             <button
               type="button"
               onClick={() => setHeaderConnectOpen((open) => !open)}
-              className="brand-chip-active inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em]"
+              className="brand-chip-active shimmer-on-hover inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em]"
             >
+              {/* Connection status dot */}
+              <span
+                className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                  isActiveHeaderConnection
+                    ? "status-dot-online"
+                    : headerConnection.status === "testing"
+                      ? "status-dot-pending"
+                      : ""
+                }`}
+                style={
+                  !isActiveHeaderConnection && headerConnection.status !== "testing"
+                    ? { background: "#4a3a1a" }
+                    : {}
+                }
+              />
               <Wallet className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Wallet Connect</span>
-              <span className="sm:hidden">Connect</span>
+              <span className="hidden sm:inline">Wallet</span>
             </button>
             <button
               type="button"
               onClick={() => setHeaderConnectOpen((open) => !open)}
-              className="terminal-chip inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)]"
+              className="terminal-chip shimmer-on-hover inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)]"
             >
               <span className="hidden md:inline text-zinc-500">{selectedHeaderPlatform.eyebrow}</span>
               <span className="text-[#f3ead7]">{selectedHeaderPlatform.label}</span>
@@ -1036,9 +1072,10 @@ export default function TerminalApp() {
       </div>
 
       <div className="px-2 pt-2">
-        <div className="panel-shell soft-divider overflow-hidden rounded-xl border">
+        <div className="panel-shell soft-divider overflow-hidden rounded-xl border terminal-glow-pulse">
           <TickerTape quotes={wsQuotes} />
           <MarketStatsBar />
+          <MarketSessionBar />
         </div>
       </div>
 
@@ -1119,26 +1156,71 @@ export default function TerminalApp() {
         </div>
       </div>
 
-      <div className="panel-header soft-divider flex shrink-0 flex-col gap-1 border-t px-3 py-2 text-[10px] text-zinc-500 sm:px-4 lg:flex-row lg:items-center lg:justify-between">
-        <span className="text-center lg:text-left">
-          {wsConnected
-            ? "Binance market data online • OKX • Bybit • Hyperliquid • dYdX active"
-            : "Binance market data reconnecting..."}
-        </span>
-        <span className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center lg:justify-end">
-          <span style={{ color: "#3f3f4e" }}>
+      {/* ── Status Bar ─────────────────────────────────────────────────────────── */}
+      <div className="panel-header soft-divider flex shrink-0 items-center justify-between gap-2 border-t px-3 py-1.5 sm:px-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* Left: feed status */}
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Binance */}
+          <div className="flex items-center gap-1">
+            <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${wsConnected ? "status-dot-online live-dot" : "status-dot-offline"}`} />
+            <span className="text-[9px] font-semibold tracking-[0.12em] uppercase"
+              style={{ color: wsConnected ? "#10b981" : "#ef4444" }}>
+              {wsConnected ? "Binance" : "Reconnecting"}
+            </span>
+          </div>
+
+          <span className="text-[#2a2820] hidden sm:inline">·</span>
+
+          {/* Venue feeds */}
+          {(["OKX", "Bybit", "HL", "dYdX"] as const).map((v) => (
+            <div key={v} className="hidden sm:flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: "#6b7280" }} />
+              <span className="text-[9px] tracking-[0.1em] text-zinc-600">{v}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Center: selected item context */}
+        <div className="min-w-0 flex items-center gap-1.5 text-[9px]">
+          {selectedItem ? (
+            <>
+              <span className="rounded px-1.5 py-0.5 font-bold tracking-[0.12em] uppercase"
+                style={{
+                  background: "rgba(212,161,31,0.1)",
+                  border: "1px solid rgba(212,161,31,0.2)",
+                  color: "#d4a11f",
+                }}>
+                {selectedItem.ticker.slice(0, 2).join(" / ")}
+              </span>
+              <span className="truncate text-zinc-500 hidden md:inline">{selectedItem.source}</span>
+            </>
+          ) : (
+            <span className="text-zinc-700 hidden md:inline tracking-[0.1em]">
+              Select a news item to analyse
+            </span>
+          )}
+        </div>
+
+        {/* Right: layout info */}
+        <div className="flex shrink-0 items-center gap-2 text-[9px] text-zinc-700">
+          <span className="hidden lg:inline tracking-[0.1em]">
             {showDesktopLayout
-              ? `News ${newsWidth}px • Right ${rightWidth}px`
+              ? `NEWS ${newsWidth}px · RIGHT ${rightWidth}px`
               : isTablet
-                ? "Tablet workspace"
-                : "Mobile workspace"}
+                ? "TABLET"
+                : "MOBILE"}
           </span>
-          <span>
-            {selectedItem
-              ? `${selectedItem.ticker.join(", ")} - ${selectedItem.source}`
-              : "Click a news item to analyze"}
+          <span
+            className="rounded px-1.5 py-0.5 tracking-[0.12em] uppercase font-semibold"
+            style={{
+              background: "rgba(6,8,12,0.8)",
+              border: "1px solid rgba(255,255,255,0.05)",
+              color: "#3f3f4e",
+            }}
+          >
+            TB v2
           </span>
-        </span>
+        </div>
       </div>
       {headerConnectOpen &&
         typeof document !== "undefined" &&
