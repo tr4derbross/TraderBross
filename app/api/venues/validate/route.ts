@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { retrieveCredentials } from "@/lib/credential-vault";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 type VenueId = "binance" | "okx" | "bybit";
 
@@ -8,7 +9,7 @@ type ValidatePayload = {
   venueId?: VenueId;
   /**
    * Preferred path: server-side vault token.
-   * The browser stores only this UUID — raw keys never leave the server
+   * The browser stores only this token — raw keys never leave the server
    * after the initial /api/vault/store call.
    */
   sessionToken?: string;
@@ -18,8 +19,15 @@ type ValidatePayload = {
   passphrase?: string;
 };
 
+const IS_PROD = process.env.NODE_ENV === "production";
+
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ ok: false, message }, { status });
+}
+
+function safeError(err: unknown, fallback = "Validation request failed.") {
+  if (IS_PROD) return fallback;
+  return err instanceof Error ? err.message : fallback;
 }
 
 function hmac(secret: string, value: string, encoding: "hex" | "base64") {
@@ -36,6 +44,7 @@ async function validateBinance(apiKey: string, apiSecret: string) {
     method: "GET",
     headers: { "X-MBX-APIKEY": apiKey },
     cache: "no-store",
+    signal: AbortSignal.timeout(8000),
   });
 
   const data = await response.json().catch(() => ({}));
@@ -63,6 +72,7 @@ async function validateOkx(apiKey: string, apiSecret: string, passphrase: string
       "OK-ACCESS-PASSPHRASE":  passphrase,
     },
     cache: "no-store",
+    signal: AbortSignal.timeout(8000),
   });
 
   const data = await response.json().catch(() => ({}));
@@ -88,6 +98,7 @@ async function validateBybit(apiKey: string, apiSecret: string) {
       "X-BAPI-RECV-WINDOW":  recvWindow,
     },
     cache: "no-store",
+    signal: AbortSignal.timeout(8000),
   });
 
   const data = await response.json().catch(() => ({}));
@@ -98,6 +109,16 @@ async function validateBybit(apiKey: string, apiSecret: string) {
 }
 
 export async function POST(req: NextRequest) {
+  // ── Rate limit: 5 validation attempts per minute per IP ────────────────────
+  const ip = getClientIp(req);
+  const { allowed } = rateLimit(`venue-validate:${ip}`, 5, 60_000);
+  if (!allowed) {
+    return NextResponse.json(
+      { ok: false, message: "Too many validation attempts. Please wait before retrying." },
+      { status: 429 },
+    );
+  }
+
   const body = (await req.json().catch(() => ({}))) as ValidatePayload;
   const venueId = body.venueId;
 
@@ -120,7 +141,10 @@ export async function POST(req: NextRequest) {
     apiSecret  = creds.apiSecret;
     passphrase = creds.passphrase;
   } else {
-    // Fallback: raw credentials in request body
+    // Fallback: raw credentials in request body (only allowed in non-production)
+    if (IS_PROD) {
+      return jsonError("Direct credential submission is disabled. Use the vault flow.", 400);
+    }
     apiKey     = body.apiKey?.trim()     ?? "";
     apiSecret  = body.apiSecret?.trim()  ?? "";
     passphrase = body.passphrase?.trim() ?? undefined;
@@ -145,8 +169,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result, { status: result.ok ? 200 : 401 });
   } catch (error) {
     return NextResponse.json(
-      { ok: false, message: error instanceof Error ? error.message : "Validation request failed." },
-      { status: 500 }
+      { ok: false, message: safeError(error) },
+      { status: 500 },
     );
   }
 }

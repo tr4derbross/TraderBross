@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
+import crypto from "crypto";
 import { retrieveCredentials } from "@/lib/credential-vault";
 import { encode } from "@msgpack/msgpack";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
+
+const IS_PROD = process.env.NODE_ENV === "production";
+
+// ─── Input validation constants ───────────────────────────────────────────────
+const VALID_TYPES     = new Set(["order", "cancel", "leverage", "marginMode"]);
+const VALID_SIDES     = new Set(["long", "short"]);
+const VALID_ORDER_TYPES = new Set(["market", "limit", "stop"]);
+/** Hyperliquid asset symbol: 1-10 uppercase letters/numbers */
+const SYMBOL_RE = /^[A-Z0-9]{1,10}$/;
 
 const HL_EXCHANGE = "https://api.hyperliquid.xyz/exchange";
 const HL_INFO     = "https://api.hyperliquid.xyz/info";
@@ -120,11 +131,27 @@ async function submitToHL(
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  // ── Rate limit: 10 orders per minute per IP ─────────────────────────────────
+  const ip = getClientIp(request);
+  const { allowed } = rateLimit(`hl-order:${ip}`, 10, 60_000);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please wait before submitting another order." },
+      { status: 429 },
+    );
+  }
+
   let body: Record<string, unknown>;
   try {
     body = await request.json() as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  // ── Validate action type early ───────────────────────────────────────────────
+  const { type } = body as { type: unknown };
+  if (typeof type !== "string" || !VALID_TYPES.has(type)) {
+    return NextResponse.json({ error: "Invalid action type." }, { status: 400 });
   }
 
   // Resolve the private key: env var takes precedence, then vault session token
@@ -157,8 +184,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { type } = body as { type: string };
-    const nonce = Date.now();
+    // Nonce: milliseconds + small random offset to avoid collisions
+    const nonce = Date.now() + crypto.randomInt(0, 999);
 
     // ── Place order ──────────────────────────────────────────────────────────
     if (type === "order") {
@@ -170,6 +197,17 @@ export async function POST(request: NextRequest) {
         leverage: number;
         limitPrice?: number;
       };
+
+      // Validate inputs
+      if (!symbol || !SYMBOL_RE.test(symbol)) throw new Error("Invalid symbol.");
+      if (!VALID_SIDES.has(side)) throw new Error("Invalid side.");
+      if (!VALID_ORDER_TYPES.has(orderType)) throw new Error("Invalid order type.");
+      if (!Number.isFinite(marginAmount) || marginAmount <= 0 || marginAmount > 10_000_000)
+        throw new Error("marginAmount must be between 0 and 10,000,000.");
+      if (!Number.isFinite(leverage) || leverage < 1 || leverage > 100)
+        throw new Error("Leverage must be between 1 and 100.");
+      if ((orderType === "limit" || orderType === "stop") && (!limitPrice || !Number.isFinite(limitPrice) || limitPrice <= 0))
+        throw new Error("Limit price required and must be positive.");
 
       const asset     = await getAssetInfo(symbol);
       const markPrice = await getMarkPrice(symbol);
@@ -212,6 +250,8 @@ export async function POST(request: NextRequest) {
     // ── Cancel order ─────────────────────────────────────────────────────────
     if (type === "cancel") {
       const { symbol, orderId } = body as { symbol: string; orderId: number };
+      if (!symbol || !SYMBOL_RE.test(symbol)) throw new Error("Invalid symbol.");
+      if (!Number.isInteger(orderId) || orderId <= 0) throw new Error("Invalid orderId.");
       const asset  = await getAssetInfo(symbol);
       const action = { type: "cancel", cancels: [{ a: asset.index, o: orderId }] };
       const result = await submitToHL(action, wallet, nonce);
@@ -221,6 +261,8 @@ export async function POST(request: NextRequest) {
     // ── Update leverage ───────────────────────────────────────────────────────
     if (type === "leverage") {
       const { symbol, leverage, isCross } = body as { symbol: string; leverage: number; isCross?: boolean };
+      if (!symbol || !SYMBOL_RE.test(symbol)) throw new Error("Invalid symbol.");
+      if (!Number.isFinite(leverage) || leverage < 1 || leverage > 100) throw new Error("Leverage must be between 1 and 100.");
       const asset  = await getAssetInfo(symbol);
       const lev    = Math.max(1, Math.min(Math.round(leverage), asset.maxLeverage));
       const action = { type: "updateLeverage", asset: asset.index, isCross: !!isCross, leverage: lev };
@@ -231,6 +273,8 @@ export async function POST(request: NextRequest) {
     // ── Update margin mode ────────────────────────────────────────────────────
     if (type === "marginMode") {
       const { symbol, isCross, leverage } = body as { symbol: string; isCross: boolean; leverage?: number };
+      if (!symbol || !SYMBOL_RE.test(symbol)) throw new Error("Invalid symbol.");
+      if (typeof isCross !== "boolean") throw new Error("isCross must be a boolean.");
       const asset  = await getAssetInfo(symbol);
       const action = {
         type:     "updateLeverage",
@@ -245,9 +289,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unknown type" }, { status: 400 });
 
   } catch (err) {
-    console.error("HL order:", err);
+    const errMsg = err instanceof Error ? err.message : "Order failed";
+    console.error("HL order:", errMsg);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Order failed" },
+      { error: IS_PROD ? "Order processing failed. Please try again." : errMsg },
       { status: 500 },
     );
   }
