@@ -13,11 +13,24 @@ const CATEGORY_TICKERS: Record<string, string[]> = {
 };
 
 const CRYPTO_TICKER_KEYWORDS: Record<string, string[]> = {
-  BTC: ["bitcoin", "btc", "$btc", "sats", "satoshi"],
-  ETH: ["ethereum", "eth", "$eth", "ether"],
-  SOL: ["solana", "sol", "$sol"],
-  BNB: ["binance", "bnb", "$bnb"],
-  XRP: ["xrp", "ripple", "$xrp"],
+  BTC:  ["bitcoin", "btc", "$btc", "sats", "satoshi"],
+  ETH:  ["ethereum", "eth", "$eth", "ether", "vitalik"],
+  SOL:  ["solana", "sol", "$sol"],
+  BNB:  ["binance", "bnb", "$bnb"],
+  XRP:  ["xrp", "ripple", "$xrp"],
+  DOGE: ["dogecoin", "doge", "$doge"],
+  AVAX: ["avalanche", "avax", "$avax"],
+  LINK: ["chainlink", "link", "$link"],
+  ARB:  ["arbitrum", "arb", "$arb"],
+  OP:   ["optimism", "$op", "optimistic"],
+  NEAR: ["near protocol", "$near"],
+  INJ:  ["injective", "inj", "$inj"],
+  APT:  ["aptos", "apt", "$apt"],
+  SUI:  ["sui network", "$sui"],
+  ATOM: ["cosmos", "atom", "$atom"],
+  HYPE: ["hyperliquid", "hype", "$hype"],
+  WIF:  ["dogwifhat", "wif", "$wif"],
+  AAVE: ["aave", "$aave"],
 };
 
 function inferTickersFromText(text: string, defaultTickers: string[]): string[] {
@@ -110,9 +123,12 @@ async function fetchSubstackFeeds(): Promise<NewsItem[]> {
 
 // ─── Reddit RSS (free, no key needed) ────────────────────────────────────────
 const REDDIT_FEEDS = [
-  { url: "https://www.reddit.com/r/CryptoCurrency/hot/.rss?limit=10", community: "r/CryptoCurrency" },
-  { url: "https://www.reddit.com/r/Bitcoin/hot/.rss?limit=10",        community: "r/Bitcoin" },
-  { url: "https://www.reddit.com/r/ethfinance/hot/.rss?limit=8",      community: "r/ethfinance" },
+  { url: "https://www.reddit.com/r/CryptoCurrency/hot/.rss?limit=12", community: "r/CryptoCurrency" },
+  { url: "https://www.reddit.com/r/Bitcoin/hot/.rss?limit=10",        community: "r/Bitcoin"        },
+  { url: "https://www.reddit.com/r/ethfinance/hot/.rss?limit=8",      community: "r/ethfinance"     },
+  { url: "https://www.reddit.com/r/solana/hot/.rss?limit=8",          community: "r/solana"         },
+  { url: "https://www.reddit.com/r/defi/hot/.rss?limit=8",            community: "r/defi"           },
+  { url: "https://www.reddit.com/r/CryptoMarkets/hot/.rss?limit=8",   community: "r/CryptoMarkets"  },
 ];
 
 async function fetchRedditFeeds(): Promise<NewsItem[]> {
