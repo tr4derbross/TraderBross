@@ -491,21 +491,16 @@ export const MOCK_SOCIAL: NewsItem[] = [
   },
 ];
 
+// Tickers available as Hyperliquid perpetuals (primary platform)
 export const AVAILABLE_TICKERS = [
-  // Top 10
-  "BTC", "ETH", "BNB", "XRP", "SOL", "DOGE", "ADA", "TRX", "AVAX", "SHIB",
-  // 11-30
-  "TON", "LINK", "DOT", "LTC", "BCH", "UNI", "ICP", "NEAR", "APT", "OP",
-  "ARB", "ATOM", "FIL", "VET", "HBAR", "MKR", "IMX", "STX", "ALGO", "GRT",
-  // 31-60
-  "EOS", "AAVE", "INJ", "SUI", "SEI", "TIA", "RUNE", "LDO", "RNDR", "FET",
-  "WLD", "PENDLE", "PYTH", "JTO", "BLUR", "ETC", "SNX", "CRV", "COMP", "SUSHI",
-  "CAKE", "APE", "SAND", "MANA", "AXS", "GALA", "ENJ", "CHZ", "FLOW", "XLM",
-  // 61-100
-  "GMX", "DYDX", "MAGIC", "ANKR", "WOO", "FTM", "THETA", "YFI", "ZEC", "BAND",
-  "OCEAN", "AGIX", "GMT", "ALPHA", "BNT", "CELR", "SKL", "ARPA", "ACH", "COTI",
-  "TRB", "GLMR", "ZIL", "IOST", "QTUM", "ONT", "WAVES", "REEF", "1INCH", "ZRX",
-  "PEPE", "FLOKI", "HOOK", "HIGH", "SFP",
+  // Majors on HL
+  "BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "AVAX", "LINK", "ARB", "OP",
+  "NEAR", "INJ", "DOT", "APT", "SUI", "TIA", "SEI", "ATOM", "AAVE", "UNI",
+  // Mid-caps on HL
+  "LTC", "FIL", "WLD", "RNDR", "PENDLE", "JTO", "GMX", "SNX", "CRV", "LDO",
+  "RUNE", "ETC", "BLUR", "PYTH", "WIF", "HYPE", "STX", "TRB", "DYDX", "GRT",
+  // Additional HL perps
+  "FET", "MAGIC", "COMP", "MKR", "YFI", "1INCH", "ZRX", "SUSHI", "IMX", "SAND",
 ];
 
 export const SECTORS = [
