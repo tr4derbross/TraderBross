@@ -1142,9 +1142,23 @@ export default function TerminalApp() {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-black">
       <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-3 py-3 sm:px-4 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
-        {/* Fear & Greed pill — left of center */}
-        <div className="absolute left-3 top-1/2 z-10 -translate-y-1/2 sm:left-4">
+        {/* Left: Fear & Greed + page nav */}
+        <div className="absolute left-3 top-1/2 z-10 -translate-y-1/2 sm:left-4 flex items-center gap-2">
           <FearGreedPill />
+          <div className="hidden items-center gap-1 sm:flex">
+            <a
+              href="/"
+              className="rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-600 transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-zinc-400"
+            >
+              Home
+            </a>
+            <a
+              href="/news"
+              className="rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-600 transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-zinc-400"
+            >
+              News
+            </a>
+          </div>
         </div>
 
         {/* Center brand */}
@@ -1365,7 +1379,7 @@ export default function TerminalApp() {
             <div className="fixed inset-0 z-[120] bg-transparent" />
             <div
               ref={headerPanelRef}
-              className="panel-shell-alt fixed z-[130] border p-3 shadow-[0_18px_48px_rgba(0,0,0,0.42)]"
+              className="panel-shell-alt fixed z-[130] max-h-[calc(100vh-100px)] overflow-y-auto border p-3 shadow-[0_18px_48px_rgba(0,0,0,0.42)]"
               style={
                 isMobile
                   ? {
