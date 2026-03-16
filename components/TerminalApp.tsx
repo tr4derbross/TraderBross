@@ -104,7 +104,7 @@ const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
     label: "Hyperliquid",
     type: "wallet",
     eyebrow: "DEX · Live",
-    description: "Connect your wallet to view real-time balance and positions. MetaMask, Rabby, and other popular wallets supported.",
+    description: "Step 1: Connect your main wallet (MetaMask, Rabby…) to view read-only balance and positions. Step 2: Enter your Hyperliquid API wallet private key below to enable in-terminal order placement.",
     primaryAction: "Connect Wallet",
     secondaryAction: "Wallet Menu",
     wallets: ["MetaMask", "Rabby", "Coinbase Wallet", "Phantom", "Solflare"],
@@ -142,10 +142,9 @@ const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
     id: "binance",
     label: "Binance",
     type: "cex",
-    eyebrow: "CEX API",
-    description: "Binance API integration — spot and futures account management coming soon.",
-    primaryAction: "Start API Setup",
-    comingSoon: true,
+    eyebrow: "CEX API · Live",
+    description: "Binance Futures — real order placement via HMAC-SHA256 signed requests. API keys are encrypted server-side (AES-256). Never grant withdrawal permissions on keys used here.",
+    primaryAction: "Save API Keys",
   },
 ];
 
