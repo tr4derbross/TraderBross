@@ -5,6 +5,7 @@ import { Maximize2, Minimize2, Newspaper } from "lucide-react";
 import { AVAILABLE_TICKERS } from "@/lib/mock-data";
 import type { TradingVenueId } from "@/lib/active-venue";
 import { MarginMode, Order, OrderType, Position, Side } from "@/hooks/useTradingState";
+import { apiFetch } from "@/lib/api-client";
 
 type FundingVenue = {
   venue: "Binance" | "OKX" | "Bybit";
@@ -238,24 +239,17 @@ export default function PriceChart({
   useEffect(() => {
     let active = true;
 
-    const loadFunding = () => {
-      fetch(`/api/funding?ticker=${ticker}`, { cache: "no-store" })
-        .then((response) => response.json())
-        .then((payload: { rates?: FundingVenue[] }) => {
-          if (!active) return;
-          setFundingRates(Array.isArray(payload.rates) ? payload.rates : []);
-        })
-        .catch(() => {
-          if (active) setFundingRates([]);
-        });
-    };
-
-    loadFunding();
-    const id = setInterval(loadFunding, 30000);
+    apiFetch<{ rates?: FundingVenue[] }>(`/api/funding?ticker=${ticker}`)
+      .then((payload) => {
+        if (!active) return;
+        setFundingRates(Array.isArray(payload.rates) ? payload.rates : []);
+      })
+      .catch(() => {
+        if (active) setFundingRates([]);
+      });
 
     return () => {
       active = false;
-      clearInterval(id);
     };
   }, [ticker]);
 
@@ -417,8 +411,7 @@ export default function PriceChart({
             ? `/api/hyperliquid?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
             : `/api/prices?ticker=${ticker}&interval=${interval}&limit=${limit}`;
 
-    fetch(endpoint)
-      .then((response) => response.json())
+    apiFetch<PriceData[]>(endpoint)
       .then((payload: PriceData[]) => {
         if (!active) return;
         setPriceData(Array.isArray(payload) ? payload : []);

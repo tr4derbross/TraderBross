@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { TickerQuote } from "@/lib/mock-data";
 
 type Props = {
@@ -14,21 +13,7 @@ const TICKER_ORDER = [
 ];
 
 export default function TickerTape({ quotes: wsQuotes }: Props) {
-  const [restQuotes, setRestQuotes] = useState<TickerQuote[]>([]);
-
-  // Only fetch via REST if WebSocket quotes aren't available yet
-  useEffect(() => {
-    if (wsQuotes && wsQuotes.length > 0) return;
-    const fetch30s = () =>
-      fetch("/api/prices?type=quotes")
-        .then((r) => r.json())
-        .then(setRestQuotes);
-    fetch30s();
-    const id = setInterval(fetch30s, 30_000);
-    return () => clearInterval(id);
-  }, [wsQuotes]);
-
-  const rawQuotes = wsQuotes && wsQuotes.length > 0 ? wsQuotes : restQuotes;
+  const rawQuotes = wsQuotes ?? [];
 
   // Sort by canonical ticker order
   const quotes = [...rawQuotes]

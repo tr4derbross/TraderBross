@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { NewsItem, AVAILABLE_TICKERS } from "@/lib/mock-data";
 import { useAlerts } from "@/hooks/useAlerts";
@@ -22,6 +22,8 @@ import ChatPanel from "@/components/ChatPanel";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { FearGreedPill } from "@/components/FearGreedWidget";
 import { useFearGreed } from "@/hooks/useFearGreed";
+import { apiFetch } from "@/lib/api-client";
+import { useRealtimeSelector } from "@/lib/realtime-client";
 import BrandMark from "@/components/BrandMark";
 import MarketStatsBar from "@/components/MarketStatsBar";
 import MarketSessionBar from "@/components/MarketSessionBar";
@@ -259,9 +261,6 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     activeSymbol: initialTicker && AVAILABLE_TICKERS.includes(initialTicker) ? initialTicker : "BTC",
     connectionStatus: "disconnected",
   });
-  const [venueMarketPrices, setVenueMarketPrices] = useState<
-    Partial<Record<ActiveVenueState["venueId"], Record<string, number>>>
-  >({});
   const { checkNewsAgainstAlerts, checkPriceAlerts } = useAlerts();
   const headerControlRef = useRef<HTMLDivElement | null>(null);
   const headerPanelRef = useRef<HTMLDivElement | null>(null);
@@ -448,40 +447,19 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     activeVenueState.venueId,
     activeVenueState.activeSymbol
   );
-
-  useEffect(() => {
-    const loadVenueMarketData = async () => {
-      const [okxRes, bybitRes, hyperliquidRes, dydxRes] = await Promise.allSettled([
-        Promise.all(
-          AVAILABLE_TICKERS.map(async (symbol) => [symbol, await getVenueAdapter("okx").getTicker(symbol)] as const)
-        ),
-        Promise.all(
-          AVAILABLE_TICKERS.map(async (symbol) => [symbol, await getVenueAdapter("bybit").getTicker(symbol)] as const)
-        ),
-        Promise.all(
-          AVAILABLE_TICKERS.map(async (symbol) => [symbol, await getVenueAdapter("hyperliquid").getTicker(symbol)] as const)
-        ),
-        Promise.all(
-          AVAILABLE_TICKERS.map(async (symbol) => [symbol, await getVenueAdapter("dydx").getTicker(symbol)] as const)
-        ),
-      ]);
-
-      const quoteMap = (entries: Array<readonly [string, { price: number } | null]>) =>
-        Object.fromEntries(entries.filter(([, quote]) => quote).map(([symbol, quote]) => [symbol, quote!.price]));
-
-      setVenueMarketPrices({
-        binance: wsPrices,
-        okx: okxRes.status === "fulfilled" ? quoteMap(okxRes.value) : {},
-        bybit: bybitRes.status === "fulfilled" ? quoteMap(bybitRes.value) : {},
-        hyperliquid: hyperliquidRes.status === "fulfilled" ? quoteMap(hyperliquidRes.value) : {},
-        dydx: dydxRes.status === "fulfilled" ? quoteMap(dydxRes.value) : {},
-      });
-    };
-
-    void loadVenueMarketData();
-    const intervalId = setInterval(loadVenueMarketData, 15_000);
-    return () => clearInterval(intervalId);
-  }, [wsPrices]);
+  const backendVenueQuotes = useRealtimeSelector((state) => state.venueQuotes);
+  const venueMarketPrices = useMemo<
+    Partial<Record<ActiveVenueState["venueId"], Record<string, number>>>
+  >(
+    () => ({
+      binance: wsPrices,
+      okx: Object.fromEntries(backendVenueQuotes.OKX.map((quote) => [quote.symbol, quote.price])),
+      bybit: Object.fromEntries(backendVenueQuotes.Bybit.map((quote) => [quote.symbol, quote.price])),
+      hyperliquid: wsPrices,
+      dydx: wsPrices,
+    }),
+    [backendVenueQuotes.Bybit, backendVenueQuotes.OKX, wsPrices],
+  );
   const {
     balance,
     positions,
@@ -520,13 +498,11 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     };
 
     void fetchVenueBalance();
-    const id = setInterval(fetchVenueBalance, 30_000);
     return () => {
       cancelled = true;
-      clearInterval(id);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeVenueState.venueId, activeVenueState.connectionStatus, hlVaultToken, vaultTokens]);
+  }, [activeVenueState.venueId, activeVenueState.connectionStatus, hlVaultToken, vaultTokens, orders.length, positions.length]);
 
   // Use real venue balance if available, otherwise paper trading balance
   const displayBalance = venueBalance != null
@@ -790,12 +766,10 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     if (!hlPrivateKeyInput.trim()) return;
     setHlKeyStatus("saving");
     try {
-      const resp = await fetch("/api/vault/store", {
+      const data = await apiFetch<{ ok: boolean; sessionToken?: string; message?: string }>("/api/vault/store", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ venueId: "hyperliquid", privateKey: hlPrivateKeyInput.trim(), walletAddress: hlWallet }),
       });
-      const data = await resp.json() as { ok: boolean; sessionToken?: string; message?: string };
       if (data.ok && data.sessionToken) {
         setHlVaultToken(data.sessionToken);
         try { sessionStorage.setItem("traderbross.vault-token.hyperliquid.v1", data.sessionToken); } catch {}
@@ -830,9 +804,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     // Store credentials in server-side vault — browser will only keep the session token
     setHeaderActionMessage("Securing credentials…");
     try {
-      const resp = await fetch("/api/vault/store", {
+      const data = await apiFetch<{ ok: boolean; sessionToken?: string; message?: string }>("/api/vault/store", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           venueId: cexPlatform,
           apiKey: creds.apiKey.trim(),
@@ -840,7 +813,6 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           passphrase: creds.passphrase.trim() || undefined,
         }),
       });
-      const data = await resp.json() as { ok: boolean; sessionToken?: string; message?: string };
 
       if (data.ok && data.sessionToken) {
         // Persist token in sessionStorage (safe — just a UUID, not the key itself)
@@ -874,9 +846,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
     // Clear vault session on server (best-effort)
     if (token) {
-      void fetch("/api/vault/clear", {
+      void apiFetch<{ ok: boolean }>("/api/vault/clear", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionToken: token }),
       }).catch(() => { /* ignore */ });
       try { sessionStorage.removeItem(`traderbross.vault-token.${cexPlatform}.v1`); } catch { /* ignore */ }
@@ -918,9 +889,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       if (!effectiveToken && hasRawCreds) {
         setHeaderActionMessage("Securing credentials…");
         const creds = headerCexCredentials[selectedHeaderCexPlatform];
-        const storeResp = await fetch("/api/vault/store", {
+        const storeData = await apiFetch<{ ok: boolean; sessionToken?: string; message?: string }>("/api/vault/store", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             venueId: selectedHeaderCexPlatform,
             apiKey: creds.apiKey.trim(),
@@ -928,7 +898,6 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
             passphrase: creds.passphrase.trim() || undefined,
           }),
         });
-        const storeData = await storeResp.json() as { ok: boolean; sessionToken?: string; message?: string };
         if (storeData.ok && storeData.sessionToken) {
           effectiveToken = storeData.sessionToken;
           try { sessionStorage.setItem(`traderbross.vault-token.${selectedHeaderCexPlatform}.v1`, effectiveToken); } catch { /* ignore */ }

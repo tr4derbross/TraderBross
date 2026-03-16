@@ -1,39 +1,50 @@
 # TraderBross Terminal
 
-TraderBross is a premium multi-panel crypto trading terminal built with Next.js.
-It combines live market data, news flow, chart-based position management, funding visibility, venue monitoring, and a branded dark trading UI in a single workspace.
+TraderBross now runs as a split architecture:
 
-## Overview
+- Frontend: Next.js on Vercel
+- Backend: standalone Node service for Railway or VPS
+- Realtime: backend WebSocket server at `/ws`
 
-The interface is designed around a three-panel terminal layout:
+## Why this refactor
 
-- Left panel: news feed, filters, alerts context
-- Center panel: chart workspace and trading overlays
-- Right panel: execution, DEX integrations, venues, watchlists
-- Bottom panel: positions, open orders, history, P&L
+The original app deployed heavy data fetching inside Next.js route handlers and combined that with many client-side 10s, 12s, 15s, 30s, 60s, and 120s polling loops. On Vercel that translated into repeated serverless invocations for prices, venues, news, market stats, mempool stats, fear and greed, and streaming routes.
 
-## Features
+The current setup keeps the UI intact while moving aggregation, polling, and live fanout into `backend/`.
 
-- Live market feed and ticker tape
-- Native chart workspace with position overlays
-- TP / SL management from chart and positions table
-- Market, limit, and stop order simulation flow
-- Funding rate support
-- News-driven workflow and trade context
-- Hyperliquid and dYdX monitoring panels
-- Venue connection status for Binance, OKX, Bybit, Hyperliquid, and dYdX
-- TraderBross brand-integrated dark premium UI
+## New structure
 
-## Tech Stack
+```text
+backend/
+  server.mjs
+  config.mjs
+  logger.mjs
+  Procfile
+  ecosystem.config.cjs
+  services/
+    ai-service.mjs
+    cache.mjs
+    dydx-service.mjs
+    http.mjs
+    hyperliquid-service.mjs
+    market-service.mjs
+    mock-data.mjs
+    news-service.mjs
+    stats-service.mjs
+    vault-service.mjs
+    venue-service.mjs
 
-- Next.js 16
-- React 19
-- TypeScript
-- Tailwind CSS 4
-- Lightweight Charts
-- Lucide React
+app/
+components/
+hooks/
+lib/
+  api-client.ts
+  backend-types.ts
+  realtime-client.ts
+  runtime-env.ts
+```
 
-## Local Development
+## Local development
 
 Install dependencies:
 
@@ -41,95 +52,85 @@ Install dependencies:
 npm install
 ```
 
-Run the development server:
+Run the backend:
 
 ```bash
-npm run dev
+npm run dev:backend
 ```
 
-Open:
+Run the frontend:
 
 ```bash
+npm run dev:frontend
+```
+
+Frontend:
+
+```text
 http://localhost:3000
 ```
 
-## Production Build
-
-Build the project:
-
-```bash
-npm run build
-```
-
-Start production mode:
-
-```bash
-npm run start
-```
-
-## Environment Notes
-
-Some venue and news integrations can use optional API credentials through local environment variables.
-
-Examples may include:
-
-- `OKX_API_KEY`
-- `OKX_SECRET`
-- `OKX_PASSPHRASE`
-- `BYBIT_API_KEY`
-- `BYBIT_SECRET`
-- `GNEWS_API_KEY`
-- `CRYPTOPANIC_KEY`
-- `CRYPTOCOMPARE_KEY`
-
-Keep local secrets in:
-
-```bash
-.env.local
-```
-
-Do not commit `.env.local` to GitHub.
-
-## Project Structure
+Backend health:
 
 ```text
-app/           Next.js app router pages and API routes
-components/    UI panels, chart, feed, terminal widgets
-hooks/         Trading, websocket, alerts, and data hooks
-lib/           Mock data, services, parsers, utilities
-public/        Static brand assets and public files
+http://localhost:4001/health
 ```
 
-## Git Workflow
+Backend websocket:
 
-After new changes:
+```text
+ws://localhost:4001/ws
+```
 
-```bash
-git add .
-git commit -m "Describe the update"
-git push
+## Environment
+
+Frontend must use:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:4001
+NEXT_PUBLIC_WS_URL=ws://127.0.0.1:4001/ws
+```
+
+Backend should also define:
+
+```env
+API_HOST=0.0.0.0
+API_PORT=4001
+CORS_ORIGINS=http://localhost:3000,https://your-vercel-app.vercel.app
+LOG_LEVEL=info
 ```
 
 ## Deployment
 
-The easiest deployment path is Vercel.
+### Vercel
 
-Recommended flow:
+Deploy only the Next.js frontend. Set:
 
-1. Import the GitHub repository into Vercel
-2. Add required environment variables
-3. Deploy
-4. Test chart, news, and API-dependent panels in production
+```env
+NEXT_PUBLIC_API_BASE_URL=https://your-backend.example.com
+NEXT_PUBLIC_WS_URL=wss://your-backend.example.com/ws
+```
 
-## Status
+### Railway
 
-Current repository includes:
+Use start command:
 
-- branded TraderBross UI
-- chart-based trading workflow
-- positions and order management
-- GitHub-connected source control setup
+```bash
+node backend/server.mjs
+```
 
----
+`backend/Procfile` is included for simple process bootstrapping.
 
-Built for a professional crypto terminal experience under the TraderBross brand.
+### VPS
+
+You can run the backend with PM2:
+
+```bash
+pm2 start backend/ecosystem.config.cjs
+```
+
+## Notes
+
+- The frontend no longer depends on short-interval polling for market/news/stats panels.
+- Realtime market/news/stats fanout is centralized in the backend websocket server.
+- Some low-frequency or non-critical flows remain REST-based by design.

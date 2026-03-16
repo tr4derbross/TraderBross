@@ -13,6 +13,7 @@ import {
   Activity,
 } from "lucide-react";
 import { getDydxReferralUrl } from "@/lib/dydx-order";
+import { apiFetch } from "@/lib/api-client";
 
 type Tab = "markets" | "positions" | "trade";
 
@@ -76,8 +77,7 @@ export default function DydxPanel() {
   const fetchMarkets = useCallback(async () => {
     setLoadingMkts(true);
     try {
-      const res = await fetch("/api/dydx?type=markets");
-      const data = await res.json();
+      const data = await apiFetch<{ assets?: DydxAsset[] }>("/api/dydx?type=markets");
       if (data.assets?.length) setAssets(data.assets);
     } catch { /* silent */ }
     setLoadingMkts(false);
@@ -90,9 +90,8 @@ export default function DydxPanel() {
     }
     setAcctError("");
     try {
-      const res = await fetch(`/api/dydx?type=account&address=${addr}`);
-      const data = await res.json();
-      if (data.error) setAcctError(data.error);
+      const data = await apiFetch<DydxAccount | { error: string }>(`/api/dydx?type=account&address=${addr}`);
+      if ("error" in data) setAcctError(data.error);
       else setAccount(data);
     } catch {
       setAcctError("Failed to fetch account");
@@ -104,11 +103,6 @@ export default function DydxPanel() {
     const saved = (() => { try { return sessionStorage.getItem(DYDX_ADDR_KEY); } catch { return null; } })();
     if (saved) fetchAccount(saved);
   }, [fetchMarkets, fetchAccount]);
-
-  useEffect(() => {
-    const id = setInterval(fetchMarkets, 30_000);
-    return () => clearInterval(id);
-  }, [fetchMarkets]);
 
   const handleConnect = () => {
     const addr = inputAddr.trim();

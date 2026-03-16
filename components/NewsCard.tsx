@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api-client";
 import { NewsItem } from "@/lib/mock-data";
 import { buildNewsTradePresets, type NewsTradePreset } from "@/lib/news-trade";
 import {
@@ -383,12 +384,14 @@ function NewsCardInner({ item, isNew, onSelect, onTickerSelect, onQuickTrade, on
     if (sentiment || loadingSentiment) return;
     setLoadingSentiment(true);
     try {
-      const res = await fetch("/api/sentiment", {
+      const data = await apiFetch<{
+        score: string;
+        confidence: number;
+        reason: string;
+      }>("/api/sentiment", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ headline: item.headline, summary: item.summary }),
       });
-      const data = await res.json();
       setSentiment(data);
     } catch {
       // ignore

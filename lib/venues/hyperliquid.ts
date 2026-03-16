@@ -1,4 +1,5 @@
 import type { VenueAdapter, VenueActionResult } from "@/lib/venues/types";
+import { buildApiUrl } from "@/lib/runtime-env";
 import {
   createPollingSubscribe,
   disconnectedResult,
@@ -55,7 +56,7 @@ const subscribeTicker: VenueAdapter["subscribeTicker"] = (symbol, onTick) => {
 
 async function hlOrderPost(body: Record<string, unknown>): Promise<VenueActionResult> {
   try {
-    const res = await fetch("/api/hyperliquid/order", {
+    const res = await fetch(buildApiUrl("/api/hyperliquid/order"), {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify(body),

@@ -10,9 +10,10 @@ import type {
   VenuePosition,
   VenueTicker,
 } from "@/lib/venues/types";
+import { buildApiUrl } from "@/lib/runtime-env";
 
 export async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, init);
+  const response = await fetch(buildApiUrl(input), init);
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}`);
   }

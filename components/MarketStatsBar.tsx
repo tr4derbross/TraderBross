@@ -1,20 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-type MarketStats = {
-  marketCapUsd: number | null;
-  btcDominance: number | null;
-  ethDominance: number | null;
-  marketCapChange24h: number | null;
-};
-
-type MempoolStats = {
-  fees: { fastestFee: number; halfHourFee: number; hourFee: number } | null;
-  blockHeight: number | null;
-  mempool: { count: number } | null;
-  halving: { remainingBlocks: number } | null;
-};
+import { useRealtimeSelector } from "@/lib/realtime-client";
 
 function fmtMarketCap(usd: number | null): string {
   if (usd == null) return "—";
@@ -24,43 +10,18 @@ function fmtMarketCap(usd: number | null): string {
 }
 
 export default function MarketStatsBar() {
-  const [market, setMarket] = useState<MarketStats>({
+  const market = useRealtimeSelector((state) => state.marketStats) ?? {
     marketCapUsd: null,
     btcDominance: null,
     ethDominance: null,
     marketCapChange24h: null,
-  });
-  const [mempool, setMempool] = useState<MempoolStats>({
+  };
+  const mempool = useRealtimeSelector((state) => state.mempoolStats) ?? {
     fees: null,
     blockHeight: null,
     mempool: null,
     halving: null,
-  });
-
-  useEffect(() => {
-    const fetchMarket = () =>
-      fetch("/api/market")
-        .then((r) => r.json())
-        .then(setMarket)
-        .catch(() => {});
-
-    const fetchMempool = () =>
-      fetch("/api/mempool")
-        .then((r) => r.json())
-        .then(setMempool)
-        .catch(() => {});
-
-    fetchMarket();
-    fetchMempool();
-
-    const marketTimer = setInterval(fetchMarket, 60_000);
-    const mempoolTimer = setInterval(fetchMempool, 30_000);
-
-    return () => {
-      clearInterval(marketTimer);
-      clearInterval(mempoolTimer);
-    };
-  }, []);
+  };
 
   const capChange = market.marketCapChange24h;
   const capChangePositive = capChange != null && capChange >= 0;

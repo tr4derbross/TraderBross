@@ -3,6 +3,7 @@
 import { Wallet, Zap, TrendingUp, TrendingDown, Loader2, AlertTriangle, RefreshCw, BarChart2 } from "lucide-react";
 import { useHyperliquid } from "@/hooks/useHyperliquid";
 import { signHLAction, buildMarketOrder, buildLimitOrder } from "@/lib/hyperliquid-sign";
+import { apiFetch } from "@/lib/api-client";
 import { useState } from "react";
 
 type Props = {
@@ -47,18 +48,16 @@ export default function HyperliquidPanel({ walletAddress, onRequestConnect }: Pr
           ? buildMarketOrder(idx, isBuy, sizeNum)
           : buildLimitOrder(idx, isBuy, sizeNum, parseFloat(limitPrice));
       const signature = await signHLAction(action, nonce);
-      const res = await fetch("/api/hyperliquid/order", {
+      const data = await apiFetch<{ status?: string; ok?: boolean; response?: string; error?: string }>("/api/hyperliquid/order", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, nonce, signature }),
       });
-      const data = await res.json();
-      if (data.status === "ok") {
+      if (data.status === "ok" || data.ok) {
         setOrderMsg({ type: "ok", text: "Order submitted successfully" });
         setSize("");
         fetchAccount();
       } else {
-        setOrderMsg({ type: "err", text: data.response ?? "Order failed" });
+        setOrderMsg({ type: "err", text: data.response ?? data.error ?? "Order failed" });
       }
     } catch (err) {
       setOrderMsg({ type: "err", text: err instanceof Error ? err.message : "Signing failed" });

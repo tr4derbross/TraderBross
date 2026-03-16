@@ -4,8 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:frontend": "next dev",
+    "dev:backend": "node backend/server.mjs",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "start:frontend": "next start",
+    "start:backend": "node backend/server.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
