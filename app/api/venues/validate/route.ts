@@ -35,12 +35,13 @@ function hmac(secret: string, value: string, encoding: "hex" | "base64") {
 }
 
 async function validateBinance(apiKey: string, apiSecret: string) {
+  // Use Futures API — keys for this terminal are Futures keys, not spot
   const timestamp = Date.now().toString();
   const query = new URLSearchParams({ timestamp, recvWindow: "5000" }).toString();
   const signature = hmac(apiSecret, query, "hex");
-  const path = `/api/v3/account?${query}&signature=${signature}`;
+  const path = `/fapi/v2/balance?${query}&signature=${signature}`;
 
-  const response = await fetch(`https://api.binance.com${path}`, {
+  const response = await fetch(`https://fapi.binance.com${path}`, {
     method: "GET",
     headers: { "X-MBX-APIKEY": apiKey },
     cache: "no-store",
@@ -49,12 +50,19 @@ async function validateBinance(apiKey: string, apiSecret: string) {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    return { ok: false, message: data?.msg || `Binance validation failed (${response.status}).` };
+    const msg = (data as { msg?: string })?.msg;
+    const code = (data as { code?: number })?.code;
+    if (code === -2015 || response.status === 403) {
+      return { ok: false, message: "Invalid API key or IP restriction. Check Futures permission and IP whitelist in Binance settings." };
+    }
+    return { ok: false, message: msg || `Binance Futures validation failed (${response.status}).` };
   }
+  const usdt = (data as Array<{ asset: string; balance: string }>).find?.((b) => b.asset === "USDT");
+  const bal = usdt ? parseFloat(usdt.balance) : null;
   return {
     ok: true,
-    message: "Binance credentials verified.",
-    detail: data?.accountType ? `Account type: ${data.accountType}` : "Account access is available.",
+    message: "Binance Futures credentials verified.",
+    detail: bal != null ? `USDT balance: $${bal.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "Futures account access confirmed.",
   };
 }
 

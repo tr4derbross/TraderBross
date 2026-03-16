@@ -910,20 +910,38 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     }
 
     setHeaderActionMessage("");
-    setHeaderConnection({
-      status: "testing",
-      platform: headerPlatform,
-    });
+    setHeaderConnection({ status: "testing", platform: headerPlatform });
 
     try {
-      // Prefer vault token; fall back to raw credentials only if no vault token exists
-      const connectionInput = token
-        ? { sessionToken: token }
-        : {
-            apiKey: selectedHeaderCredentials?.apiKey.trim(),
-            apiSecret: selectedHeaderCredentials?.apiSecret.trim(),
-            passphrase: selectedHeaderCredentials?.passphrase.trim(),
-          };
+      // If no vault token yet, auto-save to vault first so test goes through server-side signing
+      let effectiveToken = token;
+      if (!effectiveToken && hasRawCreds) {
+        setHeaderActionMessage("Securing credentials…");
+        const creds = headerCexCredentials[selectedHeaderCexPlatform];
+        const storeResp = await fetch("/api/vault/store", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            venueId: selectedHeaderCexPlatform,
+            apiKey: creds.apiKey.trim(),
+            apiSecret: creds.apiSecret.trim(),
+            passphrase: creds.passphrase.trim() || undefined,
+          }),
+        });
+        const storeData = await storeResp.json() as { ok: boolean; sessionToken?: string; message?: string };
+        if (storeData.ok && storeData.sessionToken) {
+          effectiveToken = storeData.sessionToken;
+          try { sessionStorage.setItem(`traderbross.vault-token.${selectedHeaderCexPlatform}.v1`, effectiveToken); } catch { /* ignore */ }
+          setVaultTokens((prev) => ({ ...prev, [selectedHeaderCexPlatform]: effectiveToken! }));
+          setHeaderCexCredentials((prev) => ({ ...prev, [selectedHeaderCexPlatform]: EMPTY_HEADER_CEX_CREDENTIALS[selectedHeaderCexPlatform] }));
+        } else {
+          setHeaderActionMessage(storeData.message ?? "Failed to secure credentials.");
+          setHeaderConnection({ status: "failed", platform: headerPlatform, error: storeData.message });
+          return;
+        }
+      }
+
+      const connectionInput = effectiveToken ? { sessionToken: effectiveToken } : {};
       const result = await getVenueAdapter(selectedHeaderCexPlatform).testConnection(connectionInput);
 
       if (result.ok) {
