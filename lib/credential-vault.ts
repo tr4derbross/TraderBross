@@ -28,6 +28,9 @@ type VaultEntry = {
 /** Session TTL: 8 hours — force re-entry on long-lived sessions */
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
+/** Hard cap to prevent unbounded memory growth */
+const VAULT_MAX_ENTRIES = 10_000;
+
 const vault = new Map<string, VaultEntry>();
 
 /** Sweep expired entries every 10 minutes */
@@ -44,7 +47,14 @@ setInterval(
 /* ── Store ─────────────────────────────────────────────────────────────────── */
 
 export function storeCredentials(creds: StoredCredentials): string {
-  const token = crypto.randomUUID();
+  // Evict oldest entries if vault is at capacity
+  if (vault.size >= VAULT_MAX_ENTRIES) {
+    const oldest = [...vault.entries()].sort((a, b) => a[1].expiresAt - b[1].expiresAt)[0];
+    if (oldest) vault.delete(oldest[0]);
+  }
+
+  // 256-bit random token (more entropy than UUID's 122 bits)
+  const token = crypto.randomBytes(32).toString("hex");
   const key   = crypto.randomBytes(32); // 256-bit key per session
   const iv    = crypto.randomBytes(16);
 

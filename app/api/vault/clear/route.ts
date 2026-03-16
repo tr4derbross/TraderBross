@@ -7,12 +7,22 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { clearCredentials } from "@/lib/credential-vault";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 type ClearPayload = {
   sessionToken?: string;
 };
 
 export async function DELETE(req: NextRequest) {
+  // Rate limit: 10 clears per minute per IP
+  const { allowed } = rateLimit(`vault-clear:${getClientIp(req)}`, 10, 60_000);
+  if (!allowed) {
+    return NextResponse.json(
+      { ok: false, message: "Too many requests." },
+      { status: 429 },
+    );
+  }
+
   let body: ClearPayload;
   try {
     body = (await req.json()) as ClearPayload;
@@ -22,7 +32,7 @@ export async function DELETE(req: NextRequest) {
 
   const { sessionToken } = body;
 
-  if (!sessionToken) {
+  if (!sessionToken || typeof sessionToken !== "string") {
     return NextResponse.json({ ok: false, message: "sessionToken is required." }, { status: 400 });
   }
 
