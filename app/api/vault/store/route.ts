@@ -17,6 +17,7 @@ type StorePayload = {
   apiKey?: string;
   apiSecret?: string;
   passphrase?: string;
+  testnet?: boolean;
   /** Hyperliquid: API wallet private key (stored as apiKey in vault) */
   privateKey?: string;
   /** Hyperliquid: wallet address (stored as apiSecret in vault) */
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Invalid request body." }, { status: 400 });
   }
 
-  const { venueId, apiKey, apiSecret, passphrase, privateKey, walletAddress } = body;
+  const { venueId, apiKey, apiSecret, passphrase, testnet, privateKey, walletAddress } = body;
 
   if (!venueId || !SUPPORTED_VENUES.includes(venueId)) {
     return NextResponse.json({ ok: false, message: "Unsupported venue." }, { status: 400 });
@@ -122,6 +123,7 @@ export async function POST(req: NextRequest) {
     apiKey:     trimmedKey,
     apiSecret:  trimmedSecret,
     passphrase: passphrase?.trim() || undefined,
+    testnet:    venueId === "binance" ? Boolean(testnet) : undefined,
   });
 
   return NextResponse.json({ ok: true, sessionToken });
