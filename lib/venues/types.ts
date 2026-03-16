@@ -23,9 +23,17 @@ export type VenuePosition = {
 };
 
 export type VenueConnectionInput = {
+  /**
+   * Preferred for CEX venues: server-side vault session token.
+   * When present, the server looks up credentials itself — raw keys
+   * never travel the wire after the initial /api/vault/store call.
+   */
+  sessionToken?: string;
+  /** CEX raw credentials (fallback / initial setup only) */
   apiKey?: string;
   apiSecret?: string;
   passphrase?: string;
+  /** DEX wallet */
   walletAddress?: string;
   walletProvider?: string;
 };

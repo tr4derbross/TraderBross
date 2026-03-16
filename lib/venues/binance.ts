@@ -59,10 +59,10 @@ export const binanceAdapter: VenueAdapter = {
     fetchJson("/api/venues/validate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        venueId: "binance",
-        apiKey: connection?.apiKey,
-        apiSecret: connection?.apiSecret,
-      }),
+      body: JSON.stringify(
+        connection?.sessionToken
+          ? { venueId: "binance", sessionToken: connection.sessionToken }
+          : { venueId: "binance", apiKey: connection?.apiKey, apiSecret: connection?.apiSecret }
+      ),
     }),
 };

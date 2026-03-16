@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { retrieveCredentials } from "@/lib/credential-vault";
 
 type VenueId = "binance" | "okx" | "bybit";
 
 type ValidatePayload = {
   venueId?: VenueId;
+  /**
+   * Preferred path: server-side vault token.
+   * The browser stores only this UUID — raw keys never leave the server
+   * after the initial /api/vault/store call.
+   */
+  sessionToken?: string;
+  /** Legacy / direct path (raw credentials). Still accepted as fallback. */
   apiKey?: string;
   apiSecret?: string;
   passphrase?: string;
@@ -20,29 +28,20 @@ function hmac(secret: string, value: string, encoding: "hex" | "base64") {
 
 async function validateBinance(apiKey: string, apiSecret: string) {
   const timestamp = Date.now().toString();
-  const query = new URLSearchParams({
-    timestamp,
-    recvWindow: "5000",
-  }).toString();
+  const query = new URLSearchParams({ timestamp, recvWindow: "5000" }).toString();
   const signature = hmac(apiSecret, query, "hex");
   const path = `/api/v3/account?${query}&signature=${signature}`;
 
   const response = await fetch(`https://api.binance.com${path}`, {
     method: "GET",
-    headers: {
-      "X-MBX-APIKEY": apiKey,
-    },
+    headers: { "X-MBX-APIKEY": apiKey },
     cache: "no-store",
   });
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    return {
-      ok: false,
-      message: data?.msg || `Binance validation failed (${response.status}).`,
-    };
+    return { ok: false, message: data?.msg || `Binance validation failed (${response.status}).` };
   }
-
   return {
     ok: true,
     message: "Binance credentials verified.",
@@ -51,84 +50,84 @@ async function validateBinance(apiKey: string, apiSecret: string) {
 }
 
 async function validateOkx(apiKey: string, apiSecret: string, passphrase: string) {
-  const path = "/api/v5/account/balance";
+  const path      = "/api/v5/account/balance";
   const timestamp = new Date().toISOString();
   const signature = hmac(apiSecret, `${timestamp}GET${path}`, "base64");
 
   const response = await fetch(`https://www.okx.com${path}`, {
     method: "GET",
     headers: {
-      "OK-ACCESS-KEY": apiKey,
-      "OK-ACCESS-SIGN": signature,
-      "OK-ACCESS-TIMESTAMP": timestamp,
-      "OK-ACCESS-PASSPHRASE": passphrase,
+      "OK-ACCESS-KEY":         apiKey,
+      "OK-ACCESS-SIGN":        signature,
+      "OK-ACCESS-TIMESTAMP":   timestamp,
+      "OK-ACCESS-PASSPHRASE":  passphrase,
     },
     cache: "no-store",
   });
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.code !== "0") {
-    return {
-      ok: false,
-      message: data?.msg || `OKX validation failed (${response.status}).`,
-    };
+    return { ok: false, message: data?.msg || `OKX validation failed (${response.status}).` };
   }
-
-  return {
-    ok: true,
-    message: "OKX credentials verified.",
-    detail: "Signed account access is available.",
-  };
+  return { ok: true, message: "OKX credentials verified.", detail: "Signed account access is available." };
 }
 
 async function validateBybit(apiKey: string, apiSecret: string) {
-  const timestamp = Date.now().toString();
+  const timestamp  = Date.now().toString();
   const recvWindow = "5000";
-  const query = new URLSearchParams({
-    accountType: "UNIFIED",
-  }).toString();
-  const payload = `${timestamp}${apiKey}${recvWindow}${query}`;
-  const signature = hmac(apiSecret, payload, "hex");
+  const query      = new URLSearchParams({ accountType: "UNIFIED" }).toString();
+  const payload    = `${timestamp}${apiKey}${recvWindow}${query}`;
+  const signature  = hmac(apiSecret, payload, "hex");
 
   const response = await fetch(`https://api.bybit.com/v5/account/wallet-balance?${query}`, {
     method: "GET",
     headers: {
-      "X-BAPI-API-KEY": apiKey,
-      "X-BAPI-SIGN": signature,
-      "X-BAPI-TIMESTAMP": timestamp,
-      "X-BAPI-RECV-WINDOW": recvWindow,
+      "X-BAPI-API-KEY":      apiKey,
+      "X-BAPI-SIGN":         signature,
+      "X-BAPI-TIMESTAMP":    timestamp,
+      "X-BAPI-RECV-WINDOW":  recvWindow,
     },
     cache: "no-store",
   });
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.retCode !== 0) {
-    return {
-      ok: false,
-      message: data?.retMsg || `Bybit validation failed (${response.status}).`,
-    };
+    return { ok: false, message: data?.retMsg || `Bybit validation failed (${response.status}).` };
   }
-
-  return {
-    ok: true,
-    message: "Bybit credentials verified.",
-    detail: "Unified account access is available.",
-  };
+  return { ok: true, message: "Bybit credentials verified.", detail: "Unified account access is available." };
 }
 
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as ValidatePayload;
   const venueId = body.venueId;
-  const apiKey = body.apiKey?.trim();
-  const apiSecret = body.apiSecret?.trim();
-  const passphrase = body.passphrase?.trim();
 
   if (!venueId || !["binance", "okx", "bybit"].includes(venueId)) {
     return jsonError("Unsupported venue for API validation.");
   }
 
-  if (!apiKey || !apiSecret) {
-    return jsonError("API key and secret are required.");
+  /* ── Resolve credentials ── */
+  let apiKey: string;
+  let apiSecret: string;
+  let passphrase: string | undefined;
+
+  if (body.sessionToken) {
+    // Preferred: retrieve from server-side vault — raw keys never hit the wire again
+    const creds = retrieveCredentials(body.sessionToken);
+    if (!creds) {
+      return jsonError("Session expired or not found. Please re-save your credentials.", 401);
+    }
+    apiKey     = creds.apiKey;
+    apiSecret  = creds.apiSecret;
+    passphrase = creds.passphrase;
+  } else {
+    // Fallback: raw credentials in request body
+    apiKey     = body.apiKey?.trim()     ?? "";
+    apiSecret  = body.apiSecret?.trim()  ?? "";
+    passphrase = body.passphrase?.trim() ?? undefined;
+
+    if (!apiKey || !apiSecret) {
+      return jsonError("Provide either a sessionToken or raw apiKey + apiSecret.");
+    }
   }
 
   if (venueId === "okx" && !passphrase) {
@@ -146,10 +145,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result, { status: result.ok ? 200 : 401 });
   } catch (error) {
     return NextResponse.json(
-      {
-        ok: false,
-        message: error instanceof Error ? error.message : "Validation request failed.",
-      },
+      { ok: false, message: error instanceof Error ? error.message : "Validation request failed." },
       { status: 500 }
     );
   }
