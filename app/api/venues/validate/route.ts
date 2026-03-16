@@ -174,7 +174,9 @@ export async function POST(req: NextRequest) {
           ? await validateOkx(apiKey, apiSecret, passphrase!)
           : await validateBybit(apiKey, apiSecret);
 
-    return NextResponse.json(result, { status: result.ok ? 200 : 401 });
+    // Always return 200 so the client can read the error message from the body.
+    // fetchJson throws on non-2xx, which would hide the actual Binance error.
+    return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(
       { ok: false, message: safeError(error) },
