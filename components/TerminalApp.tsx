@@ -263,7 +263,7 @@ export default function TerminalApp() {
   const [venueMarketPrices, setVenueMarketPrices] = useState<
     Partial<Record<ActiveVenueState["venueId"], Record<string, number>>>
   >({});
-  const { checkNewsAgainstAlerts } = useAlerts();
+  const { checkNewsAgainstAlerts, checkPriceAlerts } = useAlerts();
   const headerControlRef = useRef<HTMLDivElement | null>(null);
   const headerPanelRef = useRef<HTMLDivElement | null>(null);
   const [headerAnchorRect, setHeaderAnchorRect] = useState<DOMRect | null>(null);
@@ -438,6 +438,12 @@ export default function TerminalApp() {
   }, [headerConnectOpen]);
 
   const { prices: wsPrices, quotes: wsQuotes, connected: wsConnected } = useBinanceWs();
+
+  // Check price alerts whenever live quotes update
+  useEffect(() => {
+    if (wsQuotes.length > 0) checkPriceAlerts(wsQuotes);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wsQuotes]);
   const { data: fearGreedData } = useFearGreed();
   const { ticker: activeVenueTicker, connectionState: activeVenueFeedState } = useVenueMarketData(
     activeVenueState.venueId,
