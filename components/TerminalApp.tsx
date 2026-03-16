@@ -254,6 +254,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   );
   /** Server-side vault session tokens — stored in sessionStorage, NOT localStorage */
   const [vaultTokens, setVaultTokens] = useState<Partial<Record<HeaderCexPlatform, string>>>({});
+  const [binanceTestnet, setBinanceTestnet] = useState(false);
   const [newsTradeIntent, setNewsTradeIntent] = useState<NewsTradeIntent | null>(null);
   const [activeVenueState, setActiveVenueState] = useState<ActiveVenueState>({
     venueId: "hyperliquid",
@@ -811,6 +812,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           apiKey: creds.apiKey.trim(),
           apiSecret: creds.apiSecret.trim(),
           passphrase: creds.passphrase.trim() || undefined,
+          testnet: cexPlatform === "binance" ? binanceTestnet : undefined,
         }),
       });
 
@@ -836,7 +838,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       setHeaderActionMessage("Network error — could not reach the credential vault.");
       setHeaderConnection({ status: "failed", platform: headerPlatform, error: "Vault unreachable." });
     }
-  }, [headerCexCredentials, headerPlatform, selectedHeaderPlatform]);
+  }, [binanceTestnet, headerCexCredentials, headerPlatform, selectedHeaderPlatform]);
 
   const removeHeaderCexCredentials = useCallback(() => {
     if (selectedHeaderPlatform.type !== "cex") return;
@@ -1719,6 +1721,18 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                         />
                       </label>
                     </div>
+
+                    {selectedHeaderPlatform.id === "binance" && (
+                      <label className="mt-2.5 flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={binanceTestnet}
+                          onChange={(e) => setBinanceTestnet(e.target.checked)}
+                          className="h-3.5 w-3.5 accent-amber-400"
+                        />
+                        <span className="text-[10px] text-amber-400/80">Testnet mode</span>
+                      </label>
+                    )}
 
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button

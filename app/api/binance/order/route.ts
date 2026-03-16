@@ -41,14 +41,19 @@ function buildSignedQuery(secret: string, params: Record<string, string>) {
   return `${qs}&signature=${hmac(secret, qs)}`;
 }
 
+const FAPI_BASE    = "https://fapi.binance.com";
+const FAPI_TESTNET = "https://testnet.binancefuture.com";
+
 async function binancePost<T>(
   apiKey: string,
   apiSecret: string,
   path: string,
-  params: Record<string, string>
+  params: Record<string, string>,
+  testnet = false
 ): Promise<T> {
+  const base = testnet ? FAPI_TESTNET : FAPI_BASE;
   const qs = buildSignedQuery(apiSecret, params);
-  const res = await fetch(`https://fapi.binance.com${path}?${qs}`, {
+  const res = await fetch(`${base}${path}?${qs}`, {
     method: "POST",
     headers: { "X-MBX-APIKEY": apiKey },
     cache: "no-store",
@@ -69,10 +74,12 @@ async function binanceDelete<T>(
   apiKey: string,
   apiSecret: string,
   path: string,
-  params: Record<string, string>
+  params: Record<string, string>,
+  testnet = false
 ): Promise<T> {
+  const base = testnet ? FAPI_TESTNET : FAPI_BASE;
   const qs = buildSignedQuery(apiSecret, params);
-  const res = await fetch(`https://fapi.binance.com${path}?${qs}`, {
+  const res = await fetch(`${base}${path}?${qs}`, {
     method: "DELETE",
     headers: { "X-MBX-APIKEY": apiKey },
     cache: "no-store",
@@ -86,9 +93,10 @@ async function binanceDelete<T>(
 }
 
 /** Fetch current mark price to compute quantity from marginAmount × leverage */
-async function getMarkPrice(symbol: string): Promise<number> {
+async function getMarkPrice(symbol: string, testnet = false): Promise<number> {
+  const base = testnet ? FAPI_TESTNET : FAPI_BASE;
   const res = await fetch(
-    `https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${symbol}`,
+    `${base}/fapi/v1/premiumIndex?symbol=${symbol}`,
     { cache: "no-store", signal: AbortSignal.timeout(5_000) }
   );
   const data = await res.json() as { markPrice?: string };
@@ -132,7 +140,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { apiKey, apiSecret } = creds;
+  const { apiKey, apiSecret, testnet } = creds;
 
   try {
     // ── Set Leverage ────────────────────────────────────────────────────────
@@ -144,7 +152,7 @@ export async function POST(req: NextRequest) {
       await binancePost(apiKey, apiSecret, "/fapi/v1/leverage", {
         symbol,
         leverage: Math.round(body.leverage).toString(),
-      });
+      }, testnet);
       return NextResponse.json({ ok: true });
     }
 
@@ -155,7 +163,7 @@ export async function POST(req: NextRequest) {
       }
       const symbol = `${body.symbol}USDT`;
       const marginType = body.marginMode === "cross" ? "CROSSED" : "ISOLATED";
-      await binancePost(apiKey, apiSecret, "/fapi/v1/marginType", { symbol, marginType });
+      await binancePost(apiKey, apiSecret, "/fapi/v1/marginType", { symbol, marginType }, testnet);
       return NextResponse.json({ ok: true });
     }
 
@@ -168,7 +176,7 @@ export async function POST(req: NextRequest) {
       await binanceDelete(apiKey, apiSecret, "/fapi/v1/order", {
         symbol,
         orderId: body.orderId.toString(),
-      });
+      }, testnet);
       return NextResponse.json({ ok: true });
     }
 
@@ -185,7 +193,7 @@ export async function POST(req: NextRequest) {
       const binanceSide = body.side === "long" ? "BUY" : "SELL";
 
       // Calculate quantity from margin × leverage / mark price
-      const markPrice = await getMarkPrice(symbol);
+      const markPrice = await getMarkPrice(symbol, testnet);
       const notional = body.marginAmount * body.leverage;
       const qty = notional / markPrice;
       const quantity = roundQuantity(qty);
@@ -216,7 +224,8 @@ export async function POST(req: NextRequest) {
         apiKey,
         apiSecret,
         "/fapi/v1/order",
-        params
+        params,
+        testnet
       );
 
       return NextResponse.json({ ok: true, data: result });

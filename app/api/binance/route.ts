@@ -30,9 +30,13 @@ function signedQuery(secret: string, params: Record<string, string> = {}) {
   return `${qs}&signature=${hmac(secret, qs)}`;
 }
 
-async function binanceGet<T>(apiKey: string, apiSecret: string, path: string, params: Record<string, string> = {}): Promise<T> {
+const FAPI_BASE      = "https://fapi.binance.com";
+const FAPI_TESTNET   = "https://testnet.binancefuture.com";
+
+async function binanceGet<T>(apiKey: string, apiSecret: string, path: string, params: Record<string, string> = {}, testnet = false): Promise<T> {
+  const base = testnet ? FAPI_TESTNET : FAPI_BASE;
   const qs = signedQuery(apiSecret, params);
-  const res = await fetch(`https://fapi.binance.com${path}?${qs}`, {
+  const res = await fetch(`${base}${path}?${qs}`, {
     headers: { "X-MBX-APIKEY": apiKey },
     cache: "no-store",
     signal: AbortSignal.timeout(8000),
@@ -67,14 +71,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Session expired. Please re-save credentials." }, { status: 401 });
   }
 
-  const { apiKey, apiSecret } = creds;
+  const { apiKey, apiSecret, testnet } = creds;
 
   try {
     if (body.type === "balance") {
       const data = await binanceGet<Array<{ asset: string; balance: string; availableBalance: string }>>(
         apiKey,
         apiSecret,
-        "/fapi/v2/balance"
+        "/fapi/v2/balance",
+        {},
+        testnet
       );
       const usdt = data.find((b) => b.asset === "USDT");
       return NextResponse.json({
@@ -91,7 +97,7 @@ export async function POST(req: NextRequest) {
         entryPrice: string;
         unRealizedProfit: string;
         liquidationPrice: string;
-      }>>(apiKey, apiSecret, "/fapi/v2/positionRisk");
+      }>>(apiKey, apiSecret, "/fapi/v2/positionRisk", {}, testnet);
 
       const positions = data
         .filter((p) => parseFloat(p.positionAmt) !== 0)

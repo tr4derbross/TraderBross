@@ -16,6 +16,7 @@ export type StoredCredentials = {
   apiKey: string;
   apiSecret: string;
   passphrase?: string;
+  testnet?: boolean;
 };
 
 type VaultEntry = {
