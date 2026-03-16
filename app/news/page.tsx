@@ -143,14 +143,13 @@ function NewsCard({ item, onSelect, selected }: { item: NewsItem; onSelect: (ite
 
 /* ── TradingView widget ─────────────────────────────────────────────────────── */
 function TradingViewChart({ symbol }: { symbol: string }) {
-  const tvSymbol = `BINANCE:${symbol.replace("/", "").replace("USDT", "USDT").toUpperCase()}`;
+  const tvSymbol = `BINANCE:${symbol.toUpperCase()}`;
 
   return (
     <iframe
       key={symbol}
-      src={`https://www.tradingview.com/widgetembed/?symbol=${tvSymbol}&interval=60&theme=dark&style=1&locale=en&toolbar_bg=%230d0d0f&hide_side_toolbar=0&allow_symbol_change=1&save_image=0&hidevolume=0&hidetoptoolbar=0`}
+      src={`https://www.tradingview.com/widgetembed/?symbol=${tvSymbol}&interval=60&theme=dark&style=1&locale=en&toolbar_bg=%2309080c&hide_side_toolbar=1&hidetoptoolbar=1&hidevolume=1&allow_symbol_change=0&save_image=0&studies=[]`}
       className="h-full w-full rounded-xl border-0"
-      allow="clipboard-write"
       title="TradingView Chart"
     />
   );
@@ -328,35 +327,29 @@ export default function NewsPage() {
         {/* ── Right: chart + detail ────────────────────────────────────────── */}
         <div className="hidden min-h-0 flex-1 flex-col lg:flex">
           {/* Chart header */}
-          <div className="flex shrink-0 items-center justify-between border-b border-[rgba(255,255,255,0.06)] px-4 py-3">
+          <div className="flex shrink-0 items-center justify-between border-b border-[rgba(255,255,255,0.06)] px-4 py-2.5">
             <div className="flex items-center gap-2">
-              <span className="text-[13px] font-bold text-[#e8dfc8]">TradingView</span>
-              <span className="text-[11px] text-zinc-600">{chartSymbol}</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Symbol selector */}
+              <span className="text-[11px] font-semibold text-zinc-400">Chart</span>
               <div className="relative">
                 <select
                   value={chartSymbol}
                   onChange={(e) => setChartSymbol(e.target.value)}
-                  className="appearance-none rounded-lg border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.03)] py-1 pl-2.5 pr-6 text-[10px] text-zinc-300 outline-none"
+                  className="appearance-none rounded-md border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] py-0.5 pl-2 pr-5 text-[10px] text-zinc-300 outline-none"
                 >
                   {CHART_SYMBOLS.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
-                <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-zinc-600" />
+                <ChevronDown className="pointer-events-none absolute right-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-zinc-600" />
               </div>
-
-              <Link
-                href={`/terminal?ticker=${chartSymbol.replace("USDT", "")}`}
-                className="flex items-center gap-1.5 rounded-lg border border-[rgba(212,161,31,0.2)] bg-[rgba(212,161,31,0.07)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-300 transition hover:bg-[rgba(212,161,31,0.14)]"
-              >
-                <LayoutDashboard className="h-3 w-3" />
-                Trade
-              </Link>
             </div>
+            <Link
+              href={`/terminal?ticker=${chartSymbol.replace("USDT", "")}`}
+              className="flex items-center gap-1 rounded-md border border-[rgba(212,161,31,0.18)] bg-[rgba(212,161,31,0.06)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-amber-400 transition hover:bg-[rgba(212,161,31,0.12)]"
+            >
+              <LayoutDashboard className="h-2.5 w-2.5" />
+              Trade
+            </Link>
           </div>
 
           {/* TradingView chart */}
