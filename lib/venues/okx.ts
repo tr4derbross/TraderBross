@@ -83,11 +83,10 @@ export const okxAdapter: VenueAdapter = {
     fetchJson("/api/venues/validate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        venueId: "okx",
-        apiKey: connection?.apiKey,
-        apiSecret: connection?.apiSecret,
-        passphrase: connection?.passphrase,
-      }),
+      body: JSON.stringify(
+        connection?.sessionToken
+          ? { venueId: "okx", sessionToken: connection.sessionToken }
+          : { venueId: "okx", apiKey: connection?.apiKey, apiSecret: connection?.apiSecret, passphrase: connection?.passphrase }
+      ),
     }),
 };

@@ -49,6 +49,7 @@ import {
   CheckCircle,
   AlertTriangle,
   Unplug,
+  Layers,
 } from "lucide-react";
 
 type RightTab = "trade" | "dex" | "alerts" | "connect" | "watch" | "ai";
@@ -64,6 +65,7 @@ type HeaderPlatformMeta = {
   primaryAction: string;
   secondaryAction?: string;
   wallets?: SupportedWalletLabel[];
+  comingSoon?: boolean;
 };
 
 type HeaderConnectionState = {
@@ -101,8 +103,8 @@ const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
     id: "hyperliquid",
     label: "Hyperliquid",
     type: "wallet",
-    eyebrow: "DEX Wallet",
-    description: "Connect a wallet-based flow for Hyperliquid trading access.",
+    eyebrow: "DEX · Live",
+    description: "Connect your wallet to view real-time balance and positions. MetaMask, Rabby, and other popular wallets supported.",
     primaryAction: "Connect Wallet",
     secondaryAction: "Wallet Menu",
     wallets: ["MetaMask", "Rabby", "Coinbase Wallet", "Phantom", "Solflare"],
@@ -111,35 +113,39 @@ const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
     id: "dydx",
     label: "dYdX",
     type: "wallet",
-    eyebrow: "DEX Wallet",
-    description: "Prepare an address or wallet-based connection flow for dYdX v4.",
+    eyebrow: "DEX · Live",
+    description: "dYdX v4 trading with Keplr wallet and STARK key signing is coming soon.",
     primaryAction: "Connect Wallet",
     secondaryAction: "Wallet Menu",
     wallets: ["MetaMask", "Rabby", "Coinbase Wallet", "Phantom", "Solflare"],
+    comingSoon: true,
   },
   {
     id: "okx",
     label: "OKX",
     type: "cex",
     eyebrow: "CEX API",
-    description: "Store API credentials locally and test venue readiness for OKX.",
+    description: "OKX API integration — balance, position, and order management coming soon.",
     primaryAction: "Start API Setup",
+    comingSoon: true,
   },
   {
     id: "bybit",
     label: "Bybit",
     type: "cex",
     eyebrow: "CEX API",
-    description: "Configure Bybit API access for future account and execution workflows.",
+    description: "Bybit API integration — full account access and order routing coming soon.",
     primaryAction: "Start API Setup",
+    comingSoon: true,
   },
   {
     id: "binance",
     label: "Binance",
     type: "cex",
     eyebrow: "CEX API",
-    description: "Prepare Binance connectivity with a compact setup flow in the header.",
+    description: "Binance API integration — spot and futures account management coming soon.",
     primaryAction: "Start API Setup",
+    comingSoon: true,
   },
 ];
 
@@ -242,6 +248,8 @@ export default function TerminalApp() {
   const [headerCexCredentials, setHeaderCexCredentials] = useState<HeaderCexCredentialMap>(
     EMPTY_HEADER_CEX_CREDENTIALS
   );
+  /** Server-side vault session tokens — stored in sessionStorage, NOT localStorage */
+  const [vaultTokens, setVaultTokens] = useState<Partial<Record<HeaderCexPlatform, string>>>({});
   const [newsTradeIntent, setNewsTradeIntent] = useState<NewsTradeIntent | null>(null);
   const [activeVenueState, setActiveVenueState] = useState<ActiveVenueState>({
     venueId: "hyperliquid",
@@ -295,26 +303,22 @@ export default function TerminalApp() {
             walletLabel: parsed.walletLabel,
             address: parsed.address,
           });
+          // Restore hlWallet so HyperliquidPanel can show read-only account data on reload
+          if (parsed.platform === "hyperliquid" && parsed.address) {
+            setHlWallet(parsed.address);
+          }
         }
       }
 
-      const savedCexCredentials = localStorage.getItem("traderbross.header-cex-credentials.v1");
-      if (savedCexCredentials) {
-        const parsed = JSON.parse(savedCexCredentials) as Partial<HeaderCexCredentialMap>;
-        setHeaderCexCredentials({
-          okx: {
-            ...EMPTY_HEADER_CEX_CREDENTIALS.okx,
-            ...parsed.okx,
-          },
-          bybit: {
-            ...EMPTY_HEADER_CEX_CREDENTIALS.bybit,
-            ...parsed.bybit,
-          },
-          binance: {
-            ...EMPTY_HEADER_CEX_CREDENTIALS.binance,
-            ...parsed.binance,
-          },
-        });
+      // Load vault tokens from sessionStorage (tokens are safe to persist — they're just UUIDs)
+      const cexPlatforms: HeaderCexPlatform[] = ["okx", "bybit", "binance"];
+      const loadedTokens: Partial<Record<HeaderCexPlatform, string>> = {};
+      for (const platform of cexPlatforms) {
+        const token = sessionStorage.getItem(`traderbross.vault-token.${platform}.v1`);
+        if (token) loadedTokens[platform] = token;
+      }
+      if (Object.keys(loadedTokens).length > 0) {
+        setVaultTokens(loadedTokens);
       }
     } catch {
       // ignore storage errors
@@ -334,10 +338,10 @@ export default function TerminalApp() {
       const nextPlatform = HEADER_PLATFORMS.find((platform) => platform.id === headerPlatform);
       if (nextPlatform?.type === "cex") {
         const cexPlatform = nextPlatform.id as HeaderCexPlatform;
+        const hasVaultToken = Boolean(vaultTokens[cexPlatform]);
+        const hasRawCreds = hasSavedHeaderCredentials(cexPlatform, headerCexCredentials);
         return {
-          status: hasSavedHeaderCredentials(cexPlatform, headerCexCredentials)
-            ? "saved_locally"
-            : "not_configured",
+          status: (hasVaultToken || hasRawCreds) ? "saved_locally" : "not_configured",
           platform: headerPlatform,
         };
       }
@@ -365,16 +369,9 @@ export default function TerminalApp() {
     }
   }, [headerConnection]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        "traderbross.header-cex-credentials.v1",
-        JSON.stringify(headerCexCredentials)
-      );
-    } catch {
-      // ignore storage errors
-    }
-  }, [headerCexCredentials]);
+  // NOTE: Raw CEX credentials are intentionally NOT persisted to localStorage.
+  // Credentials are stored server-side (encrypted) via /api/vault/store.
+  // Only vault session tokens are persisted (in sessionStorage).
 
   useEffect(() => {
     const venueMeta = HEADER_PLATFORMS.find((platform) => platform.id === headerPlatform) ?? HEADER_PLATFORMS[0];
@@ -568,12 +565,20 @@ export default function TerminalApp() {
   }, []);
 
   const buildActiveVenueConnection = useCallback((): VenueConnectionInput | undefined => {
-    if (activeVenueState.venueType === "cex" && selectedHeaderCexPlatform && selectedHeaderCredentials) {
-      return {
-        apiKey: selectedHeaderCredentials.apiKey.trim(),
-        apiSecret: selectedHeaderCredentials.apiSecret.trim(),
-        passphrase: selectedHeaderCredentials.passphrase.trim(),
-      };
+    if (activeVenueState.venueType === "cex" && selectedHeaderCexPlatform) {
+      const token = vaultTokens[selectedHeaderCexPlatform];
+      if (token) {
+        // Preferred: vault token — raw keys stay on the server
+        return { sessionToken: token };
+      }
+      // Fallback: raw credentials (only if user hasn't saved to vault yet)
+      if (selectedHeaderCredentials) {
+        return {
+          apiKey: selectedHeaderCredentials.apiKey.trim(),
+          apiSecret: selectedHeaderCredentials.apiSecret.trim(),
+          passphrase: selectedHeaderCredentials.passphrase.trim(),
+        };
+      }
     }
 
     if (activeVenueState.venueType === "wallet") {
@@ -594,6 +599,7 @@ export default function TerminalApp() {
     headerConnection.walletLabel,
     selectedHeaderCexPlatform,
     selectedHeaderCredentials,
+    vaultTokens,
   ]);
 
   const routeOrderThroughVenue = useCallback(
@@ -721,53 +727,97 @@ export default function TerminalApp() {
     [headerPlatform]
   );
 
-  const runHeaderCexAction = useCallback(() => {
+  const runHeaderCexAction = useCallback(async () => {
     if (selectedHeaderPlatform.type !== "cex") return;
 
-    const creds = headerCexCredentials[selectedHeaderPlatform.id as HeaderCexPlatform];
-    const hasRequired = hasSavedHeaderCredentials(
-      selectedHeaderPlatform.id as HeaderCexPlatform,
-      headerCexCredentials
-    );
+    const cexPlatform = selectedHeaderPlatform.id as HeaderCexPlatform;
+    const creds = headerCexCredentials[cexPlatform];
+    const hasRequired = hasSavedHeaderCredentials(cexPlatform, headerCexCredentials);
 
-    setHeaderActionMessage(
-      hasRequired
-        ? `${selectedHeaderPlatform.label} credentials saved locally for MVP setup.`
-        : selectedHeaderPlatform.id === "okx"
+    if (!hasRequired) {
+      setHeaderActionMessage(
+        cexPlatform === "okx"
           ? "Add API key, secret, and passphrase to save OKX credentials."
-          : "Add API key and secret to save these credentials locally."
-    );
-    setHeaderConnection({
-      status: hasRequired ? "saved_locally" : "failed",
-      platform: headerPlatform,
-      error: hasRequired ? undefined : "Missing required API credentials.",
-    });
+          : "Add API key and secret to save these credentials securely."
+      );
+      setHeaderConnection({ status: "failed", platform: headerPlatform, error: "Missing required API credentials." });
+      return;
+    }
+
+    // Store credentials in server-side vault — browser will only keep the session token
+    setHeaderActionMessage("Securing credentials…");
+    try {
+      const resp = await fetch("/api/vault/store", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          venueId: cexPlatform,
+          apiKey: creds.apiKey.trim(),
+          apiSecret: creds.apiSecret.trim(),
+          passphrase: creds.passphrase.trim() || undefined,
+        }),
+      });
+      const data = await resp.json() as { ok: boolean; sessionToken?: string; message?: string };
+
+      if (data.ok && data.sessionToken) {
+        // Persist token in sessionStorage (safe — just a UUID, not the key itself)
+        try {
+          sessionStorage.setItem(`traderbross.vault-token.${cexPlatform}.v1`, data.sessionToken);
+        } catch { /* ignore */ }
+
+        setVaultTokens((prev) => ({ ...prev, [cexPlatform]: data.sessionToken }));
+        // Clear raw credentials from React state — they're secured server-side now
+        setHeaderCexCredentials((prev) => ({
+          ...prev,
+          [cexPlatform]: EMPTY_HEADER_CEX_CREDENTIALS[cexPlatform],
+        }));
+        setHeaderConnection({ status: "saved_locally", platform: headerPlatform });
+        setHeaderActionMessage(`${selectedHeaderPlatform.label} credentials secured in server vault.`);
+      } else {
+        setHeaderActionMessage(data.message ?? "Failed to store credentials.");
+        setHeaderConnection({ status: "failed", platform: headerPlatform, error: data.message });
+      }
+    } catch {
+      setHeaderActionMessage("Network error — could not reach the credential vault.");
+      setHeaderConnection({ status: "failed", platform: headerPlatform, error: "Vault unreachable." });
+    }
   }, [headerCexCredentials, headerPlatform, selectedHeaderPlatform]);
 
   const removeHeaderCexCredentials = useCallback(() => {
     if (selectedHeaderPlatform.type !== "cex") return;
 
+    const cexPlatform = selectedHeaderPlatform.id as HeaderCexPlatform;
+    const token = vaultTokens[cexPlatform];
+
+    // Clear vault session on server (best-effort)
+    if (token) {
+      void fetch("/api/vault/clear", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionToken: token }),
+      }).catch(() => { /* ignore */ });
+      try { sessionStorage.removeItem(`traderbross.vault-token.${cexPlatform}.v1`); } catch { /* ignore */ }
+      setVaultTokens((prev) => { const next = { ...prev }; delete next[cexPlatform]; return next; });
+    }
+
+    // Clear raw credentials from state
     setHeaderCexCredentials((prev) => ({
       ...prev,
-      [selectedHeaderPlatform.id]: { apiKey: "", apiSecret: "", passphrase: "" },
+      [cexPlatform]: EMPTY_HEADER_CEX_CREDENTIALS[cexPlatform],
     }));
-    setHeaderActionMessage(`${selectedHeaderPlatform.label} credentials removed from this device.`);
-    setHeaderConnection({
-      status: "not_configured",
-      platform: headerPlatform,
-    });
-  }, [headerPlatform, selectedHeaderPlatform]);
+    setHeaderActionMessage(`${selectedHeaderPlatform.label} credentials removed.`);
+    setHeaderConnection({ status: "not_configured", platform: headerPlatform });
+  }, [headerPlatform, selectedHeaderPlatform, vaultTokens]);
 
   const testHeaderCexConnection = useCallback(async () => {
-    if (!selectedHeaderCexPlatform || !selectedHeaderCredentials) return;
+    if (!selectedHeaderCexPlatform) return;
 
-    const hasRequired = hasSavedHeaderCredentials(selectedHeaderCexPlatform, headerCexCredentials);
-    if (!hasRequired) {
-      setHeaderConnection({
-        status: "failed",
-        platform: headerPlatform,
-        error: "Missing required API credentials.",
-      });
+    const token = vaultTokens[selectedHeaderCexPlatform];
+    const hasVaultToken = Boolean(token);
+    const hasRawCreds = hasSavedHeaderCredentials(selectedHeaderCexPlatform, headerCexCredentials);
+
+    if (!hasVaultToken && !hasRawCreds) {
+      setHeaderConnection({ status: "failed", platform: headerPlatform, error: "Missing required API credentials." });
       setHeaderActionMessage(
         selectedHeaderCexPlatform === "okx"
           ? "OKX needs API key, API secret, and passphrase before testing."
@@ -783,11 +833,15 @@ export default function TerminalApp() {
     });
 
     try {
-      const result = await getVenueAdapter(selectedHeaderCexPlatform).testConnection({
-        apiKey: selectedHeaderCredentials.apiKey.trim(),
-        apiSecret: selectedHeaderCredentials.apiSecret.trim(),
-        passphrase: selectedHeaderCredentials.passphrase.trim(),
-      });
+      // Prefer vault token; fall back to raw credentials only if no vault token exists
+      const connectionInput = token
+        ? { sessionToken: token }
+        : {
+            apiKey: selectedHeaderCredentials?.apiKey.trim(),
+            apiSecret: selectedHeaderCredentials?.apiSecret.trim(),
+            passphrase: selectedHeaderCredentials?.passphrase.trim(),
+          };
+      const result = await getVenueAdapter(selectedHeaderCexPlatform).testConnection(connectionInput);
 
       if (result.ok) {
         setHeaderConnection({
@@ -821,6 +875,7 @@ export default function TerminalApp() {
     selectedHeaderCredentials,
     selectedHeaderCexPlatform,
     selectedHeaderPlatform.label,
+    vaultTokens,
   ]);
 
   const handleAskAI = useCallback(
@@ -938,11 +993,35 @@ export default function TerminalApp() {
               }`}
             >
               dYdX v4
+              <span className="ml-1 rounded-full border border-amber-400/20 bg-amber-500/10 px-1 py-0.5 text-[7px] font-bold uppercase tracking-[0.1em] text-amber-400">
+                Soon
+              </span>
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-hidden">
-            {dexSubTab === "hl" && <HyperliquidPanel />}
-            {dexSubTab === "dydx" && <DydxPanel />}
+            {dexSubTab === "hl" && (
+              <HyperliquidPanel
+                walletAddress={hlWallet || undefined}
+                onRequestConnect={() => {
+                  setHeaderPlatform("hyperliquid");
+                  setHeaderConnectOpen(true);
+                }}
+              />
+            )}
+            {dexSubTab === "dydx" && (
+              <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-400/15 bg-amber-500/8">
+                  <Layers className="h-7 w-7 text-amber-300/50" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-[var(--text-primary)]">dYdX v4</p>
+                  <p className="mt-1 text-xs font-semibold text-amber-300">Coming Soon</p>
+                </div>
+                <p className="max-w-[200px] text-[10px] leading-relaxed text-zinc-500">
+                  Keplr wallet integration with STARK key signing is in development.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1268,17 +1347,28 @@ export default function TerminalApp() {
                   <button
                     key={platform.id}
                     type="button"
+                    disabled={platform.comingSoon}
                     onClick={() => {
+                      if (platform.comingSoon) return;
                       setHeaderPlatform(platform.id);
                       setHeaderActionMessage("");
                     }}
-                    className={`rounded-xl border px-3 py-2 text-left transition-colors ${
-                      headerPlatform === platform.id
-                        ? "border-[rgba(212,161,31,0.26)] bg-[rgba(212,161,31,0.12)]"
-                        : "border-[rgba(255,255,255,0.06)] bg-[#111317] hover:bg-[rgba(212,161,31,0.05)]"
+                    className={`relative rounded-xl border px-3 py-2 text-left transition-colors ${
+                      platform.comingSoon
+                        ? "cursor-not-allowed border-[rgba(255,255,255,0.04)] bg-[#0d0f12] opacity-60"
+                        : headerPlatform === platform.id
+                          ? "border-[rgba(212,161,31,0.26)] bg-[rgba(212,161,31,0.12)]"
+                          : "border-[rgba(255,255,255,0.06)] bg-[#111317] hover:bg-[rgba(212,161,31,0.05)]"
                     }`}
                   >
-                    <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500">{platform.eyebrow}</div>
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500">{platform.eyebrow}</div>
+                      {platform.comingSoon && (
+                        <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.12em] text-amber-300">
+                          Coming Soon
+                        </span>
+                      )}
+                    </div>
                     <div className="mt-1 text-[11px] font-semibold text-[#f3ead7]">{platform.label}</div>
                   </button>
                 ))}
@@ -1287,35 +1377,51 @@ export default function TerminalApp() {
               <div className="mt-3 rounded-2xl border border-[rgba(212,161,31,0.12)] bg-black/20 p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="brand-badge brand-badge-gold rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.14em]">
-                    {isHeaderWalletPlatform ? "Wallet Flow" : "API Flow"}
+                    {selectedHeaderPlatform.comingSoon ? "Coming Soon" : isHeaderWalletPlatform ? "Wallet Flow" : "API Flow"}
                   </span>
                   <span className="text-[11px] font-semibold text-[#f3ead7]">{selectedHeaderPlatform.label}</span>
-                  <span
-                    className={`rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${
-                      headerConnection.platform === headerPlatform && headerConnection.status === "connected"
-                        ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
-                        : headerConnection.platform === headerPlatform && headerConnection.status === "testing"
-                          ? "border-amber-400/20 bg-amber-500/10 text-amber-100"
-                          : headerConnection.platform === headerPlatform && headerConnection.status === "saved_locally"
-                            ? "border-[rgba(212,161,31,0.2)] bg-[rgba(212,161,31,0.1)] text-amber-100"
-                            : headerConnection.platform === headerPlatform && headerConnection.status === "failed"
-                              ? "border-rose-400/20 bg-rose-500/10 text-rose-200"
-                              : headerConnection.platform === headerPlatform &&
-                                  headerConnection.status === "not_configured"
-                                ? "border-white/10 bg-white/5 text-zinc-500"
-                                : "border-white/10 bg-white/5 text-zinc-400"
-                    }`}
-                  >
-                    {headerConnection.platform === headerPlatform
-                      ? getHeaderStatusLabel(headerConnection.status)
-                      : "Disconnected"}
-                  </span>
+                  {!selectedHeaderPlatform.comingSoon && (
+                    <span
+                      className={`rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${
+                        headerConnection.platform === headerPlatform && headerConnection.status === "connected"
+                          ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
+                          : headerConnection.platform === headerPlatform && headerConnection.status === "testing"
+                            ? "border-amber-400/20 bg-amber-500/10 text-amber-100"
+                            : headerConnection.platform === headerPlatform && headerConnection.status === "saved_locally"
+                              ? "border-[rgba(212,161,31,0.2)] bg-[rgba(212,161,31,0.1)] text-amber-100"
+                              : headerConnection.platform === headerPlatform && headerConnection.status === "failed"
+                                ? "border-rose-400/20 bg-rose-500/10 text-rose-200"
+                                : headerConnection.platform === headerPlatform &&
+                                    headerConnection.status === "not_configured"
+                                  ? "border-white/10 bg-white/5 text-zinc-500"
+                                  : "border-white/10 bg-white/5 text-zinc-400"
+                      }`}
+                    >
+                      {headerConnection.platform === headerPlatform
+                        ? getHeaderStatusLabel(headerConnection.status)
+                        : "Disconnected"}
+                    </span>
+                  )}
                 </div>
                 <p className="mt-2 text-[11px] leading-5 text-zinc-400">
                   {selectedHeaderPlatform.description}
                 </p>
 
-                {isHeaderWalletPlatform ? (
+                {selectedHeaderPlatform.comingSoon ? (
+                  <div className="mt-3 rounded-xl border border-amber-400/10 bg-amber-500/5 px-4 py-4 text-center">
+                    <div className="mb-1 text-[20px]">🔒</div>
+                    <div className="text-[12px] font-semibold text-amber-200">Coming Soon</div>
+                    <p className="mt-1.5 text-[10px] leading-4 text-zinc-400">
+                      We&apos;re actively working on {selectedHeaderPlatform.label} integration.
+                      Stay tuned for early access.
+                    </p>
+                    <div className="mt-3 flex items-center justify-center gap-2">
+                      <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300">
+                        Coming Soon
+                      </span>
+                    </div>
+                  </div>
+                ) : isHeaderWalletPlatform ? (
                   <>
                     <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {selectedHeaderPlatform.wallets?.map((walletLabel) => {
@@ -1495,14 +1601,24 @@ export default function TerminalApp() {
                         </span>
                       </div>
                       <div className="mt-2 text-[10px] text-zinc-400">
-                        {headerActionMessage ||
-                          "Credentials are stored in your browser's localStorage — for production use, set them in .env.local on the server instead."}
+                        {headerActionMessage || (
+                          vaultTokens[selectedHeaderCexPlatform as HeaderCexPlatform]
+                            ? "Credentials secured in server vault · only a session token is stored locally."
+                            : "Enter your API credentials and click Save to store them securely."
+                        )}
                       </div>
-                      {/* Security reminder */}
-                      <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-500/12 bg-amber-500/5 px-2 py-1.5 text-[9px] text-amber-400/70">
-                        <span className="mt-0.5 shrink-0">⚠</span>
-                        <span>Never use keys with withdrawal permissions. Restrict by IP in exchange settings.</span>
-                      </div>
+                      {/* Security status */}
+                      {vaultTokens[selectedHeaderCexPlatform as HeaderCexPlatform] ? (
+                        <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/8 px-2 py-1.5 text-[9px] text-emerald-400">
+                          <span className="mt-0.5 shrink-0">🔒</span>
+                          <span>Keys encrypted server-side (AES-256). Your browser holds only a session token.</span>
+                        </div>
+                      ) : (
+                        <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-500/12 bg-amber-500/5 px-2 py-1.5 text-[9px] text-amber-400/70">
+                          <span className="mt-0.5 shrink-0">⚠</span>
+                          <span>Never use keys with withdrawal permissions. Restrict by IP in exchange settings.</span>
+                        </div>
+                      )}
                       {headerConnection.platform === headerPlatform && headerConnection.status === "failed" && (
                         <div className="mt-2 text-[10px] text-rose-200">
                           {headerConnection.error || "Credential validation failed."}

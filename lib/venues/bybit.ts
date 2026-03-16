@@ -83,10 +83,10 @@ export const bybitAdapter: VenueAdapter = {
     fetchJson("/api/venues/validate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        venueId: "bybit",
-        apiKey: connection?.apiKey,
-        apiSecret: connection?.apiSecret,
-      }),
+      body: JSON.stringify(
+        connection?.sessionToken
+          ? { venueId: "bybit", sessionToken: connection.sessionToken }
+          : { venueId: "bybit", apiKey: connection?.apiKey, apiSecret: connection?.apiSecret }
+      ),
     }),
 };
