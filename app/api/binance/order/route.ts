@@ -4,6 +4,9 @@
  * All signing is done server-side. Browser never touches raw API keys after vault store.
  */
 
+// Deploy in Frankfurt to avoid Binance US geo-restriction
+export const preferredRegion = ["fra1", "sin1", "hnd1"];
+
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { retrieveCredentials } from "@/lib/credential-vault";
