@@ -3,35 +3,37 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import BrandMark from "@/components/BrandMark";
-import { Send, LayoutDashboard, Newspaper, Home } from "lucide-react";
+import { Send, LayoutDashboard, Newspaper, Home, BarChart2, Calendar } from "lucide-react";
 
 const NAV_TABS = [
-  { label: "Home",     href: "/",         icon: Home },
-  { label: "News",     href: "/news",      icon: Newspaper },
-  { label: "Terminal", href: "/terminal",  icon: LayoutDashboard },
+  { label: "Home",      href: "/",          icon: Home           },
+  { label: "News",      href: "/news",       icon: Newspaper      },
+  { label: "Terminal",  href: "/terminal",   icon: LayoutDashboard },
+  { label: "Screener",  href: "/screener",   icon: BarChart2      },
+  { label: "Calendar",  href: "/calendar",   icon: Calendar       },
 ];
 
 export default function SiteNav() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-50 flex items-center justify-between border-b border-[rgba(212,161,31,0.1)] bg-[rgba(7,6,10,0.88)] px-5 py-3 backdrop-blur-xl sm:px-8 lg:px-12">
-      <div className="flex items-center gap-6">
-        <Link href="/">
-          <BrandMark className="h-auto w-[120px] sm:w-[136px]" />
+    <header className="sticky top-0 z-50 flex items-center justify-between border-b border-[rgba(212,161,31,0.08)] bg-[rgba(7,6,10,0.92)] px-4 py-2.5 backdrop-blur-xl sm:px-6 lg:px-10">
+      <div className="flex items-center gap-5">
+        <Link href="/" className="shrink-0">
+          <BrandMark className="h-auto w-[112px] sm:w-[128px]" />
         </Link>
 
-        {/* Page tabs */}
-        <nav className="hidden items-center gap-1 sm:flex">
+        {/* Desktop nav */}
+        <nav className="hidden items-center gap-0.5 sm:flex">
           {NAV_TABS.map(({ label, href, icon: Icon }) => {
             const active = pathname === href || (href !== "/" && pathname.startsWith(href));
             return (
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] transition-all ${
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.13em] transition-all duration-150 ${
                   active
-                    ? "bg-[rgba(212,161,31,0.14)] text-amber-300"
+                    ? "bg-[rgba(212,161,31,0.13)] text-amber-300"
                     : "text-zinc-500 hover:bg-[rgba(255,255,255,0.04)] hover:text-zinc-300"
                 }`}
               >
@@ -43,20 +45,19 @@ export default function SiteNav() {
         </nav>
       </div>
 
-      {/* Mobile tab bar (bottom of header) */}
       <div className="flex items-center gap-2">
-        {/* Mobile nav tabs */}
-        <nav className="flex items-center gap-1 sm:hidden">
+        {/* Mobile nav */}
+        <nav className="flex items-center gap-0.5 sm:hidden">
           {NAV_TABS.map(({ label, href, icon: Icon }) => {
             const active = pathname === href || (href !== "/" && pathname.startsWith(href));
             return (
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.12em] transition-all ${
+                className={`flex items-center gap-1 rounded-full px-2 py-1.5 text-[9px] font-bold uppercase tracking-[0.1em] transition-all ${
                   active
-                    ? "bg-[rgba(212,161,31,0.14)] text-amber-300"
-                    : "text-zinc-500 hover:text-zinc-300"
+                    ? "bg-[rgba(212,161,31,0.13)] text-amber-300"
+                    : "text-zinc-600 hover:text-zinc-300"
                 }`}
               >
                 <Icon className="h-3 w-3" />
@@ -70,7 +71,7 @@ export default function SiteNav() {
           href="https://t.me/traderbross"
           target="_blank"
           rel="noreferrer"
-          className="hidden items-center gap-1.5 rounded-full border border-[rgba(212,161,31,0.14)] bg-[rgba(212,161,31,0.06)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-300 transition-colors hover:text-zinc-100 sm:inline-flex"
+          className="hidden items-center gap-1.5 rounded-full border border-[rgba(212,161,31,0.12)] bg-[rgba(212,161,31,0.05)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.13em] text-zinc-400 transition-all hover:border-[rgba(212,161,31,0.25)] hover:text-zinc-200 sm:inline-flex"
         >
           <Send className="h-3 w-3" />
           Telegram
@@ -79,7 +80,7 @@ export default function SiteNav() {
           href="https://x.com/traderbross"
           target="_blank"
           rel="noreferrer"
-          className="hidden items-center gap-1.5 rounded-full border border-[rgba(212,161,31,0.14)] bg-[rgba(212,161,31,0.06)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-300 transition-colors hover:text-zinc-100 sm:inline-flex"
+          className="hidden items-center gap-1.5 rounded-full border border-[rgba(212,161,31,0.12)] bg-[rgba(212,161,31,0.05)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.13em] text-zinc-400 transition-all hover:border-[rgba(212,161,31,0.25)] hover:text-zinc-200 sm:inline-flex"
         >
           𝕏
         </a>
