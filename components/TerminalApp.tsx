@@ -52,7 +52,7 @@ import {
   Layers,
 } from "lucide-react";
 
-type RightTab = "trade" | "dex" | "alerts" | "connect" | "watch" | "ai";
+type RightTab = "trade" | "dex" | "connect" | "watch" | "ai";
 type DexSubTab = "hl" | "dydx";
 type WorkspaceTab = "news" | "chart" | "tools";
 type HeaderPlatform = "hyperliquid" | "dydx" | "okx" | "bybit" | "binance";
@@ -525,9 +525,10 @@ export default function TerminalApp() {
     { id: "dex", label: "DEX" },
     { id: "connect", label: "Venues" },
     { id: "watch", label: "Watch" },
-    { id: "alerts", label: "Alerts" },
     { id: "ai", label: "AI" },
   ];
+
+  const [watchSubTab, setWatchSubTab] = useState<"watchlist" | "alerts">("watchlist");
 
   const isMobile = viewportWidth < 768;
   const isTablet = viewportWidth >= 768 && viewportWidth < 1280;
@@ -1035,26 +1036,44 @@ export default function TerminalApp() {
       )}
 
       {rightTab === "watch" && (
-        <ErrorBoundary label="Watchlist">
-          <div className="tab-content-enter min-h-0 flex-1 overflow-hidden">
-            <WatchlistPanel
-              quotes={wsQuotes}
-              prices={prices}
-              activeTicker={activeVenueState.activeSymbol}
-              onSelectTicker={(ticker) => {
-                setActiveSymbol(ticker);
-                setRightTab("trade");
-                setMobileWorkspaceTab("chart");
-              }}
-            />
-          </div>
-        </ErrorBoundary>
-      )}
+        <ErrorBoundary label="Watch">
+          <div className="tab-content-enter flex min-h-0 flex-1 flex-col overflow-hidden">
+            {/* Sub-tab toggle */}
+            <div className="panel-header soft-divider flex shrink-0 border-b">
+              {(["watchlist", "alerts"] as const).map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setWatchSubTab(st)}
+                  className={`flex-1 py-1.5 text-[9px] font-bold uppercase tracking-[0.2em] transition-colors ${
+                    watchSubTab === st
+                      ? "border-b-2 border-amber-300 text-amber-200"
+                      : "text-zinc-600 hover:text-zinc-400"
+                  }`}
+                >
+                  {st === "watchlist" ? "Watchlist" : "Alerts"}
+                </button>
+              ))}
+            </div>
 
-      {rightTab === "alerts" && (
-        <ErrorBoundary label="Alerts">
-          <div className="tab-content-enter min-h-0 flex-1 overflow-hidden">
-            <AlertPanel />
+            {watchSubTab === "watchlist" && (
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <WatchlistPanel
+                  quotes={wsQuotes}
+                  prices={prices}
+                  activeTicker={activeVenueState.activeSymbol}
+                  onSelectTicker={(ticker) => {
+                    setActiveSymbol(ticker);
+                    setRightTab("trade");
+                    setMobileWorkspaceTab("chart");
+                  }}
+                />
+              </div>
+            )}
+            {watchSubTab === "alerts" && (
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <AlertPanel />
+              </div>
+            )}
           </div>
         </ErrorBoundary>
       )}
