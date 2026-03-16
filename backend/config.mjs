@@ -26,7 +26,7 @@ function parseOrigins(value) {
 export function loadConfig() {
   return {
     apiHost: process.env.API_HOST || DEFAULT_API_HOST,
-    apiPort: toNumber(process.env.API_PORT, DEFAULT_API_PORT),
+    apiPort: toNumber(process.env.PORT || process.env.API_PORT, DEFAULT_API_PORT),
     logLevel: process.env.LOG_LEVEL || "info",
     frontendOrigins: parseOrigins(process.env.CORS_ORIGINS),
     cryptopanicKey: process.env.CRYPTOPANIC_KEY || "",
