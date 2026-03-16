@@ -14,7 +14,7 @@ import {
   MAKER_FEE,
   TAKER_FEE,
 } from "@/hooks/useTradingState";
-import { AlertTriangle, CheckCircle2, ChevronDown, Loader2, Shield, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ExternalLink, Loader2, Shield, SlidersHorizontal } from "lucide-react";
 import { createPortal } from "react-dom";
 import OrderConfirmModal, { type OrderConfirmData } from "@/components/OrderConfirmModal";
 
@@ -676,8 +676,8 @@ export default function TradingPanel({
           </div>
         </div>
 
-        {/* Validation errors */}
-        {validationErrors.length > 0 && (
+        {/* Validation errors — not shown for HL redirect flow */}
+        {validationErrors.length > 0 && activeVenueState.venueId !== "hyperliquid" && (
           <div className="space-y-1 rounded-lg border border-rose-500/20 bg-rose-500/6 px-3 py-2.5 panel-fade-in">
             {validationErrors.map((err) => (
               <div key={err} className="flex items-start gap-1.5 text-[10px] text-rose-300">
@@ -689,7 +689,7 @@ export default function TradingPanel({
         )}
 
         {/* Status message */}
-        {submitMessage && (
+        {submitMessage && activeVenueState.venueId !== "hyperliquid" && (
           <div
             className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-[11px] panel-fade-in ${
               submitState === "failure"
@@ -706,21 +706,37 @@ export default function TradingPanel({
           </div>
         )}
 
-        {/* Submit */}
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={submitDisabled}
-          className={`w-full rounded-lg py-3 text-[13px] font-bold tracking-wide transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600 ${
-            side === "long"
-              ? "bg-emerald-500 text-zinc-950 hover:bg-emerald-400 active:bg-emerald-600"
-              : "bg-red-500 text-white hover:bg-red-400 active:bg-red-600"
-          }`}
-        >
-          {submitState === "submitting"
-            ? "Submitting…"
-            : `Review ${side === "long" ? "Long" : "Short"} · ${activeVenueState.venueId.toUpperCase()}`}
-        </button>
+        {/* Submit — Hyperliquid: deep-link to HL app; others: in-app order */}
+        {activeVenueState.venueId === "hyperliquid" ? (
+          <a
+            href={`https://app.hyperliquid.xyz/trade/${ticker}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`flex w-full items-center justify-center gap-2 rounded-lg py-3 text-[13px] font-bold tracking-wide transition-all active:scale-[0.99] ${
+              side === "long"
+                ? "bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
+                : "bg-red-500 text-white hover:bg-red-400"
+            }`}
+          >
+            {side === "long" ? "Long" : "Short"} {ticker} on Hyperliquid
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        ) : (
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitDisabled}
+            className={`w-full rounded-lg py-3 text-[13px] font-bold tracking-wide transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600 ${
+              side === "long"
+                ? "bg-emerald-500 text-zinc-950 hover:bg-emerald-400 active:bg-emerald-600"
+                : "bg-red-500 text-white hover:bg-red-400 active:bg-red-600"
+            }`}
+          >
+            {submitState === "submitting"
+              ? "Submitting…"
+              : `Review ${side === "long" ? "Long" : "Short"} · ${activeVenueState.venueId.toUpperCase()}`}
+          </button>
+        )}
       </div>
 
       {/* Order Confirm Modal */}
