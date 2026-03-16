@@ -28,7 +28,7 @@ import MarketSessionBar from "@/components/MarketSessionBar";
 import { useTradingState } from "@/hooks/useTradingState";
 import type { ActiveVenueState, TradingVenueConnectionStatus, TradingVenueType } from "@/lib/active-venue";
 import { getVenueAdapter } from "@/lib/venues";
-import type { VenueConnectionInput } from "@/lib/venues/types";
+import type { VenueBalance, VenueConnectionInput } from "@/lib/venues/types";
 import { validateExecutionRequest } from "@/lib/execution-validation";
 import type { NewsTradePreset } from "@/lib/news-trade";
 import {
@@ -494,6 +494,45 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     updatePositionTpSl,
   } = useTradingState(wsPrices);
 
+  // ── Real venue balance (overwrites paper balance when connected) ────────────
+  const [venueBalance, setVenueBalance] = useState<VenueBalance | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchVenueBalance = async () => {
+      const isConnected =
+        activeVenueState.connectionStatus === "connected" ||
+        activeVenueState.connectionStatus === "saved_locally";
+
+      if (!isConnected) {
+        setVenueBalance(null);
+        return;
+      }
+
+      try {
+        const connection = buildActiveVenueConnection();
+        const result = await getVenueAdapter(activeVenueState.venueId).getBalance(connection);
+        if (!cancelled) setVenueBalance(result);
+      } catch {
+        if (!cancelled) setVenueBalance(null);
+      }
+    };
+
+    void fetchVenueBalance();
+    const id = setInterval(fetchVenueBalance, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeVenueState.venueId, activeVenueState.connectionStatus, hlVaultToken, vaultTokens]);
+
+  // Use real venue balance if available, otherwise paper trading balance
+  const displayBalance = venueBalance != null
+    ? (venueBalance.available ?? venueBalance.total)
+    : balance;
+
   const handleSelectItem = (item: NewsItem) => {
     setSelectedItem(item);
     if (item.ticker.length > 0) {
@@ -645,7 +684,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         limitPrice,
         tpPrice,
         slPrice,
-        balance,
+        balance: displayBalance,
       });
 
       if (!validation.ok) {
@@ -672,7 +711,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         ? { ok: true, message: `${adapter.id.toUpperCase()} accepted the order request.` }
         : { ok: false, message: result.message };
     },
-    [activeVenueState, balance, buildActiveVenueConnection]
+    [activeVenueState, displayBalance, buildActiveVenueConnection]
   );
 
   const disconnectHeaderWallet = useCallback(async () => {
@@ -1005,7 +1044,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           activeVenueState={activeVenueState}
           selectedNews={selectedItem}
           newsTradeIntent={newsTradeIntent}
-          balance={balance}
+          balance={displayBalance}
           positions={positions}
           prices={activeVenuePriceMap}
           marketDataSourceLabel={activeVenueMarketLabel}
@@ -1302,7 +1341,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
               <TradingActivityDrawer
                 positions={positions}
                 orders={orders}
-                balance={balance}
+                balance={displayBalance}
                 equityHistory={equityHistory}
                 onClosePosition={closePosition}
                 onCancelOrder={cancelOrder}
