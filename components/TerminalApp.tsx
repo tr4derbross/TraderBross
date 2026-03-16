@@ -231,7 +231,7 @@ function ResizeDivider({ onDrag }: { onDrag: (dx: number) => void }) {
   );
 }
 
-export default function TerminalApp() {
+export default function TerminalApp({ initialTicker }: { initialTicker?: string } = {}) {
   const [selectedItem, setSelectedItem] = useState<NewsItem | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>("trade");
   const [dexSubTab, setDexSubTab] = useState<DexSubTab>("hl");
@@ -257,7 +257,7 @@ export default function TerminalApp() {
   const [activeVenueState, setActiveVenueState] = useState<ActiveVenueState>({
     venueId: "hyperliquid",
     venueType: "wallet",
-    activeSymbol: "BTC",
+    activeSymbol: initialTicker && AVAILABLE_TICKERS.includes(initialTicker) ? initialTicker : "BTC",
     connectionStatus: "disconnected",
   });
   const [venueMarketPrices, setVenueMarketPrices] = useState<
