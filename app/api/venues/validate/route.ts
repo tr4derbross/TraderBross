@@ -1,3 +1,6 @@
+// Deploy in Frankfurt/Singapore to avoid Binance US geo-restriction
+export const preferredRegion = ["fra1", "sin1", "hnd1"];
+
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { retrieveCredentials } from "@/lib/credential-vault";
