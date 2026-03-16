@@ -1,10 +1,9 @@
-import type { VenueAdapter } from "@/lib/venues/types";
+import type { VenueAdapter, VenueActionResult } from "@/lib/venues/types";
 import {
   createPollingSubscribe,
   disconnectedResult,
   fetchJson,
   normalizeQuoteTicker,
-  notEnabledAction,
 } from "@/lib/venues/shared";
 
 const getTicker: VenueAdapter["getTicker"] = async (symbol) => {
@@ -50,31 +49,44 @@ const subscribeTicker: VenueAdapter["subscribeTicker"] = (symbol, onTick) => {
     }
   };
 
-  socket.onerror = () => {
-    socket.close();
-  };
-
+  socket.onerror = () => { socket.close(); };
   return () => socket.close();
 };
 
+async function hlOrderPost(body: Record<string, unknown>): Promise<VenueActionResult> {
+  try {
+    const res = await fetch("/api/hyperliquid/order", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(body),
+    });
+    const data = await res.json() as { ok?: boolean; error?: string; data?: unknown };
+    if (!res.ok || data.error) {
+      return { ok: false, message: data.error ?? `HTTP ${res.status}` };
+    }
+    return { ok: true, message: "Order submitted to Hyperliquid." };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Request failed" };
+  }
+}
+
 export const hyperliquidAdapter: VenueAdapter = {
-  id: "hyperliquid",
-  venueType: "wallet",
-  marketDataLabel: "Hyperliquid Mark Price",
-  supportsOrderPlacement: false,
+  id:                    "hyperliquid",
+  venueType:             "wallet",
+  marketDataLabel:       "Hyperliquid Mark Price",
+  supportsOrderPlacement: true,
+
   getTicker,
   subscribeTicker,
+
   getBalance: async (connection) => {
     if (!connection?.walletAddress) return null;
     const account = await fetchJson<{ balance: number; withdrawable?: number }>(
       `/api/hyperliquid?type=account&address=${connection.walletAddress}`
     );
-    return {
-      total: account.balance,
-      available: account.withdrawable,
-      currency: "USDC",
-    };
+    return { total: account.balance, available: account.withdrawable, currency: "USDC" };
   },
+
   getPositions: async (connection) => {
     if (!connection?.walletAddress) return [];
     const account = await fetchJson<{
@@ -87,34 +99,60 @@ export const hyperliquidAdapter: VenueAdapter = {
         liquidationPx: number | null;
       }>;
     }>(`/api/hyperliquid?type=account&address=${connection.walletAddress}`);
-    return account.positions.map((position) => ({
-      symbol: position.coin,
-      side: position.side,
-      size: position.size,
-      entryPrice: position.entryPx,
-      pnl: position.pnl,
-      liquidationPrice: position.liquidationPx,
+    return account.positions.map((p) => ({
+      symbol:           p.coin,
+      side:             p.side,
+      size:             p.size,
+      entryPrice:       p.entryPx,
+      pnl:              p.pnl,
+      liquidationPrice: p.liquidationPx,
     }));
   },
-  placeOrder: notEnabledAction("Hyperliquid execution is not enabled yet."),
-  cancelOrder: notEnabledAction("Hyperliquid execution is not enabled yet."),
-  setLeverage: notEnabledAction("Hyperliquid leverage configuration is not enabled yet."),
-  setMarginMode: notEnabledAction("Hyperliquid margin mode configuration is not enabled yet."),
+
+  placeOrder: async (input, _connection) => {
+    return hlOrderPost({
+      type:         "order",
+      symbol:       input.symbol,
+      side:         input.side,
+      orderType:    input.type,
+      marginAmount: input.marginAmount,
+      leverage:     input.leverage,
+      limitPrice:   input.limitPrice,
+    });
+  },
+
+  cancelOrder: async (orderId, _connection) => {
+    // orderId format: "SYMBOL:oid"
+    const [symbol, oidStr] = orderId.split(":");
+    return hlOrderPost({ type: "cancel", symbol, orderId: parseInt(oidStr, 10) });
+  },
+
+  setLeverage: async (input, _connection) => {
+    return hlOrderPost({ type: "leverage", symbol: input.symbol, leverage: input.leverage });
+  },
+
+  setMarginMode: async (input, _connection) => {
+    return hlOrderPost({
+      type:    "marginMode",
+      symbol:  input.symbol,
+      isCross: input.marginMode === "cross",
+    });
+  },
+
   testConnection: async (connection) => {
     if (!connection?.walletAddress) {
       return disconnectedResult("Connect a wallet before testing Hyperliquid.");
     }
-
     try {
       await fetchJson(`/api/hyperliquid?type=account&address=${connection.walletAddress}`);
       return {
-        ok: true,
+        ok:     true,
         message: "Hyperliquid wallet connection is ready.",
-        detail: "Account endpoint responded for the connected wallet.",
+        detail:  "Account endpoint responded for the connected wallet.",
       };
     } catch (error) {
       return {
-        ok: false,
+        ok:      false,
         message: error instanceof Error ? error.message : "Hyperliquid connection test failed.",
       };
     }
