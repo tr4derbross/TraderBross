@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
+import { useRealtimeSelector } from "@/lib/realtime-client";
 
 type VenueId = "binance" | "okx" | "bybit" | "hyperliquid" | "dydx";
 type VenueType = "CEX" | "DEX";
@@ -71,38 +72,16 @@ const VENUES: Venue[] = [
 ];
 
 export default function VenuesPanel({ hlWallet: _hlWallet, onHlWalletChange: _onHlWalletChange }: Props) {
-  const [prices, setPrices] = useState<Record<string, PriceMap>>({});
-  const [loadingPrices, setLoadingPrices] = useState(true);
-
-  useEffect(() => {
-    const fetchAll = async () => {
-      setLoadingPrices(true);
-      const [bnRes, okxRes, bybitRes] = await Promise.allSettled([
-        fetch("/api/prices?type=quotes").then((response) => response.json()),
-        fetch("/api/okx?type=quotes").then((response) => response.json()),
-        fetch("/api/bybit?type=quotes").then((response) => response.json()),
-      ]);
-
-      const toMap = (quotes: Array<{ symbol: string; price: number; changePct: number }>): PriceMap =>
-        Object.fromEntries(
-          (quotes || []).map((quote) => [
-            quote.symbol,
-            { price: quote.price, changePct: quote.changePct },
-          ])
-        );
-
-      setPrices({
-        Binance: bnRes.status === "fulfilled" ? toMap(bnRes.value) : {},
-        OKX: okxRes.status === "fulfilled" ? toMap(okxRes.value) : {},
-        Bybit: bybitRes.status === "fulfilled" ? toMap(bybitRes.value) : {},
-      });
-      setLoadingPrices(false);
-    };
-
-    fetchAll();
-    const intervalId = setInterval(fetchAll, 15_000);
-    return () => clearInterval(intervalId);
-  }, []);
+  const venueQuotes = useRealtimeSelector((state) => state.venueQuotes);
+  const loadingPrices = useRealtimeSelector((state) => state.connectionStatus === "connecting");
+  const prices = useMemo<Record<string, PriceMap>>(
+    () => ({
+      Binance: Object.fromEntries(venueQuotes.Binance.map((quote) => [quote.symbol, { price: quote.price, changePct: quote.changePct }])),
+      OKX: Object.fromEntries(venueQuotes.OKX.map((quote) => [quote.symbol, { price: quote.price, changePct: quote.changePct }])),
+      Bybit: Object.fromEntries(venueQuotes.Bybit.map((quote) => [quote.symbol, { price: quote.price, changePct: quote.changePct }])),
+    }),
+    [venueQuotes],
+  );
 
   const compareTickers = ["BTC", "ETH", "SOL"];
   const venuesWithData = ["Binance", "OKX", "Bybit"];

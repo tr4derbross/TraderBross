@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { buildApiUrl } from "@/lib/runtime-env";
 import { Bot, Send, Loader2, Sparkles, Trash2, ChevronDown } from "lucide-react";
 
 interface Message {
@@ -149,7 +150,7 @@ export default function ChatPanel({ context }: ChatPanelProps) {
 
   // Fetch active AI provider label
   useEffect(() => {
-    fetch("/api/chat")
+    fetch(buildApiUrl("/api/chat"))
       .then((r) => r.json())
       .then((d: { provider?: string }) => setProviderLabel(d.provider ?? ""))
       .catch(() => {});
@@ -206,7 +207,7 @@ export default function ChatPanel({ context }: ChatPanelProps) {
       abortRef.current = new AbortController();
 
       try {
-        const response = await fetch("/api/chat", {
+        const response = await fetch(buildApiUrl("/api/chat"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

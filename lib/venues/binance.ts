@@ -1,4 +1,5 @@
 import type { VenueAdapter } from "@/lib/venues/types";
+import { buildApiUrl } from "@/lib/runtime-env";
 import {
   createPollingSubscribe,
   fetchJson,
@@ -40,7 +41,7 @@ const subscribeTicker: VenueAdapter["subscribeTicker"] = (symbol, onTick) => {
 };
 
 async function binanceOrderPost(body: Record<string, unknown>) {
-  const res = await fetch("/api/binance/order", {
+  const res = await fetch(buildApiUrl("/api/binance/order"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -53,7 +54,7 @@ async function binanceOrderPost(body: Record<string, unknown>) {
 }
 
 async function binanceDataPost<T>(type: string, sessionToken: string): Promise<T> {
-  const res = await fetch("/api/binance", {
+  const res = await fetch(buildApiUrl("/api/binance"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ type, sessionToken }),

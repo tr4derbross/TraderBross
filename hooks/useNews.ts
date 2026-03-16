@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { MOCK_NEWS, MOCK_SOCIAL, MOCK_WHALES, NewsItem } from "@/lib/mock-data";
+import { useMemo, useRef } from "react";
+import { MOCK_NEWS, NewsItem } from "@/lib/mock-data";
+import { refreshRealtimeSnapshot, useRealtimeSelector } from "@/lib/realtime-client";
 
 export type SourceFilter = "all" | "news" | "social" | "whale";
 export type ImportanceFilter = "all" | "breaking" | "market-moving" | "watch" | "noise";
@@ -16,167 +17,95 @@ interface UseNewsOptions {
   sentimentFilter?: SentimentFilter;
 }
 
-export function useNews({ sector, ticker, keyword, sourceFilter = "all", importanceFilter = "all", sentimentFilter = "all" }: UseNewsOptions) {
-  const [newsItems, setNewsItems] = useState<NewsItem[]>(() => MOCK_NEWS);
-  const [whaleItems, setWhaleItems] = useState<NewsItem[]>(() => MOCK_WHALES);
-  const [socialItems, setSocialItems] = useState<NewsItem[]>(() => MOCK_SOCIAL);
-  const [loading, setLoading] = useState(false);
-  const [liveCount, setLiveCount] = useState(0);
-  const [isLive, setIsLive] = useState(false);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const [refreshNonce, setRefreshNonce] = useState(0);
+function matchesKeyword(item: NewsItem, keyword: string) {
+  const query = keyword.toLowerCase();
+  return (
+    item.headline.toLowerCase().includes(query) ||
+    item.summary.toLowerCase().includes(query) ||
+    (item.authorHandle?.toLowerCase().includes(query) ?? false) ||
+    (item.author?.toLowerCase().includes(query) ?? false)
+  );
+}
 
-  const fetchInitialNews = useCallback(() => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (sector && sector !== "All") params.set("sector", sector);
-    if (ticker) params.set("ticker", ticker);
-    if (keyword) params.set("keyword", keyword);
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 12_000);
+export function useNews({
+  sector,
+  ticker,
+  keyword,
+  sourceFilter = "all",
+  importanceFilter = "all",
+  sentimentFilter = "all",
+}: UseNewsOptions) {
+  const newsItems = useRealtimeSelector((state) => state.news);
+  const whaleItems = useRealtimeSelector((state) => state.whales);
+  const socialItems = useRealtimeSelector((state) => state.social);
+  const connectionStatus = useRealtimeSelector((state) => state.connectionStatus);
+  const previousHeadlines = useRef<Set<string>>(new Set());
 
-    fetch(`/api/news?${params}`, { signal: controller.signal, cache: "no-store" })
-      .then((r) => r.json())
-      .then((data: NewsItem[]) => {
-        const mapped = data.map((n) => ({ ...n, timestamp: new Date(n.timestamp), type: n.type || "news" }));
-        setNewsItems(mapped);
-        // Heuristic: if data contains non-mock IDs or has > 3 items with real URLs, it's live
-        const hasRealData = mapped.some((n) => n.url && n.url !== "#" && !n.id.startsWith("mock-"));
-        setIsLive(hasRealData);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false))
-      .finally(() => window.clearTimeout(timeoutId));
+  const loading = connectionStatus === "connecting" && newsItems.length === 0;
+  const allItems = useMemo(() => [...newsItems, ...whaleItems, ...socialItems], [newsItems, whaleItems, socialItems]);
 
-    return () => {
-      controller.abort();
-      window.clearTimeout(timeoutId);
-    };
-  }, [sector, ticker, keyword]);
+  const filtered = useMemo(() => {
+    let items: NewsItem[];
+    switch (sourceFilter) {
+      case "news":
+        items = newsItems;
+        break;
+      case "whale":
+        items = whaleItems;
+        break;
+      case "social":
+        items = socialItems;
+        break;
+      default:
+        items = [...allItems].sort(
+          (a, b) =>
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime() ||
+            a.id.localeCompare(b.id),
+        );
+    }
 
-  useEffect(() => {
-    return fetchInitialNews();
-  }, [fetchInitialNews, refreshNonce]);
+    if (keyword) {
+      items = items.filter((item) => matchesKeyword(item, keyword));
+    }
 
-  // Fetch whale alerts (poll every 60s)
-  const fetchWhales = useCallback(async () => {
-    try {
-      const res = await fetch("/api/whale", { signal: AbortSignal.timeout(12000) });
-      if (!res.ok) return;
-      const data: NewsItem[] = await res.json();
-      setWhaleItems(data.map((n) => ({ ...n, timestamp: new Date(n.timestamp), type: "whale" })));
-    } catch { /* ignore */ }
-  }, []);
+    if (ticker) {
+      items = items.filter((item) => item.ticker.includes(ticker.toUpperCase()));
+    }
 
-  // Fetch social/Twitter feed (poll every 5min)
-  const fetchSocial = useCallback(async () => {
-    try {
-      const res = await fetch("/api/social", { signal: AbortSignal.timeout(12000) });
-      if (!res.ok) return;
-      const data: NewsItem[] = await res.json();
-      setSocialItems(data.map((n) => ({ ...n, timestamp: new Date(n.timestamp), type: "social" })));
-    } catch { /* ignore */ }
-  }, []);
+    if (sector && sector !== "All") {
+      items = items.filter((item) => item.sector.includes(sector));
+    }
 
-  const refreshNews = useCallback(() => {
-    setLiveCount(0);
-    void fetchWhales();
-    void fetchSocial();
-    setRefreshNonce((n) => n + 1);
-  }, [fetchWhales, fetchSocial]);
+    if (importanceFilter !== "all") {
+      items = items.filter((item) => item.importance === importanceFilter);
+    }
 
-  useEffect(() => {
-    fetchWhales();
-    fetchSocial();
+    if (sentimentFilter !== "all") {
+      items = items.filter((item) => item.sentiment === sentimentFilter);
+    }
 
-    const whaleInterval = setInterval(fetchWhales, 30_000);
-    const socialInterval = setInterval(fetchSocial, 120_000);
+    return items.length > 0 ? items : sourceFilter === "news" ? MOCK_NEWS : items;
+  }, [allItems, importanceFilter, keyword, newsItems, sector, sentimentFilter, socialItems, sourceFilter, ticker, whaleItems]);
 
-    return () => {
-      clearInterval(whaleInterval);
-      clearInterval(socialInterval);
-    };
-  }, [fetchWhales, fetchSocial]);
-
-  // SSE stream for live news
-  useEffect(() => {
-    const es = new EventSource("/api/news/stream");
-    eventSourceRef.current = es;
-    let counter = 0;
-
-    es.onmessage = (e) => {
-      const payload = JSON.parse(e.data);
-      if (payload.type === "news") {
-        const item: NewsItem = {
-          ...payload.item,
-          timestamp: new Date(payload.item.timestamp),
-          id: `live-${Date.now()}-${++counter}`,
-          type: "news",
-        };
-        setNewsItems((prev) => {
-          const key = item.headline.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 70);
-          if (prev.some((n) => n.headline.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 70) === key)) return prev;
-          return [item, ...prev.slice(0, 49)];
-        });
-        setLiveCount((c) => c + 1);
+  const liveCount = useMemo(() => {
+    let nextCount = 0;
+    const nextHeadlines = new Set<string>();
+    newsItems.forEach((item) => {
+      nextHeadlines.add(item.id);
+      if (!previousHeadlines.current.has(item.id)) {
+        nextCount += 1;
       }
-    };
-
-    es.onerror = () => { es.close(); };
-    return () => { es.close(); };
-  }, []);
-
-  // Merge + filter by source
-  const allItems = [...newsItems, ...whaleItems, ...socialItems];
-
-  let filtered: NewsItem[];
-  switch (sourceFilter) {
-    case "news":
-      filtered = newsItems;
-      break;
-    case "whale":
-      filtered = whaleItems;
-      break;
-    case "social":
-      filtered = socialItems;
-      break;
-    default:
-      filtered = [...allItems].sort(
-        (a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime() ||
-          a.id.localeCompare(b.id)
-      );
-  }
-
-  // Apply keyword/ticker/sector filters across all types
-  if (keyword) {
-    const kw = keyword.toLowerCase();
-    filtered = filtered.filter(
-      (n) => n.headline.toLowerCase().includes(kw) ||
-             n.summary.toLowerCase().includes(kw) ||
-             (n.authorHandle?.toLowerCase().includes(kw)) ||
-             (n.author?.toLowerCase().includes(kw))
-    );
-  }
-  if (ticker) {
-    filtered = filtered.filter((n) => n.ticker.includes(ticker.toUpperCase()));
-  }
-  if (sector && sector !== "All") {
-    filtered = filtered.filter((n) => n.sector.includes(sector));
-  }
-  if (importanceFilter && importanceFilter !== "all") {
-    filtered = filtered.filter((n) => n.importance === importanceFilter);
-  }
-  if (sentimentFilter && sentimentFilter !== "all") {
-    filtered = filtered.filter((n) => n.sentiment === sentimentFilter);
-  }
+    });
+    previousHeadlines.current = nextHeadlines;
+    return Math.max(0, nextCount - 1);
+  }, [newsItems]);
 
   return {
     news: filtered,
     loading,
     liveCount,
-    isLive,
-    refreshNews,
+    isLive: newsItems.some((item) => item.url && item.url !== "#" && !item.id.startsWith("mock-")),
+    refreshNews: refreshRealtimeSnapshot,
     counts: {
       news: newsItems.length,
       whale: whaleItems.length,

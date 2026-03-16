@@ -1,0 +1,55 @@
+import type { NewsItem, TickerQuote } from "@/lib/mock-data";
+
+export type FearGreedData = {
+  value: number;
+  label: string;
+  history: Array<{
+    value: number;
+    label: string;
+    timestamp: string;
+  }>;
+};
+
+export type MarketStats = {
+  marketCapUsd: number | null;
+  btcDominance: number | null;
+  ethDominance: number | null;
+  marketCapChange24h: number | null;
+};
+
+export type MempoolStats = {
+  fees: { fastestFee: number; halfHourFee: number; hourFee: number } | null;
+  blockHeight: number | null;
+  mempool: { count: number } | null;
+  halving: { remainingBlocks: number } | null;
+};
+
+export type VenueQuotes = {
+  Binance: TickerQuote[];
+  OKX: TickerQuote[];
+  Bybit: TickerQuote[];
+};
+
+export type BackendSnapshot = {
+  quotes: TickerQuote[];
+  venueQuotes: VenueQuotes;
+  marketStats: MarketStats | null;
+  mempoolStats: MempoolStats | null;
+  fearGreed: FearGreedData | null;
+  news: NewsItem[];
+  whales: NewsItem[];
+  social: NewsItem[];
+  connectionState: "connecting" | "connected" | "disconnected";
+};
+
+export type RealtimeEnvelope =
+  | { type: "snapshot"; payload: BackendSnapshot; timestamp: string }
+  | { type: "quotes"; payload: TickerQuote[]; timestamp: string }
+  | { type: "venueQuotes"; payload: VenueQuotes; timestamp: string }
+  | { type: "marketStats"; payload: MarketStats; timestamp: string }
+  | { type: "mempoolStats"; payload: MempoolStats; timestamp: string }
+  | { type: "fearGreed"; payload: FearGreedData; timestamp: string }
+  | { type: "news"; payload: NewsItem; timestamp: string }
+  | { type: "social"; payload: NewsItem[]; timestamp: string }
+  | { type: "whales"; payload: NewsItem[]; timestamp: string }
+  | { type: "heartbeat"; payload: { ok: boolean; ts: number }; timestamp: string };

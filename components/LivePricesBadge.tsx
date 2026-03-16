@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useBinanceWs } from "@/hooks/useBinanceWs";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
 interface Quote {
@@ -12,31 +13,19 @@ interface Quote {
 const SYMBOLS = ["BTC", "ETH", "SOL"];
 
 export default function LivePricesBadge() {
-  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [flash, setFlash] = useState<string | null>(null);
+  const { quotes: allQuotes } = useBinanceWs();
+  const quotes = allQuotes.filter((quote) => SYMBOLS.includes(quote.symbol)) as Quote[];
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch("/api/prices?type=quotes");
-        if (!res.ok) return;
-        const data: Quote[] = await res.json();
-        const filtered = data.filter((q) => SYMBOLS.includes(q.symbol));
-        setQuotes(filtered);
-      } catch {
-        // silent fallback
-      }
-    };
+    if (quotes.length === 0) {
+      return;
+    }
 
-    load();
-    const id = setInterval(() => {
-      load();
-      setFlash(SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]);
-      setTimeout(() => setFlash(null), 600);
-    }, 12000);
-
-    return () => clearInterval(id);
-  }, []);
+    setFlash(SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]);
+    const timer = window.setTimeout(() => setFlash(null), 600);
+    return () => window.clearTimeout(timer);
+  }, [quotes]);
 
   if (!quotes.length) {
     return (

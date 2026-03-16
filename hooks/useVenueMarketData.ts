@@ -1,64 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import type { TradingVenueId } from "@/lib/active-venue";
-import { getMarketDataAdapter } from "@/lib/market-data";
+import { useRealtimeSelector } from "@/lib/realtime-client";
 import type { MarketDataConnectionState, NormalizedTicker } from "@/lib/market-data/types";
 
-type StreamState = {
-  ticker: NormalizedTicker | null;
-  connectionState: MarketDataConnectionState;
-};
-
 export function useVenueMarketData(venueId: TradingVenueId, symbol: string) {
-  const [state, setState] = useState<StreamState>({
-    ticker: null,
-    connectionState: "idle",
-  });
+  const venueQuotes = useRealtimeSelector((state) => state.venueQuotes);
+  const quotes = useRealtimeSelector((state) => state.quotes);
+  const connectionState = useRealtimeSelector<MarketDataConnectionState>((state) =>
+    state.connectionStatus === "connected" ? "connected" : state.connectionStatus === "connecting" ? "connecting" : "error",
+  );
 
-  useEffect(() => {
-    let active = true;
-    const adapter = getMarketDataAdapter(venueId);
-    let cleanup: (() => void) | undefined;
-
-    setState({ ticker: null, connectionState: "connecting" });
-
-    adapter
-      .connect((connectionState) => {
-        if (!active) return;
-        setState((prev) => ({ ...prev, connectionState }));
-      })
-      .then(async (connection) => {
-        if (!active) {
-          await adapter.disconnect(connection);
-          return;
-        }
-
-        const handler = (ticker: NormalizedTicker) => {
-          if (!active) return;
-          setState({
-            ticker,
-            connectionState: ticker.connectionState,
-          });
-        };
-
-        await adapter.subscribeTicker(connection, symbol, handler);
-        cleanup = () => {
-          void adapter.unsubscribeTicker(connection, symbol, handler);
-          void adapter.disconnect(connection);
-        };
-      })
-      .catch(() => {
-        if (active) {
-          setState({ ticker: null, connectionState: "error" });
-        }
-      });
-
-    return () => {
-      active = false;
-      cleanup?.();
+  const ticker = useMemo<NormalizedTicker | null>(() => {
+    const venueMap =
+      venueId === "okx"
+        ? venueQuotes.OKX
+        : venueId === "bybit"
+          ? venueQuotes.Bybit
+          : venueId === "binance"
+            ? quotes
+            : quotes;
+    const quote = venueMap.find((item) => item.symbol === symbol);
+    if (!quote) {
+      return null;
+    }
+    return {
+      symbol,
+      venue: venueId,
+      markPrice: quote.price,
+      lastPrice: quote.price,
+      bid: quote.price,
+      ask: quote.price,
+      timestamp: Date.now(),
+      connectionState,
     };
-  }, [symbol, venueId]);
+  }, [connectionState, quotes, symbol, venueId, venueQuotes.Bybit, venueQuotes.OKX]);
 
-  return state;
+  return {
+    ticker,
+    connectionState,
+  };
 }
