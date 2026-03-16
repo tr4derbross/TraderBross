@@ -1151,19 +1151,21 @@ export default function TerminalApp() {
         {/* Left: Fear & Greed + page nav */}
         <div className="absolute left-3 top-1/2 z-10 -translate-y-1/2 sm:left-4 flex items-center gap-2">
           <FearGreedPill />
-          <div className="hidden items-center gap-1 sm:flex">
-            <a
-              href="/"
-              className="rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-600 transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-zinc-400"
-            >
-              Home
-            </a>
-            <a
-              href="/news"
-              className="rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-600 transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-zinc-400"
-            >
-              News
-            </a>
+          <div className="hidden items-center gap-0.5 sm:flex">
+            {([
+              { label: "Home",     href: "/"          },
+              { label: "News",     href: "/news"      },
+              { label: "Screener", href: "/screener"  },
+              { label: "Calendar", href: "/calendar"  },
+            ] as const).map(({ label, href }) => (
+              <a
+                key={href}
+                href={href}
+                className="rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-600 transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-zinc-400"
+              >
+                {label}
+              </a>
+            ))}
           </div>
         </div>
 
