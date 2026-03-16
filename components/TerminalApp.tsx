@@ -236,6 +236,9 @@ export default function TerminalApp() {
   const [rightTab, setRightTab] = useState<RightTab>("trade");
   const [dexSubTab, setDexSubTab] = useState<DexSubTab>("hl");
   const [hlWallet, setHlWallet] = useState("");
+  const [hlVaultToken, setHlVaultToken] = useState<string>("");
+  const [hlPrivateKeyInput, setHlPrivateKeyInput] = useState<string>("");
+  const [hlKeyStatus, setHlKeyStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [viewportWidth, setViewportWidth] = useState(1440);
   const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<WorkspaceTab>("chart");
   const [headerPlatform, setHeaderPlatform] = useState<HeaderPlatform>("hyperliquid");
@@ -319,6 +322,12 @@ export default function TerminalApp() {
       }
       if (Object.keys(loadedTokens).length > 0) {
         setVaultTokens(loadedTokens);
+      }
+
+      const hlToken = sessionStorage.getItem("traderbross.vault-token.hyperliquid.v1");
+      if (hlToken) {
+        setHlVaultToken(hlToken);
+        setHeaderConnection({ status: "connected", platform: "hyperliquid" });
       }
     } catch {
       // ignore storage errors
@@ -583,6 +592,9 @@ export default function TerminalApp() {
     }
 
     if (activeVenueState.venueType === "wallet") {
+      if (activeVenueState.venueId === "hyperliquid" && hlVaultToken) {
+        return { walletAddress: hlWallet, sessionToken: hlVaultToken };
+      }
       return {
         walletAddress:
           headerConnection.platform === activeVenueState.venueId ? headerConnection.address : undefined,
@@ -598,6 +610,8 @@ export default function TerminalApp() {
     headerConnection.address,
     headerConnection.platform,
     headerConnection.walletLabel,
+    hlVaultToken,
+    hlWallet,
     selectedHeaderCexPlatform,
     selectedHeaderCredentials,
     vaultTokens,
@@ -727,6 +741,30 @@ export default function TerminalApp() {
     },
     [headerPlatform]
   );
+
+  const saveHlPrivateKey = async () => {
+    if (!hlPrivateKeyInput.trim()) return;
+    setHlKeyStatus("saving");
+    try {
+      const resp = await fetch("/api/vault/store", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ venueId: "hyperliquid", privateKey: hlPrivateKeyInput.trim(), walletAddress: hlWallet }),
+      });
+      const data = await resp.json() as { ok: boolean; sessionToken?: string; message?: string };
+      if (data.ok && data.sessionToken) {
+        setHlVaultToken(data.sessionToken);
+        try { sessionStorage.setItem("traderbross.vault-token.hyperliquid.v1", data.sessionToken); } catch {}
+        setHlPrivateKeyInput("");
+        setHlKeyStatus("saved");
+        setHeaderConnection({ status: "connected", platform: "hyperliquid" });
+      } else {
+        setHlKeyStatus("error");
+      }
+    } catch {
+      setHlKeyStatus("error");
+    }
+  };
 
   const runHeaderCexAction = useCallback(async () => {
     if (selectedHeaderPlatform.type !== "cex") return;
@@ -1512,6 +1550,57 @@ export default function TerminalApp() {
                         </div>
                       )}
                     </div>
+
+                    {headerPlatform === "hyperliquid" && (
+                      <div className="mt-3 space-y-2 rounded-xl border border-[rgba(212,161,31,0.12)] bg-[#0c0f13] p-3">
+                        <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300/70">
+                          API Wallet — Trading Key
+                        </div>
+                        <p className="text-[10px] leading-4 text-zinc-500">
+                          Enter your Hyperliquid API wallet private key to enable in-terminal order placement with builder fee revenue.
+                        </p>
+                        {hlVaultToken ? (
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 text-[10px] text-emerald-300">
+                              <CheckCircle className="h-3.5 w-3.5" />
+                              API key secured in vault
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setHlVaultToken("");
+                                try { sessionStorage.removeItem("traderbross.vault-token.hyperliquid.v1"); } catch {}
+                                setHlKeyStatus("idle");
+                                if (headerConnection.platform === "hyperliquid") {
+                                  setHeaderConnection({ status: "disconnected", platform: "hyperliquid" });
+                                }
+                              }}
+                              className="text-[10px] text-zinc-500 hover:text-zinc-300"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <input
+                              type="password"
+                              value={hlPrivateKeyInput}
+                              onChange={(e) => setHlPrivateKeyInput(e.target.value)}
+                              placeholder="0x… private key"
+                              className="terminal-input w-full rounded-xl px-3 py-2 text-[11px] outline-none placeholder:text-zinc-600"
+                            />
+                            <button
+                              type="button"
+                              disabled={!hlPrivateKeyInput.trim() || hlKeyStatus === "saving"}
+                              onClick={saveHlPrivateKey}
+                              className="w-full rounded-xl bg-amber-500/15 px-3 py-2 text-[11px] font-bold text-amber-200 transition hover:bg-amber-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {hlKeyStatus === "saving" ? "Securing…" : hlKeyStatus === "error" ? "Failed — Retry" : "Save API Key"}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>
