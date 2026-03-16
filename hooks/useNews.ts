@@ -61,7 +61,7 @@ export function useNews({ sector, ticker, keyword, sourceFilter = "all", importa
   // Fetch whale alerts (poll every 60s)
   const fetchWhales = useCallback(async () => {
     try {
-      const res = await fetch("/api/whale", { signal: AbortSignal.timeout(4000) });
+      const res = await fetch("/api/whale", { signal: AbortSignal.timeout(12000) });
       if (!res.ok) return;
       const data: NewsItem[] = await res.json();
       setWhaleItems(data.map((n) => ({ ...n, timestamp: new Date(n.timestamp), type: "whale" })));
@@ -71,7 +71,7 @@ export function useNews({ sector, ticker, keyword, sourceFilter = "all", importa
   // Fetch social/Twitter feed (poll every 5min)
   const fetchSocial = useCallback(async () => {
     try {
-      const res = await fetch("/api/social", { signal: AbortSignal.timeout(4000) });
+      const res = await fetch("/api/social", { signal: AbortSignal.timeout(12000) });
       if (!res.ok) return;
       const data: NewsItem[] = await res.json();
       setSocialItems(data.map((n) => ({ ...n, timestamp: new Date(n.timestamp), type: "social" })));
@@ -89,8 +89,8 @@ export function useNews({ sector, ticker, keyword, sourceFilter = "all", importa
     fetchWhales();
     fetchSocial();
 
-    const whaleInterval = setInterval(fetchWhales, 60_000);
-    const socialInterval = setInterval(fetchSocial, 300_000);
+    const whaleInterval = setInterval(fetchWhales, 30_000);
+    const socialInterval = setInterval(fetchSocial, 120_000);
 
     return () => {
       clearInterval(whaleInterval);
