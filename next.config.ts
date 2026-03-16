@@ -17,6 +17,7 @@ const securityHeaders = [
       "img-src 'self' data: blob: https:",
       "font-src 'self'",
       "frame-ancestors 'none'",
+      "frame-src https://www.tradingview.com https://s.tradingview.com",
       [
         "connect-src 'self'",
         "wss://stream.binance.com:9443",

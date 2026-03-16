@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   RefreshCw,
@@ -9,11 +9,10 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  Twitter,
   Waves,
   Newspaper,
   LayoutDashboard,
-  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import SiteNav from "@/components/SiteNav";
 import { useNews, SourceFilter, SentimentFilter } from "@/hooks/useNews";
@@ -26,154 +25,144 @@ function timeAgo(date: Date): string {
   if (diff < 60) return `${diff}s ago`;
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function sentimentColor(s?: string) {
-  if (s === "bullish")  return "border-emerald-500/25 bg-emerald-500/10 text-emerald-400";
-  if (s === "bearish")  return "border-rose-500/25 bg-rose-500/10 text-rose-400";
-  return "border-zinc-600/25 bg-zinc-600/10 text-zinc-400";
+  if (s === "bullish") return "text-emerald-400";
+  if (s === "bearish") return "text-rose-400";
+  return "text-zinc-500";
 }
 
-function SentimentIcon({ s }: { s?: string }) {
-  if (s === "bullish") return <TrendingUp  className="h-3 w-3" />;
-  if (s === "bearish") return <TrendingDown className="h-3 w-3" />;
-  return <Minus className="h-3 w-3" />;
-}
+/* ── Avatar ─────────────────────────────────────────────────────────────────── */
+function Avatar({ item }: { item: NewsItem }) {
+  const initials = item.author
+    ? item.author.slice(0, 2).toUpperCase()
+    : item.source.slice(0, 2).toUpperCase();
 
-function TypeIcon({ type }: { type?: string }) {
-  if (type === "social") return <Twitter className="h-3 w-3 text-sky-400" />;
-  if (type === "whale")  return <Waves   className="h-3 w-3 text-violet-400" />;
-  return <Newspaper className="h-3 w-3 text-amber-400" />;
-}
+  const colors: Record<string, string> = {
+    social: "bg-sky-900/60 text-sky-300 border-sky-700/40",
+    whale: "bg-violet-900/60 text-violet-300 border-violet-700/40",
+    news: "bg-amber-900/40 text-amber-300 border-amber-700/30",
+  };
+  const cls = colors[item.type ?? "news"] ?? colors.news;
 
-function typeBadge(type?: string) {
-  if (type === "social") return "border-sky-500/20 bg-sky-500/8 text-sky-400";
-  if (type === "whale")  return "border-violet-500/20 bg-violet-500/8 text-violet-400";
-  return "border-amber-500/20 bg-amber-500/8 text-amber-300";
-}
-
-function typeLabel(type?: string) {
-  if (type === "social") return "Social";
-  if (type === "whale")  return "Whale";
-  return "News";
+  return (
+    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold ${cls}`}>
+      {initials}
+    </div>
+  );
 }
 
 /* ── News card ─────────────────────────────────────────────────────────────── */
-
-function NewsCard({ item }: { item: NewsItem }) {
+function NewsCard({ item, onSelect, selected }: { item: NewsItem; onSelect: (item: NewsItem) => void; selected: boolean }) {
   return (
-    <article className="group rounded-2xl border border-[rgba(212,161,31,0.08)] bg-[rgba(255,255,255,0.02)] p-4 transition-all hover:border-[rgba(212,161,31,0.18)] hover:bg-[rgba(255,255,255,0.04)]">
-      <div className="mb-2.5 flex flex-wrap items-center gap-2">
-        {/* Type badge */}
-        <span className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] ${typeBadge(item.type)}`}>
-          <TypeIcon type={item.type} />
-          {typeLabel(item.type)}
-        </span>
+    <article
+      onClick={() => onSelect(item)}
+      className={`cursor-pointer border-b border-[rgba(255,255,255,0.05)] px-4 py-3.5 transition-colors hover:bg-[rgba(255,255,255,0.03)] ${selected ? "bg-[rgba(212,161,31,0.05)]" : ""}`}
+    >
+      <div className="flex gap-3">
+        <Avatar item={item} />
 
-        {/* Sentiment */}
-        {item.sentiment && (
-          <span className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${sentimentColor(item.sentiment)}`}>
-            <SentimentIcon s={item.sentiment} />
-            {item.sentiment}
-          </span>
-        )}
-
-        {/* Tickers */}
-        {item.ticker?.slice(0, 4).map((t) => (
-          <span key={t} className="rounded-full border border-[rgba(212,161,31,0.2)] bg-[rgba(212,161,31,0.07)] px-2 py-0.5 text-[9px] font-bold text-amber-300">
-            {t}
-          </span>
-        ))}
-
-        {/* Time */}
-        <span className="ml-auto text-[10px] text-zinc-600">
-          {timeAgo(item.timestamp)}
-        </span>
-      </div>
-
-      {/* Headline */}
-      <p className="text-[0.88rem] font-semibold leading-[1.55] text-[#f0e8d3]">
-        {item.headline}
-      </p>
-
-      {/* Summary */}
-      {item.summary && item.summary !== item.headline && (
-        <p className="mt-1.5 line-clamp-2 text-[0.8rem] leading-[1.6] text-zinc-500">
-          {item.summary}
-        </p>
-      )}
-
-      {/* Footer */}
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-zinc-600">{item.source}</span>
-          {item.authorHandle && (
-            <span className="text-[10px] text-zinc-600">@{item.authorHandle}</span>
-          )}
-          {item.whaleAmountUsd && item.whaleAmountUsd > 0 && (
-            <span className="rounded-full border border-violet-500/20 bg-violet-500/8 px-2 py-0.5 text-[9px] font-bold text-violet-400">
-              ${(item.whaleAmountUsd / 1_000_000).toFixed(1)}M
+        <div className="min-w-0 flex-1">
+          {/* Author / source row */}
+          <div className="mb-1 flex flex-wrap items-center gap-1.5">
+            <span className="text-[12px] font-semibold text-[#e8dfc8]">
+              {item.author ?? item.source}
             </span>
-          )}
-        </div>
+            {item.authorHandle && (
+              <span className="text-[11px] text-zinc-500">@{item.authorHandle}</span>
+            )}
+            <span className="ml-auto text-[10px] text-zinc-600">{timeAgo(item.timestamp)}</span>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/terminal?ticker=${item.ticker?.[0] ?? "BTC"}`}
-            className="flex items-center gap-1 rounded-full border border-[rgba(212,161,31,0.14)] bg-[rgba(212,161,31,0.06)] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-amber-300 opacity-0 transition-all group-hover:opacity-100 hover:bg-[rgba(212,161,31,0.12)]"
-          >
-            <LayoutDashboard className="h-2.5 w-2.5" />
-            Trade
-          </Link>
-          {item.url && item.url !== "#" && (
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-zinc-600 opacity-0 transition-opacity group-hover:opacity-100 hover:text-zinc-300"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
+          {/* Headline */}
+          <p className="text-[12px] leading-[1.55] text-zinc-300">{item.headline}</p>
+
+          {/* Summary (for news only) */}
+          {item.type === "news" && item.summary && item.summary !== item.headline && (
+            <p className="mt-1 line-clamp-2 text-[11px] leading-[1.5] text-zinc-600">
+              {item.summary}
+            </p>
           )}
+
+          {/* Whale amount */}
+          {item.type === "whale" && item.whaleAmountUsd && (
+            <div className="mt-1.5 flex items-center gap-1.5">
+              <Waves className="h-3 w-3 text-violet-400" />
+              <span className="text-[11px] font-bold text-violet-300">
+                ${(item.whaleAmountUsd / 1_000_000).toFixed(2)}M
+              </span>
+              {item.whaleFrom && item.whaleTo && (
+                <span className="text-[10px] text-zinc-600">
+                  {item.whaleFrom} → {item.whaleTo}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Footer row */}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {/* Sentiment */}
+            {item.sentiment && (
+              <span className={`flex items-center gap-0.5 text-[10px] font-semibold ${sentimentColor(item.sentiment)}`}>
+                {item.sentiment === "bullish" ? <TrendingUp className="h-2.5 w-2.5" /> : item.sentiment === "bearish" ? <TrendingDown className="h-2.5 w-2.5" /> : <Minus className="h-2.5 w-2.5" />}
+                {item.sentiment}
+              </span>
+            )}
+
+            {/* Tickers */}
+            <div className="flex flex-wrap gap-1">
+              {item.ticker?.slice(0, 3).map((t) => (
+                <Link
+                  key={t}
+                  href={`/terminal?ticker=${t}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="rounded border border-[rgba(212,161,31,0.2)] bg-[rgba(212,161,31,0.06)] px-1.5 py-0.5 text-[9px] font-bold text-amber-400 hover:bg-[rgba(212,161,31,0.14)]"
+                >
+                  {t}
+                </Link>
+              ))}
+            </div>
+
+            {/* Source */}
+            <span className="ml-auto text-[10px] text-zinc-700">{item.source}</span>
+
+            {/* External link */}
+            {item.url && item.url !== "#" && (
+              <a href={item.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-zinc-700 hover:text-zinc-400">
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </article>
   );
 }
 
-/* ── Filter pill ───────────────────────────────────────────────────────────── */
+/* ── TradingView widget ─────────────────────────────────────────────────────── */
+function TradingViewChart({ symbol }: { symbol: string }) {
+  const tvSymbol = `BINANCE:${symbol.replace("/", "").replace("USDT", "USDT").toUpperCase()}`;
 
-function FilterPill({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
   return (
-    <button
-      onClick={onClick}
-      className={`rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] transition-all ${
-        active
-          ? "bg-[rgba(212,161,31,0.18)] text-amber-200"
-          : "border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] text-zinc-500 hover:text-zinc-300"
-      }`}
-    >
-      {children}
-    </button>
+    <iframe
+      key={symbol}
+      src={`https://www.tradingview.com/widgetembed/?symbol=${tvSymbol}&interval=60&theme=dark&style=1&locale=en&toolbar_bg=%230d0d0f&hide_side_toolbar=0&allow_symbol_change=1&save_image=0&hidevolume=0&hidetoptoolbar=0`}
+      className="h-full w-full rounded-xl border-0"
+      allow="clipboard-write"
+      title="TradingView Chart"
+    />
   );
 }
 
 /* ── Page ──────────────────────────────────────────────────────────────────── */
 
-const SOURCE_TABS: { label: string; value: SourceFilter }[] = [
+const SOURCE_TABS: { label: string; value: SourceFilter; icon?: React.ReactNode }[] = [
   { label: "All",    value: "all" },
-  { label: "News",   value: "news" },
-  { label: "Social", value: "social" },
-  { label: "Whales", value: "whale" },
+  { label: "News",   value: "news",   icon: <Newspaper className="h-3 w-3" /> },
+  { label: "Social", value: "social", icon: <span className="text-[10px]">𝕏</span> },
+  { label: "Whales", value: "whale",  icon: <Waves className="h-3 w-3" /> },
 ];
 
 const SENTIMENT_TABS: { label: string; value: SentimentFilter }[] = [
@@ -183,10 +172,22 @@ const SENTIMENT_TABS: { label: string; value: SentimentFilter }[] = [
   { label: "Neutral", value: "neutral" },
 ];
 
+const CHART_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
+
 export default function NewsPage() {
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [sourceFilter, setSourceFilter]       = useState<SourceFilter>("all");
   const [sentimentFilter, setSentimentFilter] = useState<SentimentFilter>("all");
-  const [search, setSearch] = useState("");
+  const [search, setSearch]                   = useState("");
+  const [selectedItem, setSelectedItem]       = useState<NewsItem | null>(null);
+  const [chartSymbol, setChartSymbol]         = useState("BTCUSDT");
+  const [now, setNow]                         = useState(Date.now());
+
+  // Tick every 30 s to keep timestamps fresh
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  void now; // used to trigger re-render
 
   const { news, loading, liveCount, isLive, refreshNews, counts } = useNews({
     sourceFilter,
@@ -194,131 +195,213 @@ export default function NewsPage() {
     keyword: search.length >= 2 ? search : undefined,
   });
 
-  return (
-    <div className="min-h-screen bg-[#07060a] text-[var(--text-primary)]">
-      {/* Ambient orbs */}
-      <div className="pointer-events-none fixed inset-0 z-0">
-        <div className="hero-orb hero-orb-1" style={{ opacity: 0.3 }} />
-        <div className="hero-orb hero-orb-2" style={{ opacity: 0.2 }} />
-      </div>
+  // When user clicks a card, sync chart to first ticker
+  function handleSelect(item: NewsItem) {
+    setSelectedItem(item);
+    const t = item.ticker?.[0];
+    if (t && CHART_SYMBOLS.includes(`${t}USDT`)) setChartSymbol(`${t}USDT`);
+    else if (t && CHART_SYMBOLS.includes(t)) setChartSymbol(t);
+  }
 
+  return (
+    <div className="flex h-screen flex-col bg-[#09080c] text-[var(--text-primary)]">
       <SiteNav />
 
-      <main className="relative z-10 mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Page header */}
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="mb-1.5 flex items-center gap-2">
-              <div className="text-[10px] uppercase tracking-[0.28em] text-amber-400">
-                TraderBross
-              </div>
-              {isLive && (
-                <span className="flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-emerald-400">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                  Live
-                </span>
-              )}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* ── Left: news feed ──────────────────────────────────────────────── */}
+        <div className="flex w-full flex-col border-r border-[rgba(255,255,255,0.06)] lg:w-[520px] xl:w-[580px]">
+          {/* Feed header */}
+          <div className="flex shrink-0 items-center justify-between border-b border-[rgba(255,255,255,0.06)] px-4 py-3">
+            <div className="flex items-center gap-2">
+              <h1 className="text-[13px] font-bold tracking-[-0.01em] text-[#e8dfc8]">
+                News &amp; Tweets
+              </h1>
+              <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${isLive ? "border border-emerald-500/25 bg-emerald-500/10 text-emerald-400" : "border border-zinc-700/40 bg-zinc-800/40 text-zinc-500"}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${isLive ? "animate-pulse bg-emerald-400" : "bg-zinc-600"}`} />
+                {isLive ? "Live" : "Loading"}
+              </span>
               {liveCount > 0 && (
                 <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[9px] font-bold text-amber-300">
-                  +{liveCount} new
+                  +{liveCount}
                 </span>
               )}
             </div>
-            <h1 className="text-2xl font-semibold tracking-[-0.03em] text-[#f8f3e5] sm:text-3xl">
-              Crypto News Feed
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-2">
             <button
               onClick={refreshNews}
-              className="flex items-center gap-1.5 rounded-full border border-[rgba(212,161,31,0.18)] bg-[rgba(212,161,31,0.06)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-300 transition-all hover:text-zinc-100 disabled:opacity-50"
               disabled={loading}
+              className="flex items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.03)] px-2.5 py-1.5 text-[10px] text-zinc-400 transition hover:text-zinc-200 disabled:opacity-40"
             >
               <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
               Refresh
             </button>
-            <Link
-              href="/terminal"
-              className="flex items-center gap-1.5 rounded-full bg-[rgba(212,161,31,0.9)] px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#0c0a04] shadow-[0_0_16px_rgba(212,161,31,0.3)] transition-all hover:bg-[rgba(212,161,31,1)]"
-            >
-              <LayoutDashboard className="h-3 w-3" />
-              Terminal
-              <ChevronRight className="h-3 w-3" />
-            </Link>
+          </div>
+
+          {/* Filters */}
+          <div className="shrink-0 border-b border-[rgba(255,255,255,0.06)] px-4 py-2.5 space-y-2">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-zinc-600" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search headlines, symbols…"
+                className="w-full rounded-lg border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] py-1.5 pl-7 pr-3 text-[11px] text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-[rgba(212,161,31,0.2)]"
+              />
+            </div>
+
+            {/* Source tabs */}
+            <div className="flex gap-1">
+              {SOURCE_TABS.map(({ label, value, icon }) => (
+                <button
+                  key={value}
+                  onClick={() => setSourceFilter(value)}
+                  className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] transition-all ${
+                    sourceFilter === value
+                      ? "bg-[rgba(212,161,31,0.16)] text-amber-200"
+                      : "text-zinc-600 hover:text-zinc-300"
+                  }`}
+                >
+                  {icon}
+                  {label}
+                  {value !== "all" && (
+                    <span className="opacity-50">
+                      {value === "news" ? counts.news : value === "social" ? counts.social : counts.whale}
+                    </span>
+                  )}
+                </button>
+              ))}
+
+              <div className="ml-auto flex gap-1">
+                {SENTIMENT_TABS.filter(t => t.value !== "all").map(({ label, value }) => (
+                  <button
+                    key={value}
+                    onClick={() => setSentimentFilter(sentimentFilter === value ? "all" : value)}
+                    className={`rounded-md px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-all ${
+                      sentimentFilter === value
+                        ? value === "bullish" ? "bg-emerald-500/15 text-emerald-400" : value === "bearish" ? "bg-rose-500/15 text-rose-400" : "bg-zinc-700/40 text-zinc-300"
+                        : "text-zinc-700 hover:text-zinc-500"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Feed list */}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {loading && news.length === 0 ? (
+              <div className="space-y-0">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="border-b border-[rgba(255,255,255,0.05)] px-4 py-4">
+                    <div className="flex gap-3">
+                      <div className="skeleton-shimmer h-9 w-9 rounded-full" />
+                      <div className="flex-1 space-y-2 pt-1">
+                        <div className="skeleton-shimmer h-3 w-1/3 rounded" />
+                        <div className="skeleton-shimmer h-3 w-full rounded" />
+                        <div className="skeleton-shimmer h-3 w-4/5 rounded" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : news.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-16 text-zinc-600">
+                <Newspaper className="h-7 w-7 opacity-30" />
+                <p className="text-sm">No items match your filters.</p>
+              </div>
+            ) : (
+              news.map((item) => (
+                <NewsCard
+                  key={item.id}
+                  item={item}
+                  onSelect={handleSelect}
+                  selected={selectedItem?.id === item.id}
+                />
+              ))
+            )}
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="mb-5 space-y-3">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search headlines, symbols, sources…"
-              className="w-full rounded-xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.03)] py-2.5 pl-9 pr-4 text-[12px] text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-[rgba(212,161,31,0.25)]"
-            />
-          </div>
+        {/* ── Right: chart + detail ────────────────────────────────────────── */}
+        <div className="hidden min-h-0 flex-1 flex-col lg:flex">
+          {/* Chart header */}
+          <div className="flex shrink-0 items-center justify-between border-b border-[rgba(255,255,255,0.06)] px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] font-bold text-[#e8dfc8]">TradingView</span>
+              <span className="text-[11px] text-zinc-600">{chartSymbol}</span>
+            </div>
 
-          {/* Source + sentiment row */}
-          <div className="flex flex-wrap gap-2">
-            {SOURCE_TABS.map(({ label, value }) => (
-              <FilterPill
-                key={value}
-                active={sourceFilter === value}
-                onClick={() => setSourceFilter(value)}
+            <div className="flex items-center gap-2">
+              {/* Symbol selector */}
+              <div className="relative">
+                <select
+                  value={chartSymbol}
+                  onChange={(e) => setChartSymbol(e.target.value)}
+                  className="appearance-none rounded-lg border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.03)] py-1 pl-2.5 pr-6 text-[10px] text-zinc-300 outline-none"
+                >
+                  {CHART_SYMBOLS.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-zinc-600" />
+              </div>
+
+              <Link
+                href={`/terminal?ticker=${chartSymbol.replace("USDT", "")}`}
+                className="flex items-center gap-1.5 rounded-lg border border-[rgba(212,161,31,0.2)] bg-[rgba(212,161,31,0.07)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-300 transition hover:bg-[rgba(212,161,31,0.14)]"
               >
-                {label}
-                {value !== "all" && (
-                  <span className="ml-1.5 opacity-60">
-                    {value === "news" ? counts.news : value === "social" ? counts.social : counts.whale}
-                  </span>
-                )}
-              </FilterPill>
-            ))}
-
-            <div className="my-0.5 w-px bg-[rgba(255,255,255,0.06)]" />
-
-            {SENTIMENT_TABS.map(({ label, value }) => (
-              <FilterPill
-                key={value}
-                active={sentimentFilter === value}
-                onClick={() => setSentimentFilter(value)}
-              >
-                {label}
-              </FilterPill>
-            ))}
+                <LayoutDashboard className="h-3 w-3" />
+                Trade
+              </Link>
+            </div>
           </div>
+
+          {/* TradingView chart */}
+          <div className="min-h-0 flex-1 p-3">
+            <TradingViewChart symbol={chartSymbol} />
+          </div>
+
+          {/* Selected item detail */}
+          {selectedItem && (
+            <div className="shrink-0 border-t border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.015)] px-4 py-3">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-amber-400/80 uppercase tracking-[0.14em]">{selectedItem.source}</span>
+                  <span className="text-[10px] text-zinc-600">{timeAgo(selectedItem.timestamp)}</span>
+                </div>
+                <button
+                  onClick={() => setSelectedItem(null)}
+                  className="text-[10px] text-zinc-600 hover:text-zinc-400"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="text-[12px] font-semibold leading-[1.5] text-[#e8dfc8]">
+                {selectedItem.headline}
+              </p>
+              {selectedItem.summary && selectedItem.summary !== selectedItem.headline && (
+                <p className="mt-1 line-clamp-3 text-[11px] leading-[1.6] text-zinc-500">
+                  {selectedItem.summary}
+                </p>
+              )}
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {selectedItem.ticker?.map((t) => (
+                  <Link
+                    key={t}
+                    href={`/terminal?ticker=${t}`}
+                    className="rounded border border-[rgba(212,161,31,0.2)] bg-[rgba(212,161,31,0.06)] px-2 py-0.5 text-[9px] font-bold text-amber-400 hover:bg-[rgba(212,161,31,0.14)]"
+                  >
+                    {t}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-
-        {/* Count */}
-        <div className="mb-4 text-[10px] text-zinc-600">
-          {loading ? "Loading…" : `${news.length} items`}
-        </div>
-
-        {/* News list */}
-        {loading && news.length === 0 ? (
-          <div className="space-y-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="skeleton-shimmer h-28 rounded-2xl" />
-            ))}
-          </div>
-        ) : news.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-20 text-zinc-600">
-            <Newspaper className="h-8 w-8 opacity-30" />
-            <p className="text-sm">No items match your filters.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {news.map((item) => (
-              <NewsCard key={item.id} item={item} />
-            ))}
-          </div>
-        )}
-      </main>
+      </div>
     </div>
   );
 }
