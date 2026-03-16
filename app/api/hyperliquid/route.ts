@@ -4,7 +4,12 @@ import { withCache } from "@/lib/server-cache";
 const HL_INFO = "https://api.hyperliquid.xyz/info";
 
 const SUPPORTED = [
-  "BTC","ETH","SOL","BNB","XRP","DOGE","AVAX","LINK","ARB","OP","NEAR","INJ","DOT",
+  // Majors
+  "BTC","ETH","SOL","BNB","XRP","DOGE","AVAX","LINK","ARB","OP",
+  "NEAR","INJ","DOT","APT","SUI","TIA","SEI","ATOM","AAVE","UNI",
+  // Mid-caps
+  "LTC","FIL","WLD","RNDR","PENDLE","JTO","GMX","SNX","CRV","LDO",
+  "RUNE","ETC","BLUR","PYTH","WIF","HYPE","STX","TRB","DYDX","GRT",
 ];
 
 interface HLUniverse { name: string; szDecimals: number; maxLeverage: number }
@@ -32,13 +37,58 @@ interface HLAccountResponse {
   withdrawable: string;
 }
 
+const INTERVAL_MS: Record<string, number> = {
+  "1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000,
+  "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000, "1w": 604_800_000,
+};
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type");
 
   if (type === "market") return getMarket();
   if (type === "account") return getAccount(searchParams.get("address") ?? "");
+  if (type === "ohlcv") return getOhlcv(
+    searchParams.get("ticker") ?? "BTC",
+    searchParams.get("interval") ?? "1h",
+    parseInt(searchParams.get("limit") ?? "240", 10),
+  );
   return NextResponse.json({ error: "invalid type" }, { status: 400 });
+}
+
+async function getOhlcv(ticker: string, interval: string, limit: number) {
+  const safeInterval = INTERVAL_MS[interval] ? interval : "1h";
+  const safeLimit = Math.min(Math.max(limit, 1), 500);
+  const endTime = Date.now();
+  const startTime = endTime - safeLimit * (INTERVAL_MS[safeInterval] ?? 3_600_000);
+
+  try {
+    const res = await fetch(HL_INFO, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "candleSnapshot",
+        req: { coin: ticker, interval: safeInterval, startTime, endTime },
+      }),
+      next: { revalidate: safeInterval === "1d" || safeInterval === "1w" ? 300 : 30 },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) throw new Error(`HL candle ${res.status}`);
+
+    const candles: Array<{ t: number; T: number; o: string; h: string; l: string; c: string; v: string }> = await res.json();
+    const data = candles.map((c) => ({
+      time: Math.floor(c.t / 1000),
+      open: parseFloat(c.o),
+      high: parseFloat(c.h),
+      low: parseFloat(c.l),
+      close: parseFloat(c.c),
+      volume: parseFloat(c.v),
+    }));
+    return NextResponse.json(data);
+  } catch (err) {
+    console.error("HL ohlcv:", err);
+    return NextResponse.json([], { status: 200 });
+  }
 }
 
 async function getMarket() {

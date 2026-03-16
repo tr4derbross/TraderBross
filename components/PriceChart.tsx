@@ -413,7 +413,9 @@ export default function PriceChart({
         ? `/api/okx?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
         : activeVenue === "bybit"
           ? `/api/bybit?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
-          : `/api/prices?ticker=${ticker}&interval=${interval}&limit=${limit}`;
+          : activeVenue === "hyperliquid"
+            ? `/api/hyperliquid?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
+            : `/api/prices?ticker=${ticker}&interval=${interval}&limit=${limit}`;
 
     fetch(endpoint)
       .then((response) => response.json())

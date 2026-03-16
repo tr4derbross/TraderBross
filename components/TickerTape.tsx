@@ -8,7 +8,10 @@ type Props = {
 };
 
 // Preserve order across renders
-const TICKER_ORDER = ["BTC","ETH","SOL","BNB","XRP","DOGE","AVAX","LINK","ARB","OP","NEAR","INJ","DOT","COIN","MSTR"];
+const TICKER_ORDER = [
+  "BTC","ETH","SOL","BNB","XRP","DOGE","AVAX","LINK","ARB","OP",
+  "NEAR","INJ","DOT","APT","SUI","TIA","ATOM","AAVE","WIF","HYPE",
+];
 
 export default function TickerTape({ quotes: wsQuotes }: Props) {
   const [restQuotes, setRestQuotes] = useState<TickerQuote[]>([]);
