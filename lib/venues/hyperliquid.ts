@@ -109,7 +109,7 @@ export const hyperliquidAdapter: VenueAdapter = {
     }));
   },
 
-  placeOrder: async (input, _connection) => {
+  placeOrder: async (input, connection) => {
     return hlOrderPost({
       type:         "order",
       symbol:       input.symbol,
@@ -118,24 +118,26 @@ export const hyperliquidAdapter: VenueAdapter = {
       marginAmount: input.marginAmount,
       leverage:     input.leverage,
       limitPrice:   input.limitPrice,
+      sessionToken: connection?.sessionToken,
     });
   },
 
-  cancelOrder: async (orderId, _connection) => {
+  cancelOrder: async (orderId, connection) => {
     // orderId format: "SYMBOL:oid"
     const [symbol, oidStr] = orderId.split(":");
-    return hlOrderPost({ type: "cancel", symbol, orderId: parseInt(oidStr, 10) });
+    return hlOrderPost({ type: "cancel", symbol, orderId: parseInt(oidStr, 10), sessionToken: connection?.sessionToken });
   },
 
-  setLeverage: async (input, _connection) => {
-    return hlOrderPost({ type: "leverage", symbol: input.symbol, leverage: input.leverage });
+  setLeverage: async (input, connection) => {
+    return hlOrderPost({ type: "leverage", symbol: input.symbol, leverage: input.leverage, sessionToken: connection?.sessionToken });
   },
 
-  setMarginMode: async (input, _connection) => {
+  setMarginMode: async (input, connection) => {
     return hlOrderPost({
-      type:    "marginMode",
-      symbol:  input.symbol,
-      isCross: input.marginMode === "cross",
+      type:         "marginMode",
+      symbol:       input.symbol,
+      isCross:      input.marginMode === "cross",
+      sessionToken: connection?.sessionToken,
     });
   },
 

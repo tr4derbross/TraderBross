@@ -16,9 +16,13 @@ type StorePayload = {
   apiKey?: string;
   apiSecret?: string;
   passphrase?: string;
+  /** Hyperliquid: API wallet private key (stored as apiKey in vault) */
+  privateKey?: string;
+  /** Hyperliquid: wallet address (stored as apiSecret in vault) */
+  walletAddress?: string;
 };
 
-const SUPPORTED_VENUES = ["binance", "okx", "bybit"];
+const SUPPORTED_VENUES = ["binance", "okx", "bybit", "hyperliquid"];
 
 export async function POST(req: NextRequest) {
   let body: StorePayload;
@@ -28,10 +32,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Invalid request body." }, { status: 400 });
   }
 
-  const { venueId, apiKey, apiSecret, passphrase } = body;
+  const { venueId, apiKey, apiSecret, passphrase, privateKey, walletAddress } = body;
 
   if (!venueId || !SUPPORTED_VENUES.includes(venueId)) {
     return NextResponse.json({ ok: false, message: "Unsupported venue." }, { status: 400 });
+  }
+
+  // Hyperliquid uses privateKey + walletAddress instead of apiKey + apiSecret
+  if (venueId === "hyperliquid") {
+    const trimmedKey = privateKey?.trim() ?? "";
+    if (!trimmedKey) {
+      return NextResponse.json(
+        { ok: false, message: "Private key is required for Hyperliquid." },
+        { status: 400 }
+      );
+    }
+
+    const sessionToken = storeCredentials({
+      venueId,
+      apiKey:    trimmedKey,
+      apiSecret: walletAddress?.trim() ?? "",
+    });
+
+    return NextResponse.json({ ok: true, sessionToken });
   }
 
   const trimmedKey    = apiKey?.trim()    ?? "";

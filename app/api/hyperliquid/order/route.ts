@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
+import { retrieveCredentials } from "@/lib/credential-vault";
 import { encode } from "@msgpack/msgpack";
 
 const HL_EXCHANGE = "https://api.hyperliquid.xyz/exchange";
@@ -119,23 +120,43 @@ async function submitToHL(
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
-  const privateKey = process.env.HL_PRIVATE_KEY;
-  if (!privateKey) {
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json() as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  // Resolve the private key: env var takes precedence, then vault session token
+  let resolvedPrivateKey: string | undefined = process.env.HL_PRIVATE_KEY;
+
+  if (!resolvedPrivateKey) {
+    const sessionToken = typeof body.sessionToken === "string" ? body.sessionToken : undefined;
+    if (sessionToken) {
+      const creds = retrieveCredentials(sessionToken);
+      if (creds?.apiKey) {
+        resolvedPrivateKey = creds.apiKey;
+      }
+    }
+  }
+
+  if (!resolvedPrivateKey) {
     return NextResponse.json(
-      { error: "HL_PRIVATE_KEY is not set. Add it to .env.local to enable live trading." },
+      { error: "No Hyperliquid signing key available. Set HL_PRIVATE_KEY or provide a vault session token." },
       { status: 503 },
     );
   }
 
   let wallet: ethers.Wallet;
   try {
-    wallet = new ethers.Wallet(privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`);
+    wallet = new ethers.Wallet(
+      resolvedPrivateKey.startsWith("0x") ? resolvedPrivateKey : `0x${resolvedPrivateKey}`
+    );
   } catch {
-    return NextResponse.json({ error: "Invalid HL_PRIVATE_KEY" }, { status: 500 });
+    return NextResponse.json({ error: "Invalid Hyperliquid private key." }, { status: 500 });
   }
 
   try {
-    const body = await request.json();
     const { type } = body as { type: string };
     const nonce = Date.now();
 
