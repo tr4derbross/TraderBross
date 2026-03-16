@@ -2,18 +2,19 @@ import Link from "next/link";
 import { Suspense } from "react";
 import BrandMark from "@/components/BrandMark";
 import LivePricesBadge from "@/components/LivePricesBadge";
+import SiteNav from "@/components/SiteNav";
 import {
   ArrowUpRight,
   Newspaper,
   Zap,
   LayoutDashboard,
-  Send,
   Shield,
   Brain,
   TrendingUp,
   Activity,
   Globe,
   ChevronRight,
+  Send,
 } from "lucide-react";
 
 /* ─── Data ─────────────────────────────────────────────────────────────────── */
@@ -105,38 +106,7 @@ export default function HomePage() {
       </div>
 
       {/* ── Top nav ─────────────────────────────────────────────────────────── */}
-      <header className="relative z-20 flex items-center justify-between border-b border-[rgba(212,161,31,0.1)] bg-[rgba(7,6,10,0.72)] px-5 py-3 backdrop-blur-xl sm:px-8 lg:px-12">
-        <div className="flex items-center gap-3">
-          <BrandMark className="h-auto w-[130px] sm:w-[148px]" />
-        </div>
-
-        <nav className="flex items-center gap-2">
-          <a
-            href="https://t.me/traderbross"
-            target="_blank"
-            rel="noreferrer"
-            className="hidden items-center gap-1.5 rounded-full border border-[rgba(212,161,31,0.14)] bg-[rgba(212,161,31,0.06)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-300 transition-colors hover:border-[rgba(212,161,31,0.28)] hover:text-zinc-100 sm:inline-flex"
-          >
-            <Send className="h-3 w-3" />
-            Telegram
-          </a>
-          <a
-            href="https://x.com/traderbross"
-            target="_blank"
-            rel="noreferrer"
-            className="hidden items-center gap-1.5 rounded-full border border-[rgba(212,161,31,0.14)] bg-[rgba(212,161,31,0.06)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-300 transition-colors hover:border-[rgba(212,161,31,0.28)] hover:text-zinc-100 sm:inline-flex"
-          >
-            𝕏
-          </a>
-          <Link
-            href="/terminal"
-            className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(212,161,31,0.92)] px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[#0c0a04] shadow-[0_0_18px_rgba(212,161,31,0.35)] transition-all hover:bg-[rgba(212,161,31,1)] hover:shadow-[0_0_28px_rgba(212,161,31,0.55)]"
-          >
-            Enter Terminal
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </Link>
-        </nav>
-      </header>
+      <SiteNav />
 
       {/* ── Hero ────────────────────────────────────────────────────────────── */}
       <section className="hero-section relative z-10 flex min-h-[calc(100vh-56px)] flex-col items-center justify-center px-4 pb-16 pt-10 text-center sm:px-6">
