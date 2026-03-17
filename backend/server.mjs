@@ -415,6 +415,8 @@ const server = http.createServer(async (request, reply) => {
                 entryPx: parseFloat(p.entryPrice),
                 pnl: parseFloat(p.unRealizedProfit),
                 liquidationPx: parseFloat(p.liquidationPrice) || null,
+                leverage: parseInt(p.leverage) || 1,
+                marginMode: p.marginType === "cross" ? "cross" : "isolated",
               };
             });
           json(reply, 200, { positions });
