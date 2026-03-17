@@ -754,21 +754,30 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         const pos = displayPositions.find((p) => p.id === positionId);
         if (pos) {
           const connection = buildActiveVenueConnection();
-          await fetch(
-            buildApiUrl("/api/binance/order"),
-            {
+          try {
+            const res = await fetch(buildApiUrl("/api/binance/order"), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 type: "closePosition",
                 symbol: pos.ticker,
                 side: pos.side,
-                size: pos.amount.toFixed(3),
                 sessionToken: connection?.sessionToken,
               }),
+            });
+            const data = await res.json() as { ok?: boolean; error?: string };
+            if (!data.ok) {
+              // Show error in browser console + alert so user knows what happened
+              console.error("[ClosePosition] Binance error:", data.error);
+              window.alert(`Close position failed: ${data.error ?? "Unknown error"}`);
+              return;
             }
-          );
-          // Refresh positions after close
+          } catch (err) {
+            console.error("[ClosePosition] Network error:", err);
+            window.alert(`Close position network error: ${(err as Error).message}`);
+            return;
+          }
+          // Refresh positions after successful close
           setTimeout(() => setVenueRefreshTick((t) => t + 1), 1500);
           return;
         }
