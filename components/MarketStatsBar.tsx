@@ -24,6 +24,8 @@ export default function MarketStatsBar() {
     mempool: null,
     halving: null,
   };
+  const ethGas = useRealtimeSelector((state) => state.ethGas);
+  const defiTvl = useRealtimeSelector((state) => state.defiTvl);
 
   const failed = connectionStatus === "disconnected";
   const capChange = market.marketCapChange24h;
@@ -82,6 +84,16 @@ export default function MarketStatsBar() {
           ? `${mempool.halving.remainingBlocks.toLocaleString()} blk`
           : nullVal(null),
       warn: failed && mempool.halving == null,
+    },
+    {
+      label: "ETH GAS",
+      value: ethGas != null ? `${ethGas.safe} · ${ethGas.average} · ${ethGas.fast}` : nullVal(null),
+      warn: failed && ethGas == null,
+    },
+    {
+      label: "DEFI TVL",
+      value: defiTvl?.tvl != null ? fmtMarketCap(defiTvl.tvl) : nullVal(null),
+      warn: failed && defiTvl == null,
     },
   ];
 

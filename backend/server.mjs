@@ -17,7 +17,7 @@ import {
   getOkxQuotes,
 } from "./services/market-service.mjs";
 import { getNews, getNewsFeed, getSocial, getWhales } from "./services/news-service.mjs";
-import { getFearGreed, getMarketStats, getMempoolStats } from "./services/stats-service.mjs";
+import { getFearGreed, getMarketStats, getMempoolStats, getEthGas, getDefiLlamaTvl } from "./services/stats-service.mjs";
 import { getVenueQuotes } from "./services/venue-service.mjs";
 import { clearSecret, getSecret, storeSecret } from "./services/vault-service.mjs";
 
@@ -31,6 +31,9 @@ function createState() {
     marketStats: null,
     mempoolStats: null,
     fearGreed: null,
+    ethGas: null,
+    defiTvl: null,
+    liquidations: [],
     news: [],
     whales: [],
     social: [],
@@ -89,12 +92,14 @@ function broadcast(type, payload) {
 }
 
 async function refreshCoreState() {
-  const [quotes, venueQuotes, marketStats, mempoolStats, fearGreed, newsFeed] = await Promise.all([
+  const [quotes, venueQuotes, marketStats, mempoolStats, fearGreed, ethGas, defiTvl, newsFeed] = await Promise.all([
     getBinanceQuotes(),
     getVenueQuotes(),
     getMarketStats(),
     getMempoolStats(),
     getFearGreed(),
+    getEthGas(config.etherscanApiKey),
+    getDefiLlamaTvl(),
     getNewsFeed(config),
   ]);
 
@@ -103,6 +108,8 @@ async function refreshCoreState() {
   state.marketStats = marketStats;
   state.mempoolStats = mempoolStats;
   state.fearGreed = fearGreed;
+  state.ethGas = ethGas;
+  state.defiTvl = defiTvl;
   state.news = newsFeed.news;
   state.whales = newsFeed.whales;
   state.social = newsFeed.social;
@@ -127,12 +134,23 @@ async function refreshNewsOnly() {
 }
 
 async function refreshStatsOnly() {
-  state.marketStats = await getMarketStats();
-  state.mempoolStats = await getMempoolStats();
-  state.fearGreed = await getFearGreed();
+  const [marketStats, mempoolStats, fearGreed, ethGas, defiTvl] = await Promise.all([
+    getMarketStats(),
+    getMempoolStats(),
+    getFearGreed(),
+    getEthGas(config.etherscanApiKey),
+    getDefiLlamaTvl(),
+  ]);
+  state.marketStats = marketStats;
+  state.mempoolStats = mempoolStats;
+  state.fearGreed = fearGreed;
+  state.ethGas = ethGas;
+  state.defiTvl = defiTvl;
   broadcast("marketStats", state.marketStats);
   broadcast("mempoolStats", state.mempoolStats);
   broadcast("fearGreed", state.fearGreed);
+  broadcast("ethGas", state.ethGas);
+  broadcast("defiTvl", state.defiTvl);
 }
 
 async function refreshVenueQuotesOnly() {
@@ -147,6 +165,9 @@ function buildSnapshot() {
     marketStats: state.marketStats,
     mempoolStats: state.mempoolStats,
     fearGreed: state.fearGreed,
+    ethGas: state.ethGas,
+    defiTvl: state.defiTvl,
+    liquidations: state.liquidations,
     news: state.news,
     whales: state.whales,
     social: state.social,
@@ -636,6 +657,84 @@ const stopBinanceStream = createBinanceQuoteStream({
   },
 });
 
+// Binance Futures Liquidations stream (free, no key required)
+let liquidationSocket = null;
+let liquidationReconnectTimer = null;
+
+function connectLiquidationStream() {
+  if (liquidationSocket) return;
+  try {
+    liquidationSocket = new WebSocket("wss://fstream.binance.com/ws/!forceOrder@arr");
+
+    liquidationSocket.on("open", () => {
+      logger.info("liquidations.stream.connected");
+    });
+
+    liquidationSocket.on("message", (raw) => {
+      try {
+        const msg = JSON.parse(raw.toString());
+        const order = msg?.o;
+        if (!order) return;
+        const symbol = (order.s || "").replace("USDT", "");
+        const side = order.S === "SELL" ? "long" : "short"; // SELL = long position liquidated
+        const qty = parseFloat(order.q || "0");
+        const price = parseFloat(order.ap || order.p || "0");
+        const usdValue = qty * price;
+        if (usdValue < 10000) return; // skip tiny liquidations < $10k
+        const event = {
+          id: `liq-${order.T}-${order.s}`,
+          symbol,
+          side,
+          qty,
+          price,
+          usdValue,
+          timestamp: new Date(Number(order.T || Date.now())).toISOString(),
+        };
+        state.liquidations = [event, ...state.liquidations].slice(0, 100);
+        broadcast("liquidation", event);
+
+        // Also surface large liquidations (>$50k) in the whale feed for immediate UI visibility
+        if (usdValue >= 50000) {
+          const fmtUsd = usdValue >= 1e6
+            ? `$${(usdValue / 1e6).toFixed(2)}M`
+            : `$${(usdValue / 1e3).toFixed(0)}K`;
+          const whaleItem = {
+            id: event.id,
+            type: "whale",
+            title: `${symbol} ${side.toUpperCase()} liquidated`,
+            body: `${fmtUsd} ${symbol} ${side} position force-closed at $${price.toLocaleString()}`,
+            source: "Binance Liquidations",
+            publishedAt: event.timestamp,
+            sentiment: side === "long" ? "bearish" : "bullish",
+            tickers: [symbol],
+            whaleAmountUsd: usdValue,
+            whaleToken: symbol,
+          };
+          state.whales = [whaleItem, ...state.whales].slice(0, 50);
+          broadcast("whales", state.whales);
+        }
+      } catch {
+        // ignore malformed packets
+      }
+    });
+
+    liquidationSocket.on("close", () => {
+      logger.warn("liquidations.stream.disconnected");
+      liquidationSocket = null;
+      liquidationReconnectTimer = setTimeout(connectLiquidationStream, 5000);
+    });
+
+    liquidationSocket.on("error", () => {
+      liquidationSocket?.terminate();
+      liquidationSocket = null;
+    });
+  } catch {
+    liquidationReconnectTimer = setTimeout(connectLiquidationStream, 10000);
+  }
+}
+
+connectLiquidationStream();
+
 const intervals = [
   setInterval(() => {
     void refreshNewsOnly();
@@ -661,6 +760,8 @@ server.listen(config.apiPort, config.apiHost, () => {
 
 process.on("SIGINT", () => {
   stopBinanceStream();
+  if (liquidationSocket) liquidationSocket.terminate();
+  if (liquidationReconnectTimer) clearTimeout(liquidationReconnectTimer);
   intervals.forEach(clearInterval);
   server.close(() => process.exit(0));
 });
