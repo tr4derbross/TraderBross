@@ -65,16 +65,16 @@ function getReferralUrl(symbol: string): string {
 
 function RsiBadge({ rsi }: { rsi: number | null | undefined }) {
   if (rsi == null)
-    return <span className="text-[10px] text-[#3a4050]">—</span>;
+    return <span className="text-[10px] text-[#3A3A3A]">—</span>;
 
   const isOversold   = rsi < 30;
   const isOverbought = rsi > 70;
 
   const cls = isOversold
-    ? "bg-[#22c55e]/15 text-[#22c55e] border-[#22c55e]/25"
+    ? "bg-[#4CAF50]/15 text-[#4CAF50] border-[#4CAF50]/25"
     : isOverbought
-    ? "bg-[#ef4444]/15 text-[#ef4444] border-[#ef4444]/25"
-    : "bg-[rgba(59,130,246,0.06)] text-[#8b95a5] border-[rgba(59,130,246,0.12)]";
+    ? "bg-[#FF4D4D]/15 text-[#FF4D4D] border-[#FF4D4D]/25"
+    : "bg-[rgba(242,183,5,0.06)] text-[#A0A0A0] border-[rgba(242,183,5,0.12)]";
 
   const label = isOversold ? "OS" : isOverbought ? "OB" : "";
 
@@ -93,11 +93,11 @@ function RsiBadge({ rsi }: { rsi: number | null | undefined }) {
 
 function LSBadge({ ratio }: { ratio: number | null | undefined }) {
   if (ratio == null)
-    return <span className="text-[10px] text-[#3a4050]">—</span>;
+    return <span className="text-[10px] text-[#3A3A3A]">—</span>;
   const bullish = ratio >= 1;
   return (
     <span
-      className={`text-[10px] font-bold tabular-nums ${bullish ? "text-[#22c55e]" : "text-[#ef4444]"}`}
+      className={`text-[10px] font-bold tabular-nums ${bullish ? "text-[#4CAF50]" : "text-[#FF4D4D]"}`}
       title={`Global Long/Short Account Ratio (1h): ${ratio} — ${bullish ? "More longs than shorts" : "More shorts than longs"}`}
     >
       {ratio.toFixed(2)}
@@ -110,9 +110,9 @@ function LSBadge({ ratio }: { ratio: number | null | undefined }) {
 function MiniRange({ low, high, price }: { low: number; high: number; price: number }) {
   const pct = high > low ? ((price - low) / (high - low)) * 100 : 50;
   return (
-    <div className="relative h-1 w-16 rounded-full bg-[rgba(59,130,246,0.08)]">
+    <div className="relative h-1 w-16 rounded-full bg-[rgba(242,183,5,0.08)]">
       <div
-        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#ef4444]/60 to-[#22c55e]/60"
+        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#FF4D4D]/60 to-[#4CAF50]/60"
         style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
       />
       <div
@@ -137,10 +137,10 @@ function StatCard({
   variant?: "default" | "bull" | "bear" | "accent";
 }) {
   const colors: Record<string, string> = {
-    default: "border-[rgba(59,130,246,0.12)] bg-[rgba(59,130,246,0.04)] text-[#3b82f6]",
-    bull:    "border-[#22c55e]/15 bg-[#22c55e]/5 text-[#22c55e]",
-    bear:    "border-[#ef4444]/15 bg-[#ef4444]/5 text-[#ef4444]",
-    accent:  "border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)] text-[#3b82f6]",
+    default: "border-[rgba(242,183,5,0.12)] bg-[rgba(242,183,5,0.04)] text-[#F2B705]",
+    bull:    "border-[#4CAF50]/15 bg-[#4CAF50]/5 text-[#4CAF50]",
+    bear:    "border-[#FF4D4D]/15 bg-[#FF4D4D]/5 text-[#FF4D4D]",
+    accent:  "border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.08)] text-[#F2B705]",
   };
   return (
     <div className={`rounded-xl border px-3 py-2.5 ${colors[variant]}`}>
@@ -156,21 +156,21 @@ function StatCard({
 function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
   const positive = coin.change24h >= 0;
   return (
-    <tr className="group border-b border-[rgba(59,130,246,0.05)] transition-colors hover:bg-[rgba(59,130,246,0.03)]">
-      <td className="py-2.5 pl-4 pr-2 text-[11px] text-[#3a4050] tabular-nums">{rank}</td>
+    <tr className="group border-b border-[rgba(242,183,5,0.05)] transition-colors hover:bg-[rgba(242,183,5,0.03)]">
+      <td className="py-2.5 pl-4 pr-2 text-[11px] text-[#3A3A3A] tabular-nums">{rank}</td>
       <td className="py-2.5 pr-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)] text-[10px] font-bold text-[#3b82f6]">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[rgba(242,183,5,0.1)] text-[10px] font-bold text-[#F2B705]">
             {coin.symbol.slice(0, 2)}
           </div>
           <div>
-            <div className="text-[12px] font-semibold text-[#e2e4ea]">{coin.symbol}</div>
-            <div className="text-[10px] text-[#3a4050]">/USDT</div>
+            <div className="text-[12px] font-semibold text-[#FFFFFF]">{coin.symbol}</div>
+            <div className="text-[10px] text-[#3A3A3A]">/USDT</div>
           </div>
         </div>
       </td>
       <td className="py-2.5 pr-4 text-right tabular-nums">
-        <span className="text-[12px] font-medium text-[#e2e4ea]">
+        <span className="text-[12px] font-medium text-[#FFFFFF]">
           {fmtPrice(coin.price)}
         </span>
       </td>
@@ -178,8 +178,8 @@ function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
         <span
           className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-bold ${
             positive
-              ? "bg-[#22c55e]/10 text-[#22c55e]"
-              : "bg-[#ef4444]/10 text-[#ef4444]"
+              ? "bg-[#4CAF50]/10 text-[#4CAF50]"
+              : "bg-[#FF4D4D]/10 text-[#FF4D4D]"
           }`}
         >
           {positive ? (
@@ -197,24 +197,24 @@ function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
       <td className="hidden py-2.5 pr-4 text-right tabular-nums xl:table-cell">
         {coin.openInterestUsd != null ? (
           <span
-            className="text-[11px] text-[#8b95a5]"
+            className="text-[11px] text-[#A0A0A0]"
             title={`Open Interest: $${coin.openInterestUsd.toLocaleString()}`}
           >
             ${fmtOI(coin.openInterestUsd)}
           </span>
         ) : (
-          <span className="text-[10px] text-[#3a4050]">—</span>
+          <span className="text-[10px] text-[#3A3A3A]">—</span>
         )}
       </td>
       <td className="hidden py-2.5 pr-4 text-right xl:table-cell">
         <LSBadge ratio={coin.longShortRatio} />
       </td>
       <td className="hidden py-2.5 pr-4 text-right tabular-nums sm:table-cell">
-        <span className="text-[11px] text-[#8b95a5]">${fmtVol(coin.volume24h)}</span>
+        <span className="text-[11px] text-[#A0A0A0]">${fmtVol(coin.volume24h)}</span>
       </td>
       <td className="hidden py-2.5 pr-4 md:table-cell">
         <MiniRange low={coin.low24h} high={coin.high24h} price={coin.price} />
-        <div className="mt-0.5 flex justify-between text-[9px] text-[#3a4050]">
+        <div className="mt-0.5 flex justify-between text-[9px] text-[#3A3A3A]">
           <span>{fmtPrice(coin.low24h)}</span>
           <span>{fmtPrice(coin.high24h)}</span>
         </div>
@@ -223,7 +223,7 @@ function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
         <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
           <Link
             href={`/terminal?ticker=${coin.symbol}`}
-            className="flex items-center gap-1 rounded-md border border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#3b82f6] transition hover:bg-[rgba(59,130,246,0.16)]"
+            className="flex items-center gap-1 rounded-md border border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.08)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#F2B705] transition hover:bg-[rgba(242,183,5,0.16)]"
           >
             <LayoutDashboard className="h-2.5 w-2.5" />
             Terminal
@@ -232,7 +232,7 @@ function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
             href={getReferralUrl(coin.symbol)}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1 rounded-md border border-[rgba(59,130,246,0.08)] bg-[rgba(59,130,246,0.03)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#555d6e] transition hover:text-[#8b95a5]"
+            className="flex items-center gap-1 rounded-md border border-[rgba(242,183,5,0.08)] bg-[rgba(242,183,5,0.03)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#6B6B6B] transition hover:text-[#A0A0A0]"
           >
             <ExternalLink className="h-2.5 w-2.5" />
             Trade
@@ -248,24 +248,24 @@ function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
 function CoinCard({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
   const positive = coin.change24h >= 0;
   return (
-    <div className="rounded-xl border border-[rgba(59,130,246,0.1)] bg-[#12141a] p-4">
+    <div className="rounded-xl border border-[rgba(242,183,5,0.1)] bg-[#121212] p-4">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)] text-[11px] font-bold text-[#3b82f6]">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgba(242,183,5,0.1)] text-[11px] font-bold text-[#F2B705]">
             {coin.symbol.slice(0, 2)}
           </div>
           <div>
-            <div className="text-[13px] font-bold text-[#e2e4ea]">{coin.symbol}</div>
-            <div className="text-[10px] text-[#3a4050]">#{rank}</div>
+            <div className="text-[13px] font-bold text-[#FFFFFF]">{coin.symbol}</div>
+            <div className="text-[10px] text-[#3A3A3A]">#{rank}</div>
           </div>
         </div>
         <div className="text-right">
-          <div className="text-[13px] font-mono font-bold text-[#e2e4ea]">
+          <div className="text-[13px] font-mono font-bold text-[#FFFFFF]">
             {fmtPrice(coin.price)}
           </div>
           <div
             className={`inline-flex items-center gap-0.5 text-[11px] font-bold ${
-              positive ? "text-[#22c55e]" : "text-[#ef4444]"
+              positive ? "text-[#4CAF50]" : "text-[#FF4D4D]"
             }`}
           >
             {positive ? (
@@ -281,19 +281,19 @@ function CoinCard({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
 
       <div className="mb-3 grid grid-cols-3 gap-2 text-center">
         <div>
-          <div className="text-[9px] uppercase tracking-[0.12em] text-[#555d6e]">RSI-14</div>
+          <div className="text-[9px] uppercase tracking-[0.12em] text-[#6B6B6B]">RSI-14</div>
           <div className="mt-0.5">
             <RsiBadge rsi={coin.rsi14} />
           </div>
         </div>
         <div>
-          <div className="text-[9px] uppercase tracking-[0.12em] text-[#555d6e]">Volume</div>
-          <div className="mt-0.5 text-[11px] font-mono text-[#8b95a5]">
+          <div className="text-[9px] uppercase tracking-[0.12em] text-[#6B6B6B]">Volume</div>
+          <div className="mt-0.5 text-[11px] font-mono text-[#A0A0A0]">
             ${fmtVol(coin.volume24h)}
           </div>
         </div>
         <div>
-          <div className="text-[9px] uppercase tracking-[0.12em] text-[#555d6e]">L/S</div>
+          <div className="text-[9px] uppercase tracking-[0.12em] text-[#6B6B6B]">L/S</div>
           <div className="mt-0.5">
             <LSBadge ratio={coin.longShortRatio} />
           </div>
@@ -303,7 +303,7 @@ function CoinCard({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
       <div className="flex items-center gap-2">
         <Link
           href={`/terminal?ticker=${coin.symbol}`}
-          className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)] py-1.5 text-[10px] font-bold text-[#3b82f6] transition hover:bg-[rgba(59,130,246,0.16)]"
+          className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.08)] py-1.5 text-[10px] font-bold text-[#F2B705] transition hover:bg-[rgba(242,183,5,0.16)]"
         >
           <LayoutDashboard className="h-3 w-3" />
           Terminal
@@ -312,7 +312,7 @@ function CoinCard({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
           href={getReferralUrl(coin.symbol)}
           target="_blank"
           rel="noreferrer"
-          className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-[rgba(59,130,246,0.08)] bg-[rgba(59,130,246,0.03)] py-1.5 text-[10px] font-bold text-[#555d6e] transition hover:text-[#8b95a5]"
+          className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-[rgba(242,183,5,0.08)] bg-[rgba(242,183,5,0.03)] py-1.5 text-[10px] font-bold text-[#6B6B6B] transition hover:text-[#A0A0A0]"
         >
           <ExternalLink className="h-3 w-3" />
           Trade
@@ -376,222 +376,234 @@ export default function ScreenerPage() {
 
   return (
     <PageWrapper>
-      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* Page header */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="mb-1 flex flex-wrap items-center gap-2">
-              <BarChart2 className="h-4 w-4 text-[#3b82f6]" />
-              <h1 className="text-[15px] font-bold tracking-[-0.01em] text-[#e2e4ea]">
-                Market Screener
-              </h1>
-              <span
-                className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${
-                  !loading
-                    ? "border-[#22c55e]/25 bg-[#22c55e]/10 text-[#22c55e]"
-                    : "border-[rgba(59,130,246,0.15)] bg-[rgba(59,130,246,0.06)] text-[#555d6e]"
-                }`}
-              >
+      <div className="relative mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {/* Background watermark */}
+        <div className="pointer-events-none fixed inset-0 flex items-center justify-center z-0 overflow-hidden">
+          <img
+            src="/Brand/logo.png"
+            alt=""
+            aria-hidden="true"
+            style={{ opacity: 0.04, width: "50%", maxWidth: 600, objectFit: "contain" }}
+          />
+        </div>
+
+        <div className="relative z-10">
+          {/* Page header */}
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <BarChart2 className="h-4 w-4 text-[#F2B705]" />
+                <h1 className="text-[15px] font-bold tracking-[-0.01em] text-[#FFFFFF]">
+                  Market Screener
+                </h1>
                 <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    !loading && coins.length > 0
-                      ? "animate-pulse bg-[#22c55e]"
-                      : "bg-[#555d6e]"
+                  className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${
+                    !loading
+                      ? "border-[#4CAF50]/25 bg-[#4CAF50]/10 text-[#4CAF50]"
+                      : "border-[rgba(242,183,5,0.15)] bg-[rgba(242,183,5,0.06)] text-[#6B6B6B]"
                   }`}
-                />
-                {loading ? "Loading" : `${coins.length} pairs`}
-              </span>
-              {!loading && oversoldCount > 0 && (
-                <span className="flex items-center gap-1 rounded-full border border-[#22c55e]/20 bg-[#22c55e]/8 px-2 py-0.5 text-[9px] font-bold text-[#22c55e]">
-                  <Activity className="h-2.5 w-2.5" />
-                  {oversoldCount} oversold
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      !loading && coins.length > 0
+                        ? "animate-pulse bg-[#4CAF50]"
+                        : "bg-[#6B6B6B]"
+                    }`}
+                  />
+                  {loading ? "Loading" : `${coins.length} pairs`}
                 </span>
-              )}
-              {!loading && overboughtCount > 0 && (
-                <span className="flex items-center gap-1 rounded-full border border-[#ef4444]/20 bg-[#ef4444]/8 px-2 py-0.5 text-[9px] font-bold text-[#ef4444]">
-                  <Activity className="h-2.5 w-2.5" />
-                  {overboughtCount} overbought
-                </span>
+                {!loading && oversoldCount > 0 && (
+                  <span className="flex items-center gap-1 rounded-full border border-[#4CAF50]/20 bg-[#4CAF50]/8 px-2 py-0.5 text-[9px] font-bold text-[#4CAF50]">
+                    <Activity className="h-2.5 w-2.5" />
+                    {oversoldCount} oversold
+                  </span>
+                )}
+                {!loading && overboughtCount > 0 && (
+                  <span className="flex items-center gap-1 rounded-full border border-[#FF4D4D]/20 bg-[#FF4D4D]/8 px-2 py-0.5 text-[9px] font-bold text-[#FF4D4D]">
+                    <Activity className="h-2.5 w-2.5" />
+                    {overboughtCount} overbought
+                  </span>
+                )}
+              </div>
+              {lastUpdate && (
+                <p className="text-[11px] text-[#6B6B6B]">
+                  Updated {lastUpdate.toLocaleTimeString()} · RSI-14 &amp; OI enriched for top 20 futures pairs
+                </p>
               )}
             </div>
-            {lastUpdate && (
-              <p className="text-[11px] text-[#555d6e]">
-                Updated {lastUpdate.toLocaleTimeString()} · RSI-14 &amp; OI enriched for top 20 futures pairs
-              </p>
-            )}
-          </div>
-          <button
-            onClick={load}
-            disabled={loading}
-            className="flex items-center gap-1.5 self-start rounded-full border border-[rgba(59,130,246,0.12)] bg-[rgba(59,130,246,0.04)] px-3 py-1.5 text-[10px] text-[#8b95a5] transition hover:text-[#e2e4ea] disabled:opacity-40"
-          >
-            <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
-        </div>
-
-        {/* Stat cards */}
-        <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-          {loading ? (
-            Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 rounded-xl" />
-            ))
-          ) : (
-            <>
-              <StatCard label="24h Volume" value={fmt(totalVol)} variant="default" />
-              <StatCard
-                label="Gainers"
-                value={gainersCount.toString()}
-                sub={topGainer ? `Top: ${topGainer.symbol} +${topGainer.change24h.toFixed(1)}%` : undefined}
-                variant="bull"
-              />
-              <StatCard
-                label="Losers"
-                value={losersCount.toString()}
-                sub={topLoser ? `Top: ${topLoser.symbol} ${topLoser.change24h.toFixed(1)}%` : undefined}
-                variant="bear"
-              />
-              <StatCard label="Pairs" value={coins.length.toString()} sub=">$500K vol" variant="accent" />
-              <StatCard label="Oversold" value={oversoldCount.toString()} sub="RSI-14 < 30" variant="bull" />
-              <StatCard label="Overbought" value={overboughtCount.toString()} sub="RSI-14 > 70" variant="bear" />
-            </>
-          )}
-        </div>
-
-        {/* Controls */}
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          {/* Sort tabs */}
-          <div className="flex items-center gap-1 rounded-xl border border-[rgba(59,130,246,0.1)] bg-[rgba(59,130,246,0.03)] p-1">
-            {SORT_TABS.map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                onClick={() => setSort(key as typeof sort)}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] transition-all ${
-                  sort === key
-                    ? "bg-[rgba(59,130,246,0.16)] text-[#3b82f6] shadow-sm"
-                    : "text-[#555d6e] hover:text-[#8b95a5]"
-                }`}
-              >
-                <Icon className="h-3 w-3" />
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#555d6e]" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filter symbol…"
-              className="w-full rounded-xl border border-[rgba(59,130,246,0.1)] bg-[rgba(59,130,246,0.04)] py-1.5 pl-8 pr-3 text-[11px] text-[#8b95a5] outline-none placeholder:text-[#555d6e] focus:border-[rgba(59,130,246,0.3)] sm:w-[180px] transition"
-            />
-          </div>
-        </div>
-
-        {/* Error state */}
-        {error && !loading && (
-          <div className="mb-4 flex flex-col items-center gap-3 rounded-2xl border border-[#ef4444]/20 bg-[#ef4444]/5 py-10">
-            <AlertCircle className="h-6 w-6 text-[#ef4444]" />
-            <p className="text-sm text-[#ef4444]">{error}</p>
             <button
               onClick={load}
-              className="flex items-center gap-1.5 rounded-full border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-1.5 text-[11px] font-bold text-[#ef4444] transition hover:bg-[#ef4444]/20"
+              disabled={loading}
+              className="flex items-center gap-1.5 self-start rounded-full border border-[rgba(242,183,5,0.12)] bg-[rgba(242,183,5,0.04)] px-3 py-1.5 text-[10px] text-[#A0A0A0] transition hover:text-[#FFFFFF] disabled:opacity-40"
             >
-              <RefreshCw className="h-3 w-3" />
-              Retry
+              <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+              Refresh
             </button>
           </div>
-        )}
 
-        {/* Desktop table */}
-        <div className="hidden overflow-hidden rounded-2xl border border-[rgba(59,130,246,0.1)] bg-[rgba(59,130,246,0.02)] sm:block">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-[rgba(59,130,246,0.08)] bg-[rgba(59,130,246,0.04)]">
-                  <th className="py-2.5 pl-4 pr-2 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e]">#</th>
-                  <th className="py-2.5 pr-3 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e]">Coin</th>
-                  <th className="py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e]">Price</th>
-                  <th className="py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e]">24h %</th>
-                  <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e] lg:table-cell" title="RSI-14 on 4h candles">RSI-14</th>
-                  <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e] xl:table-cell" title="Open Interest in USD">OI (USD)</th>
-                  <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e] xl:table-cell" title="Long/Short Account Ratio">L/S</th>
-                  <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e] sm:table-cell">Volume</th>
-                  <th className="hidden py-2.5 pr-4 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e] md:table-cell">24h Range</th>
-                  <th className="py-2.5 pr-3 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e]">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && coins.length === 0 ? (
-                  Array.from({ length: 10 }).map((_, i) => (
-                    <tr key={i} className="border-b border-[rgba(59,130,246,0.04)]">
-                      {[40, 80, 60, 50, 45, 55, 45, 70, 100, 60].map((w, j) => (
-                        <td key={j} className="py-3 pl-4">
-                          <Skeleton className="h-3 rounded" style={{ width: w }} />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="py-16 text-center">
-                      <div className="flex flex-col items-center gap-2 text-[#555d6e]">
-                        <Search className="h-6 w-6 opacity-30" />
-                        <p className="text-sm">No coins found</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((coin, i) => (
-                    <CoinRow key={coin.symbol} coin={coin} rank={i + 1} />
-                  ))
-                )}
-              </tbody>
-            </table>
+          {/* Stat cards */}
+          <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+            {loading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 rounded-xl" />
+              ))
+            ) : (
+              <>
+                <StatCard label="24h Volume" value={fmt(totalVol)} variant="default" />
+                <StatCard
+                  label="Gainers"
+                  value={gainersCount.toString()}
+                  sub={topGainer ? `Top: ${topGainer.symbol} +${topGainer.change24h.toFixed(1)}%` : undefined}
+                  variant="bull"
+                />
+                <StatCard
+                  label="Losers"
+                  value={losersCount.toString()}
+                  sub={topLoser ? `Top: ${topLoser.symbol} ${topLoser.change24h.toFixed(1)}%` : undefined}
+                  variant="bear"
+                />
+                <StatCard label="Pairs" value={coins.length.toString()} sub=">$500K vol" variant="accent" />
+                <StatCard label="Oversold" value={oversoldCount.toString()} sub="RSI-14 < 30" variant="bull" />
+                <StatCard label="Overbought" value={overboughtCount.toString()} sub="RSI-14 > 70" variant="bear" />
+              </>
+            )}
           </div>
 
-          {!loading && filtered.length > 0 && (
-            <div className="flex items-center justify-between border-t border-[rgba(59,130,246,0.06)] px-4 py-2">
-              <span className="text-[10px] text-[#3a4050]">
-                Showing {filtered.length} of {coins.length} pairs · Binance Spot + Futures
-              </span>
-              <div className="flex items-center gap-3 text-[10px] text-[#3a4050]">
-                <span className="flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]/50" />
-                  RSI &lt;30 = Oversold
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#ef4444]/50" />
-                  RSI &gt;70 = Overbought
-                </span>
-                <span className="flex items-center gap-1">
-                  <Zap className="h-2.5 w-2.5" />
-                  Auto-refresh 45s
-                </span>
-              </div>
+          {/* Controls */}
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            {/* Sort tabs */}
+            <div className="flex items-center gap-1 rounded-xl border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.03)] p-1">
+              {SORT_TABS.map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => setSort(key as typeof sort)}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] transition-all ${
+                    sort === key
+                      ? "bg-[rgba(242,183,5,0.16)] text-[#F2B705] shadow-sm"
+                      : "text-[#6B6B6B] hover:text-[#A0A0A0]"
+                  }`}
+                >
+                  <Icon className="h-3 w-3" />
+                  {label}
+                </button>
+              ))}
             </div>
-          )}
-        </div>
 
-        {/* Mobile card grid */}
-        <div className="grid gap-3 sm:hidden">
-          {loading && coins.length === 0 ? (
-            Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-36 rounded-xl" />
-            ))
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-[#555d6e]">
-              <Search className="h-6 w-6 opacity-30" />
-              <p className="text-sm">No coins found</p>
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#6B6B6B]" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Filter symbol…"
+                className="w-full rounded-xl border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.04)] py-1.5 pl-8 pr-3 text-[11px] text-[#A0A0A0] outline-none placeholder:text-[#6B6B6B] focus:border-[rgba(242,183,5,0.3)] sm:w-[180px] transition"
+              />
             </div>
-          ) : (
-            filtered.map((coin, i) => (
-              <CoinCard key={coin.symbol} coin={coin} rank={i + 1} />
-            ))
+          </div>
+
+          {/* Error state */}
+          {error && !loading && (
+            <div className="mb-4 flex flex-col items-center gap-3 rounded-2xl border border-[#FF4D4D]/20 bg-[#FF4D4D]/5 py-10">
+              <AlertCircle className="h-6 w-6 text-[#FF4D4D]" />
+              <p className="text-sm text-[#FF4D4D]">{error}</p>
+              <button
+                onClick={load}
+                className="flex items-center gap-1.5 rounded-full border border-[#FF4D4D]/30 bg-[#FF4D4D]/10 px-4 py-1.5 text-[11px] font-bold text-[#FF4D4D] transition hover:bg-[#FF4D4D]/20"
+              >
+                <RefreshCw className="h-3 w-3" />
+                Retry
+              </button>
+            </div>
           )}
+
+          {/* Desktop table */}
+          <div className="hidden overflow-hidden rounded-2xl border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.02)] sm:block">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-[rgba(242,183,5,0.08)] bg-[rgba(242,183,5,0.04)]">
+                    <th className="py-2.5 pl-4 pr-2 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">#</th>
+                    <th className="py-2.5 pr-3 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">Coin</th>
+                    <th className="py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">Price</th>
+                    <th className="py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">24h %</th>
+                    <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B] lg:table-cell" title="RSI-14 on 4h candles">RSI-14</th>
+                    <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B] xl:table-cell" title="Open Interest in USD">OI (USD)</th>
+                    <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B] xl:table-cell" title="Long/Short Account Ratio">L/S</th>
+                    <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B] sm:table-cell">Volume</th>
+                    <th className="hidden py-2.5 pr-4 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B] md:table-cell">24h Range</th>
+                    <th className="py-2.5 pr-3 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading && coins.length === 0 ? (
+                    Array.from({ length: 10 }).map((_, i) => (
+                      <tr key={i} className="border-b border-[rgba(242,183,5,0.04)]">
+                        {[40, 80, 60, 50, 45, 55, 45, 70, 100, 60].map((w, j) => (
+                          <td key={j} className="py-3 pl-4">
+                            <Skeleton className="h-3 rounded" style={{ width: w }} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="py-16 text-center">
+                        <div className="flex flex-col items-center gap-2 text-[#6B6B6B]">
+                          <Search className="h-6 w-6 opacity-30" />
+                          <p className="text-sm">No coins found</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map((coin, i) => (
+                      <CoinRow key={coin.symbol} coin={coin} rank={i + 1} />
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {!loading && filtered.length > 0 && (
+              <div className="flex items-center justify-between border-t border-[rgba(242,183,5,0.06)] px-4 py-2">
+                <span className="text-[10px] text-[#3A3A3A]">
+                  Showing {filtered.length} of {coins.length} pairs · Binance Spot + Futures
+                </span>
+                <div className="flex items-center gap-3 text-[10px] text-[#3A3A3A]">
+                  <span className="flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#4CAF50]/50" />
+                    RSI &lt;30 = Oversold
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#FF4D4D]/50" />
+                    RSI &gt;70 = Overbought
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Zap className="h-2.5 w-2.5" />
+                    Auto-refresh 45s
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile card grid */}
+          <div className="grid gap-3 sm:hidden">
+            {loading && coins.length === 0 ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-36 rounded-xl" />
+              ))
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-12 text-[#6B6B6B]">
+                <Search className="h-6 w-6 opacity-30" />
+                <p className="text-sm">No coins found</p>
+              </div>
+            ) : (
+              filtered.map((coin, i) => (
+                <CoinCard key={coin.symbol} coin={coin} rank={i + 1} />
+              ))
+            )}
+          </div>
         </div>
       </div>
     </PageWrapper>

@@ -34,9 +34,9 @@ function timeAgo(date: Date): string {
 }
 
 function sentimentColor(s?: string) {
-  if (s === "bullish") return "text-[#22c55e]";
-  if (s === "bearish") return "text-[#ef4444]";
-  return "text-[#555d6e]";
+  if (s === "bullish") return "text-[#4CAF50]";
+  if (s === "bearish") return "text-[#FF4D4D]";
+  return "text-[#6B6B6B]";
 }
 
 /* ── Avatar ────────────────────────────────────────────────────────────────── */
@@ -46,9 +46,9 @@ function Avatar({ item }: { item: NewsItem }) {
     ? item.author.slice(0, 2).toUpperCase()
     : item.source.slice(0, 2).toUpperCase();
   const colors: Record<string, string> = {
-    social: "bg-sky-900/50 text-sky-300 border-sky-700/30",
-    whale:  "bg-violet-900/50 text-violet-300 border-violet-700/30",
-    news:   "bg-[rgba(59,130,246,0.12)] text-[#3b82f6] border-[rgba(59,130,246,0.2)]",
+    social: "bg-[rgba(242,183,5,0.1)] text-[#F2B705] border-[rgba(242,183,5,0.2)]",
+    whale:  "bg-[rgba(255,255,255,0.05)] text-[#A0A0A0] border-[rgba(255,255,255,0.1)]",
+    news:   "bg-[rgba(242,183,5,0.08)] text-[#F2B705] border-[rgba(242,183,5,0.15)]",
   };
   return (
     <div
@@ -65,7 +65,7 @@ function Avatar({ item }: { item: NewsItem }) {
 
 function SkeletonCard() {
   return (
-    <div className="border-b border-[rgba(59,130,246,0.06)] px-4 py-4">
+    <div className="border-b border-[rgba(242,183,5,0.06)] px-4 py-4">
       <div className="flex gap-3">
         <div className="h-8 w-8 rounded-full skeleton shrink-0" />
         <div className="flex-1 space-y-2 pt-1">
@@ -92,9 +92,9 @@ function NewsCard({
   return (
     <article
       onClick={() => onSelect(item)}
-      className={`cursor-pointer border-b border-[rgba(59,130,246,0.06)] px-4 py-3 transition-all hover:bg-[rgba(59,130,246,0.04)] ${
+      className={`cursor-pointer border-b border-[rgba(242,183,5,0.06)] px-4 py-3 transition-all hover:bg-[rgba(242,183,5,0.03)] ${
         selected
-          ? "border-l-2 border-l-[#3b82f6]/50 bg-[rgba(59,130,246,0.06)]"
+          ? "border-l-2 border-l-[#F2B705]/50 bg-[rgba(242,183,5,0.05)]"
           : ""
       }`}
     >
@@ -102,39 +102,39 @@ function NewsCard({
         <Avatar item={item} />
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-1.5">
-            <span className="text-[12px] font-semibold text-[#e2e4ea]">
+            <span className="text-[12px] font-semibold text-[#FFFFFF]">
               {item.author ?? item.source}
             </span>
             {item.authorHandle && (
-              <span className="text-[11px] text-[#555d6e]">
+              <span className="text-[11px] text-[#6B6B6B]">
                 @{item.authorHandle}
               </span>
             )}
-            <span className="ml-auto text-[10px] text-[#3a4050]">
+            <span className="ml-auto text-[10px] text-[#3A3A3A]">
               {timeAgo(item.timestamp)}
             </span>
           </div>
 
-          <p className="text-[12px] leading-[1.55] text-[#8b95a5]">
+          <p className="text-[12px] leading-[1.55] text-[#A0A0A0]">
             {item.headline}
           </p>
 
           {item.type === "news" &&
             item.summary &&
             item.summary !== item.headline && (
-              <p className="mt-1 line-clamp-2 text-[11px] leading-[1.5] text-[#555d6e]">
+              <p className="mt-1 line-clamp-2 text-[11px] leading-[1.5] text-[#6B6B6B]">
                 {item.summary}
               </p>
             )}
 
           {item.type === "whale" && item.whaleAmountUsd && (
             <div className="mt-1.5 flex items-center gap-1.5">
-              <Waves className="h-3 w-3 text-violet-400" />
-              <span className="text-[11px] font-bold text-violet-300">
+              <Waves className="h-3 w-3 text-[#F2B705]" />
+              <span className="text-[11px] font-bold text-[#F2B705]">
                 ${(item.whaleAmountUsd / 1_000_000).toFixed(2)}M
               </span>
               {item.whaleFrom && item.whaleTo && (
-                <span className="text-[10px] text-[#555d6e]">
+                <span className="text-[10px] text-[#6B6B6B]">
                   {item.whaleFrom} → {item.whaleTo}
                 </span>
               )}
@@ -163,14 +163,14 @@ function NewsCard({
                   key={t}
                   href={`/terminal?ticker=${t}`}
                   onClick={(e) => e.stopPropagation()}
-                  className="rounded border border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)] px-1.5 py-0.5 text-[9px] font-bold text-[#3b82f6] transition hover:bg-[rgba(59,130,246,0.16)]"
+                  className="rounded border border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.08)] px-1.5 py-0.5 text-[9px] font-bold text-[#F2B705] transition hover:bg-[rgba(242,183,5,0.16)]"
                 >
                   {t}
                 </Link>
               ))}
             </div>
 
-            <span className="ml-auto text-[10px] text-[#3a4050]">
+            <span className="ml-auto text-[10px] text-[#3A3A3A]">
               {item.source}
             </span>
             {item.url && item.url !== "#" && (
@@ -179,7 +179,7 @@ function NewsCard({
                 target="_blank"
                 rel="noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="text-[#3a4050] transition hover:text-[#8b95a5]"
+                className="text-[#3A3A3A] transition hover:text-[#A0A0A0]"
               >
                 <ExternalLink className="h-3 w-3" />
               </a>
@@ -191,7 +191,7 @@ function NewsCard({
             <Link
               href={`/terminal${item.ticker?.[0] ? `?ticker=${item.ticker[0]}` : ""}`}
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 rounded border border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)] px-2 py-0.5 text-[9px] font-bold text-[#3b82f6] transition hover:bg-[rgba(59,130,246,0.16)]"
+              className="flex items-center gap-1 rounded border border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.08)] px-2 py-0.5 text-[9px] font-bold text-[#F2B705] transition hover:bg-[rgba(242,183,5,0.16)]"
             >
               <Zap className="h-2.5 w-2.5" />
               Trade →
@@ -199,7 +199,7 @@ function NewsCard({
             <Link
               href={`/terminal${item.ticker?.[0] ? `?ticker=${item.ticker[0]}&ai=1` : "?ai=1"}`}
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 rounded border border-[rgba(167,139,250,0.2)] bg-[rgba(167,139,250,0.08)] px-2 py-0.5 text-[9px] font-bold text-[#a78bfa] transition hover:bg-[rgba(167,139,250,0.16)]"
+              className="flex items-center gap-1 rounded border border-[rgba(242,183,5,0.15)] bg-[rgba(242,183,5,0.06)] px-2 py-0.5 text-[9px] font-bold text-[#A0A0A0] transition hover:bg-[rgba(242,183,5,0.12)] hover:text-[#F2B705]"
             >
               Analyze
             </Link>
@@ -216,7 +216,7 @@ function TradingViewChart({ symbol }: { symbol: string }) {
   return (
     <iframe
       key={symbol}
-      src={`https://www.tradingview.com/widgetembed/?symbol=BINANCE:${symbol}&interval=60&theme=dark&style=1&locale=en&toolbar_bg=%230a0b0e&hide_side_toolbar=1&hidetoptoolbar=1&hidevolume=1&allow_symbol_change=0&save_image=0&backgroundColor=0a0b0e&gridColor=rgba(59,130,246,0.04)`}
+      src={`https://www.tradingview.com/widgetembed/?symbol=BINANCE:${symbol}&interval=60&theme=dark&style=1&locale=en&toolbar_bg=%230B0B0B&hide_side_toolbar=1&hidetoptoolbar=1&hidevolume=1&allow_symbol_change=0&save_image=0&backgroundColor=0B0B0B&gridColor=rgba(242,183,5,0.04)`}
       className="h-full w-full border-0"
       title="TradingView Chart"
     />
@@ -258,10 +258,10 @@ function TrendingTopics({ news }: { news: NewsItem[] }) {
   if (topics.length === 0) return null;
 
   return (
-    <div className="mx-3 mb-3 shrink-0 rounded-xl border border-[rgba(59,130,246,0.1)] bg-[rgba(59,130,246,0.04)] p-3">
+    <div className="mx-3 mb-3 shrink-0 rounded-xl border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.04)] p-3">
       <div className="mb-2.5 flex items-center gap-1.5">
         <Flame className="h-3.5 w-3.5 text-orange-400" />
-        <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#8b95a5]">
+        <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#A0A0A0]">
           Trending Now
         </span>
       </div>
@@ -275,8 +275,8 @@ function TrendingTopics({ news }: { news: NewsItem[] }) {
               href={`/terminal?ticker=${ticker}`}
               className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-bold transition hover:scale-105 ${
                 dom === "bullish"
-                  ? "border-[#22c55e]/20 bg-[#22c55e]/8 text-[#22c55e] hover:border-[#22c55e]/40"
-                  : "border-[#ef4444]/20 bg-[#ef4444]/8 text-[#ef4444] hover:border-[#ef4444]/40"
+                  ? "border-[#4CAF50]/20 bg-[#4CAF50]/8 text-[#4CAF50] hover:border-[#4CAF50]/40"
+                  : "border-[#FF4D4D]/20 bg-[#FF4D4D]/8 text-[#FF4D4D] hover:border-[#FF4D4D]/40"
               }`}
             >
               {ticker}
@@ -316,13 +316,13 @@ function MarketImpact({ item }: { item: NewsItem }) {
   if (!item.ticker?.length || quotes.length === 0) return null;
 
   return (
-    <div className="mx-3 mb-3 shrink-0 rounded-xl border border-[rgba(59,130,246,0.1)] bg-[rgba(59,130,246,0.04)] p-3">
+    <div className="mx-3 mb-3 shrink-0 rounded-xl border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.04)] p-3">
       <div className="mb-2 flex items-center gap-1.5">
-        <BarChart2 className="h-3 w-3 text-[#3b82f6]/80" />
-        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#555d6e]">
+        <BarChart2 className="h-3 w-3 text-[#F2B705]/80" />
+        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">
           Market Prices
         </span>
-        <span className="ml-auto text-[9px] text-[#3a4050]">24h change</span>
+        <span className="ml-auto text-[9px] text-[#3A3A3A]">24h change</span>
       </div>
       <div className="space-y-1.5">
         {quotes.map((q) => {
@@ -336,18 +336,18 @@ function MarketImpact({ item }: { item: NewsItem }) {
           return (
             <div key={q.symbol} className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-[#3b82f6]">
+                <span className="text-[11px] font-bold text-[#F2B705]">
                   {q.symbol}
                 </span>
-                <span className="text-[11px] tabular-nums text-[#8b95a5]">
+                <span className="text-[11px] tabular-nums text-[#A0A0A0]">
                   {fmtPrice}
                 </span>
               </div>
               <span
                 className={`flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
                   pos
-                    ? "bg-[#22c55e]/10 text-[#22c55e]"
-                    : "bg-[#ef4444]/10 text-[#ef4444]"
+                    ? "bg-[#4CAF50]/10 text-[#4CAF50]"
+                    : "bg-[#FF4D4D]/10 text-[#FF4D4D]"
                 }`}
               >
                 {pos ? (
@@ -365,7 +365,7 @@ function MarketImpact({ item }: { item: NewsItem }) {
 
       {/* Exchange trade links */}
       {item.ticker?.[0] && (
-        <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-[rgba(59,130,246,0.08)] pt-2.5">
+        <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-[rgba(242,183,5,0.08)] pt-2.5">
           {getAllTradeLinks(item.ticker[0])
             .slice(0, 4)
             .map(({ exchange, label, href, color }) => (
@@ -446,35 +446,45 @@ export default function NewsPage() {
   ));
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#0a0b0e] text-[#e2e4ea]">
+    <div className="relative flex min-h-screen flex-col bg-[#0B0B0B] text-[#FFFFFF]">
+      {/* Background watermark */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-0 overflow-hidden">
+        <img
+          src="/Brand/logo.png"
+          alt=""
+          aria-hidden="true"
+          style={{ opacity: 0.04, width: "50%", maxWidth: 600, objectFit: "contain" }}
+        />
+      </div>
+
       <Navbar />
 
       {/* Main layout */}
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="relative z-10 flex min-h-0 flex-1 overflow-hidden">
         {/* Left: news feed */}
-        <div className="flex w-full flex-col border-r border-[rgba(59,130,246,0.08)] lg:w-[520px] xl:w-[560px]">
+        <div className="flex w-full flex-col border-r border-[rgba(242,183,5,0.08)] lg:w-[520px] xl:w-[560px]">
           {/* Feed header */}
-          <div className="flex shrink-0 items-center justify-between border-b border-[rgba(59,130,246,0.08)] px-4 py-2.5">
+          <div className="flex shrink-0 items-center justify-between border-b border-[rgba(242,183,5,0.08)] px-4 py-2.5">
             <div className="flex items-center gap-2">
-              <h1 className="text-[13px] font-bold tracking-[-0.01em] text-[#e2e4ea]">
+              <h1 className="text-[13px] font-bold tracking-[-0.01em] text-[#FFFFFF]">
                 News &amp; Tweets
               </h1>
               <span
                 className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${
                   isLive
-                    ? "border border-[#22c55e]/25 bg-[#22c55e]/10 text-[#22c55e]"
-                    : "border border-[rgba(59,130,246,0.15)] bg-[rgba(59,130,246,0.06)] text-[#555d6e]"
+                    ? "border border-[#4CAF50]/25 bg-[#4CAF50]/10 text-[#4CAF50]"
+                    : "border border-[rgba(242,183,5,0.15)] bg-[rgba(242,183,5,0.06)] text-[#6B6B6B]"
                 }`}
               >
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${
-                    isLive ? "animate-pulse bg-[#22c55e]" : "bg-[#555d6e]"
+                    isLive ? "animate-pulse bg-[#4CAF50]" : "bg-[#6B6B6B]"
                   }`}
                 />
                 {isLive ? "Live" : "Loading"}
               </span>
               {liveCount > 0 && (
-                <span className="rounded-full border border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)] px-2 py-0.5 text-[9px] font-bold text-[#3b82f6]">
+                <span className="rounded-full border border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.08)] px-2 py-0.5 text-[9px] font-bold text-[#F2B705]">
                   +{liveCount}
                 </span>
               )}
@@ -482,7 +492,7 @@ export default function NewsPage() {
             <button
               onClick={refreshNews}
               disabled={loading}
-              className="flex items-center gap-1.5 rounded-full border border-[rgba(59,130,246,0.12)] bg-[rgba(59,130,246,0.04)] px-2.5 py-1.5 text-[10px] text-[#8b95a5] transition hover:text-[#e2e4ea] disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-full border border-[rgba(242,183,5,0.12)] bg-[rgba(242,183,5,0.04)] px-2.5 py-1.5 text-[10px] text-[#A0A0A0] transition hover:text-[#FFFFFF] disabled:opacity-40"
             >
               <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
               Refresh
@@ -490,16 +500,16 @@ export default function NewsPage() {
           </div>
 
           {/* Sticky filter bar */}
-          <div className="shrink-0 space-y-2 border-b border-[rgba(59,130,246,0.08)] bg-[#0a0b0e]/95 px-4 py-2.5 backdrop-blur-sm">
+          <div className="shrink-0 space-y-2 border-b border-[rgba(242,183,5,0.08)] bg-[#0B0B0B]/95 px-4 py-2.5 backdrop-blur-sm">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[#555d6e]" />
+              <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[#6B6B6B]" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search headlines, symbols…"
-                className="w-full rounded-lg border border-[rgba(59,130,246,0.1)] bg-[rgba(59,130,246,0.04)] py-1.5 pl-7 pr-3 text-[11px] text-[#8b95a5] outline-none placeholder:text-[#555d6e] focus:border-[rgba(59,130,246,0.3)] transition"
+                className="w-full rounded-lg border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.04)] py-1.5 pl-7 pr-3 text-[11px] text-[#A0A0A0] outline-none placeholder:text-[#6B6B6B] focus:border-[rgba(242,183,5,0.3)] transition"
               />
             </div>
 
@@ -511,8 +521,8 @@ export default function NewsPage() {
                   onClick={() => setSourceFilter(value)}
                   className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em] transition-all ${
                     sourceFilter === value
-                      ? "bg-[rgba(59,130,246,0.14)] text-[#3b82f6]"
-                      : "text-[#555d6e] hover:text-[#8b95a5]"
+                      ? "bg-[rgba(242,183,5,0.14)] text-[#F2B705]"
+                      : "text-[#6B6B6B] hover:text-[#A0A0A0]"
                   }`}
                 >
                   {icon}
@@ -541,11 +551,11 @@ export default function NewsPage() {
                       className={`rounded-md px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-all ${
                         sentimentFilter === value
                           ? value === "bullish"
-                            ? "bg-[#22c55e]/15 text-[#22c55e]"
+                            ? "bg-[#4CAF50]/15 text-[#4CAF50]"
                             : value === "bearish"
-                            ? "bg-[#ef4444]/15 text-[#ef4444]"
-                            : "bg-[rgba(255,255,255,0.06)] text-[#8b95a5]"
-                          : "text-[#3a4050] hover:text-[#555d6e]"
+                            ? "bg-[#FF4D4D]/15 text-[#FF4D4D]"
+                            : "bg-[rgba(255,255,255,0.06)] text-[#A0A0A0]"
+                          : "text-[#3A3A3A] hover:text-[#6B6B6B]"
                       }`}
                     >
                       {label}
@@ -565,7 +575,7 @@ export default function NewsPage() {
                 ))}
               </div>
             ) : news.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 py-16 text-[#555d6e]">
+              <div className="flex flex-col items-center gap-3 py-16 text-[#6B6B6B]">
                 <Newspaper className="h-7 w-7 opacity-30" />
                 <p className="text-sm">No items match your filters.</p>
               </div>
@@ -578,13 +588,13 @@ export default function NewsPage() {
         {/* Right: sidebar */}
         <div className="hidden min-h-0 flex-1 flex-col overflow-y-auto lg:flex">
           {/* Chart header */}
-          <div className="flex shrink-0 items-center justify-between border-b border-[rgba(59,130,246,0.08)] px-4 py-2.5">
+          <div className="flex shrink-0 items-center justify-between border-b border-[rgba(242,183,5,0.08)] px-4 py-2.5">
             <div className="flex items-center gap-2">
               <div className="relative">
                 <select
                   value={chartSymbol}
                   onChange={(e) => setChartSymbol(e.target.value)}
-                  className="appearance-none rounded-lg border border-[rgba(59,130,246,0.1)] bg-[rgba(59,130,246,0.04)] py-0.5 pl-2 pr-5 text-[11px] font-semibold text-[#8b95a5] outline-none transition hover:border-[rgba(59,130,246,0.25)]"
+                  className="appearance-none rounded-lg border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.04)] py-0.5 pl-2 pr-5 text-[11px] font-semibold text-[#A0A0A0] outline-none transition hover:border-[rgba(242,183,5,0.25)]"
                 >
                   {CHART_SYMBOLS.map((s) => (
                     <option key={s} value={s}>
@@ -592,27 +602,27 @@ export default function NewsPage() {
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="pointer-events-none absolute right-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-[#555d6e]" />
+                <ChevronDown className="pointer-events-none absolute right-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-[#6B6B6B]" />
               </div>
             </div>
             <div className="flex items-center gap-1.5">
               <Link
                 href="/screener"
-                className="flex items-center gap-1 rounded-md border border-[rgba(59,130,246,0.1)] bg-[rgba(59,130,246,0.04)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#555d6e] transition hover:text-[#8b95a5]"
+                className="flex items-center gap-1 rounded-md border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.04)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#6B6B6B] transition hover:text-[#A0A0A0]"
               >
                 <BarChart2 className="h-2.5 w-2.5" />
                 Screener
               </Link>
               <Link
                 href="/calendar"
-                className="flex items-center gap-1 rounded-md border border-[rgba(59,130,246,0.1)] bg-[rgba(59,130,246,0.04)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#555d6e] transition hover:text-[#8b95a5]"
+                className="flex items-center gap-1 rounded-md border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.04)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#6B6B6B] transition hover:text-[#A0A0A0]"
               >
                 <Calendar className="h-2.5 w-2.5" />
                 Events
               </Link>
               <Link
                 href={`/terminal?ticker=${chartSymbol.replace("USDT", "")}`}
-                className="flex items-center gap-1 rounded-md border border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#3b82f6] transition hover:bg-[rgba(59,130,246,0.16)]"
+                className="flex items-center gap-1 rounded-md border border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.08)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#F2B705] transition hover:bg-[rgba(242,183,5,0.16)]"
               >
                 <LayoutDashboard className="h-2.5 w-2.5" />
                 Trade
@@ -631,29 +641,29 @@ export default function NewsPage() {
           {/* Selected item detail + market impact */}
           {selectedItem && (
             <>
-              <div className="mx-3 mb-3 shrink-0 rounded-xl border border-[rgba(59,130,246,0.1)] bg-[rgba(59,130,246,0.04)] px-4 py-3">
+              <div className="mx-3 mb-3 shrink-0 rounded-xl border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.04)] px-4 py-3">
                 <div className="mb-1.5 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#3b82f6]/80">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#F2B705]/80">
                       {selectedItem.source}
                     </span>
-                    <span className="text-[10px] text-[#555d6e]">
+                    <span className="text-[10px] text-[#6B6B6B]">
                       {timeAgo(selectedItem.timestamp)}
                     </span>
                   </div>
                   <button
                     onClick={() => setSelectedItem(null)}
-                    className="text-[10px] text-[#555d6e] hover:text-[#8b95a5]"
+                    className="text-[10px] text-[#6B6B6B] hover:text-[#A0A0A0]"
                   >
                     ✕
                   </button>
                 </div>
-                <p className="text-[12px] font-semibold leading-[1.5] text-[#e2e4ea]">
+                <p className="text-[12px] font-semibold leading-[1.5] text-[#FFFFFF]">
                   {selectedItem.headline}
                 </p>
                 {selectedItem.summary &&
                   selectedItem.summary !== selectedItem.headline && (
-                    <p className="mt-1 line-clamp-3 text-[11px] leading-[1.6] text-[#555d6e]">
+                    <p className="mt-1 line-clamp-3 text-[11px] leading-[1.6] text-[#6B6B6B]">
                       {selectedItem.summary}
                     </p>
                   )}
@@ -662,7 +672,7 @@ export default function NewsPage() {
                     <Link
                       key={t}
                       href={`/terminal?ticker=${t}`}
-                      className="rounded border border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.06)] px-2 py-0.5 text-[9px] font-bold text-[#3b82f6] hover:bg-[rgba(59,130,246,0.14)]"
+                      className="rounded border border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.06)] px-2 py-0.5 text-[9px] font-bold text-[#F2B705] hover:bg-[rgba(242,183,5,0.14)]"
                     >
                       {t}
                     </Link>

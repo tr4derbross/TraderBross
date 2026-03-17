@@ -30,8 +30,8 @@ const CATEGORY_META: Record<
   tokenUnlock: {
     label: "Token Unlock",
     icon: <Unlock className="h-3 w-3" />,
-    color: "bg-[#ef4444]/8 text-[#ef4444] border-[#ef4444]/20",
-    border: "border-l-[#ef4444]",
+    color: "bg-[#FF4D4D]/8 text-[#FF4D4D] border-[#FF4D4D]/20",
+    border: "border-l-[#FF4D4D]",
   },
   hardFork: {
     label: "Hard Fork",
@@ -42,32 +42,32 @@ const CATEGORY_META: Record<
   upgrade: {
     label: "Upgrade",
     icon: <Zap className="h-3 w-3" />,
-    color: "bg-[#f59e0b]/8 text-[#f59e0b] border-[#f59e0b]/20",
-    border: "border-l-[#f59e0b]",
+    color: "bg-[#F2B705]/8 text-[#F2B705] border-[#F2B705]/20",
+    border: "border-l-[#F2B705]",
   },
   conference: {
     label: "Conference",
     icon: <Users className="h-3 w-3" />,
-    color: "bg-sky-500/8 text-sky-400 border-sky-500/20",
-    border: "border-l-sky-400",
+    color: "bg-[rgba(242,183,5,0.08)] text-[#F2B705] border-[rgba(242,183,5,0.2)]",
+    border: "border-l-[#F2B705]",
   },
   listing: {
     label: "Listing",
     icon: <Plus className="h-3 w-3" />,
-    color: "bg-[#22c55e]/8 text-[#22c55e] border-[#22c55e]/20",
-    border: "border-l-[#22c55e]",
+    color: "bg-[#4CAF50]/8 text-[#4CAF50] border-[#4CAF50]/20",
+    border: "border-l-[#4CAF50]",
   },
   mainnet: {
     label: "Mainnet",
     icon: <Globe className="h-3 w-3" />,
-    color: "bg-violet-500/8 text-violet-400 border-violet-500/20",
-    border: "border-l-violet-400",
+    color: "bg-[rgba(242,183,5,0.06)] text-[#A0A0A0] border-[rgba(242,183,5,0.15)]",
+    border: "border-l-[#A0A0A0]",
   },
   regulation: {
     label: "Regulation",
     icon: <Shield className="h-3 w-3" />,
-    color: "bg-[rgba(59,130,246,0.08)] text-[#3b82f6] border-[rgba(59,130,246,0.2)]",
-    border: "border-l-[#3b82f6]",
+    color: "bg-[rgba(242,183,5,0.08)] text-[#F2B705] border-[rgba(242,183,5,0.2)]",
+    border: "border-l-[#F2B705]",
   },
   airdrop: {
     label: "Airdrop",
@@ -78,9 +78,9 @@ const CATEGORY_META: Record<
 };
 
 const IMPORTANCE_MAP = {
-  high:   "border-[#f59e0b]/30 bg-[#f59e0b]/10 text-[#f59e0b]",
-  medium: "border-[rgba(59,130,246,0.15)] bg-[rgba(59,130,246,0.06)] text-[#8b95a5]",
-  low:    "border-[rgba(59,130,246,0.08)] bg-[rgba(59,130,246,0.03)] text-[#555d6e]",
+  high:   "border-[#F2B705]/30 bg-[#F2B705]/10 text-[#F2B705]",
+  medium: "border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.04)] text-[#A0A0A0]",
+  low:    "border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] text-[#6B6B6B]",
 };
 
 /* ── Helpers ─────────────────────────────────────────────────────────────────── */
@@ -112,27 +112,27 @@ function EventCard({ event }: { event: CalendarEvent }) {
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-xl border-l-2 border border-[rgba(59,130,246,0.1)] bg-[#12141a] transition-all hover:border-[rgba(59,130,246,0.2)] hover:bg-[#181a22] ${meta.border} ${
+      className={`group relative overflow-hidden rounded-xl border-l-2 border border-[rgba(242,183,5,0.1)] bg-[#121212] transition-all hover:border-[rgba(242,183,5,0.2)] hover:bg-[#1A1A1A] ${meta.border} ${
         isPast ? "opacity-55" : ""
       }`}
     >
       {/* High importance top accent */}
       {event.importance === "high" && !isPast && (
-        <div className="absolute right-0 top-0 h-0.5 w-full bg-gradient-to-l from-transparent via-[#f59e0b]/40 to-transparent" />
+        <div className="absolute right-0 top-0 h-0.5 w-full bg-gradient-to-l from-transparent via-[#F2B705]/40 to-transparent" />
       )}
 
       <div className="p-4">
         {/* Header */}
         <div className="mb-3 flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)] text-[10px] font-bold text-[#3b82f6]">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[rgba(242,183,5,0.1)] text-[10px] font-bold text-[#F2B705]">
               {event.coinSymbol.slice(0, 3)}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-[12px] font-semibold text-[#e2e4ea]">
+              <p className="truncate text-[12px] font-semibold text-[#FFFFFF]">
                 {event.title}
               </p>
-              <p className="text-[10px] text-[#555d6e]">{event.coin}</p>
+              <p className="text-[10px] text-[#6B6B6B]">{event.coin}</p>
             </div>
           </div>
 
@@ -140,12 +140,12 @@ function EventCard({ event }: { event: CalendarEvent }) {
           <div
             className={`shrink-0 rounded-lg border px-2.5 py-1.5 text-center ${
               isToday
-                ? "border-[#f59e0b]/40 bg-[#f59e0b]/15 text-[#f59e0b]"
+                ? "border-[#F2B705]/40 bg-[#F2B705]/15 text-[#F2B705]"
                 : isSoon
                 ? "border-orange-400/30 bg-orange-400/10 text-orange-300"
                 : isPast
-                ? "border-[rgba(59,130,246,0.08)] bg-[rgba(59,130,246,0.03)] text-[#555d6e]"
-                : "border-[rgba(59,130,246,0.1)] bg-[rgba(59,130,246,0.04)] text-[#8b95a5]"
+                ? "border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] text-[#6B6B6B]"
+                : "border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.04)] text-[#A0A0A0]"
             }`}
           >
             <div className="text-[9px] font-bold uppercase tracking-[0.12em]">
@@ -156,7 +156,7 @@ function EventCard({ event }: { event: CalendarEvent }) {
         </div>
 
         {/* Description */}
-        <p className="mb-3 line-clamp-2 text-[11px] leading-[1.6] text-[#555d6e]">
+        <p className="mb-3 line-clamp-2 text-[11px] leading-[1.6] text-[#6B6B6B]">
           {event.description}
         </p>
 
@@ -179,7 +179,7 @@ function EventCard({ event }: { event: CalendarEvent }) {
             event.coin !== "Market-wide" ? (
               <Link
                 href={`/terminal?ticker=${event.coinSymbol}`}
-                className="flex items-center gap-1 rounded-md border border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)] px-2 py-0.5 text-[9px] font-bold text-[#3b82f6] transition hover:bg-[rgba(59,130,246,0.16)]"
+                className="flex items-center gap-1 rounded-md border border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.08)] px-2 py-0.5 text-[9px] font-bold text-[#F2B705] transition hover:bg-[rgba(242,183,5,0.16)]"
               >
                 <LayoutDashboard className="h-2.5 w-2.5" />
                 Trade
@@ -190,7 +190,7 @@ function EventCard({ event }: { event: CalendarEvent }) {
                 href={event.source}
                 target="_blank"
                 rel="noreferrer"
-                className="text-[#3a4050] transition hover:text-[#8b95a5]"
+                className="text-[#3A3A3A] transition hover:text-[#A0A0A0]"
               >
                 <ExternalLink className="h-3 w-3" />
               </a>
@@ -209,13 +209,13 @@ function MonthGroup({ month, events }: { month: string; events: CalendarEvent[] 
     <div>
       <div className="mb-3 flex items-center gap-3">
         <div className="flex items-center gap-1.5">
-          <CalendarDays className="h-3.5 w-3.5 text-[#3b82f6]/60" />
-          <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#555d6e]">
+          <CalendarDays className="h-3.5 w-3.5 text-[#F2B705]/60" />
+          <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#6B6B6B]">
             {month}
           </span>
         </div>
-        <div className="h-px flex-1 bg-[rgba(59,130,246,0.08)]" />
-        <span className="text-[10px] text-[#3a4050]">{events.length} events</span>
+        <div className="h-px flex-1 bg-[rgba(242,183,5,0.08)]" />
+        <span className="text-[10px] text-[#3A3A3A]">{events.length} events</span>
       </div>
       <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
         {events.map((e) => (
@@ -274,137 +274,149 @@ export default function CalendarPage() {
 
   return (
     <PageWrapper>
-      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="mb-1 flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-[#3b82f6]" />
-            <h1 className="text-[15px] font-bold tracking-[-0.01em] text-[#e2e4ea]">
-              Crypto Calendar
-            </h1>
-            {!loading && (
-              <span className="rounded-full border border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)] px-2 py-0.5 text-[9px] font-bold text-[#3b82f6]">
-                {events.filter((e) => daysUntil(e.date) >= 0).length} upcoming
-              </span>
-            )}
-          </div>
-          <p className="text-[11px] text-[#555d6e]">
-            Token unlocks, protocol upgrades, conferences &amp; regulation milestones
-          </p>
+      <div className="relative mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {/* Background watermark */}
+        <div className="pointer-events-none fixed inset-0 flex items-center justify-center z-0 overflow-hidden">
+          <img
+            src="/Brand/logo.png"
+            alt=""
+            aria-hidden="true"
+            style={{ opacity: 0.04, width: "50%", maxWidth: 600, objectFit: "contain" }}
+          />
         </div>
 
-        {/* Stats */}
-        {!loading && (
-          <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="rounded-xl border border-[#f59e0b]/15 bg-[#f59e0b]/5 px-3 py-2.5">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-[#f59e0b]/60">
-                Next 7 days
-              </div>
-              <div className="mt-0.5 font-mono text-[15px] font-bold text-[#f59e0b]">
-                {upcoming.length}
-              </div>
+        <div className="relative z-10">
+          {/* Header */}
+          <div className="mb-6">
+            <div className="mb-1 flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-[#F2B705]" />
+              <h1 className="text-[15px] font-bold tracking-[-0.01em] text-[#FFFFFF]">
+                Crypto Calendar
+              </h1>
+              {!loading && (
+                <span className="rounded-full border border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.08)] px-2 py-0.5 text-[9px] font-bold text-[#F2B705]">
+                  {events.filter((e) => daysUntil(e.date) >= 0).length} upcoming
+                </span>
+              )}
             </div>
-            <div className="rounded-xl border border-[#ef4444]/15 bg-[#ef4444]/5 px-3 py-2.5">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-[#ef4444]/60">
-                High Impact
-              </div>
-              <div className="mt-0.5 font-mono text-[15px] font-bold text-[#ef4444]">
-                {highCount}
-              </div>
-            </div>
-            <div className="rounded-xl border border-violet-400/15 bg-violet-400/5 px-3 py-2.5">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-violet-400/60">
-                Token Unlocks
-              </div>
-              <div className="mt-0.5 font-mono text-[15px] font-bold text-violet-400">
-                {events.filter((e) => e.category === "tokenUnlock" && daysUntil(e.date) >= 0).length}
-              </div>
-            </div>
-            <div className="rounded-xl border border-sky-400/15 bg-sky-400/5 px-3 py-2.5">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-sky-400/60">
-                Conferences
-              </div>
-              <div className="mt-0.5 font-mono text-[15px] font-bold text-sky-400">
-                {events.filter((e) => e.category === "conference" && daysUntil(e.date) >= 0).length}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Category filter pills */}
-        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap gap-1">
-            {ALL_CATEGORIES.map((cat) => {
-              const meta = cat === "all" ? null : CATEGORY_META[cat];
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setCatFilter(cat)}
-                  className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all ${
-                    catFilter === cat
-                      ? "bg-[rgba(59,130,246,0.16)] text-[#3b82f6]"
-                      : "text-[#555d6e] hover:text-[#8b95a5]"
-                  }`}
-                >
-                  {meta?.icon}
-                  {cat === "all" ? "All" : meta?.label}
-                </button>
-              );
-            })}
-          </div>
-          <button
-            onClick={() => setShowPast((p) => !p)}
-            className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all ${
-              showPast
-                ? "bg-[rgba(59,130,246,0.1)] text-[#8b95a5]"
-                : "text-[#555d6e] hover:text-[#8b95a5]"
-            }`}
-          >
-            <ChevronRight
-              className={`h-3 w-3 transition-transform ${showPast ? "rotate-90" : ""}`}
-            />
-            Show past
-          </button>
-        </div>
-
-        {/* Content */}
-        {loading ? (
-          <div className="space-y-6">
-            {[1, 2].map((g) => (
-              <div key={g}>
-                <Skeleton className="mb-3 h-4 w-32 rounded" />
-                <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <Skeleton key={i} className="h-36 rounded-xl" />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : Object.keys(groups).length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-20 text-[#555d6e]">
-            <Calendar className="h-8 w-8 opacity-30" />
-            <p className="text-sm">No upcoming events found.</p>
-            <p className="text-[11px] text-[#3a4050]">
-              Check back soon or{" "}
-              <a
-                href="https://t.me/traderbross"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[#3b82f6]/70 transition hover:text-[#3b82f6] underline underline-offset-2"
-              >
-                join our Telegram
-              </a>{" "}
-              for live updates.
+            <p className="text-[11px] text-[#6B6B6B]">
+              Token unlocks, protocol upgrades, conferences &amp; regulation milestones
             </p>
           </div>
-        ) : (
-          <div className="space-y-8">
-            {Object.entries(groups).map(([month, evts]) => (
-              <MonthGroup key={month} month={month} events={evts} />
-            ))}
+
+          {/* Stats */}
+          {!loading && (
+            <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="rounded-xl border border-[#F2B705]/15 bg-[#F2B705]/5 px-3 py-2.5">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-[#F2B705]/60">
+                  Next 7 days
+                </div>
+                <div className="mt-0.5 font-mono text-[15px] font-bold text-[#F2B705]">
+                  {upcoming.length}
+                </div>
+              </div>
+              <div className="rounded-xl border border-[#FF4D4D]/15 bg-[#FF4D4D]/5 px-3 py-2.5">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-[#FF4D4D]/60">
+                  High Impact
+                </div>
+                <div className="mt-0.5 font-mono text-[15px] font-bold text-[#FF4D4D]">
+                  {highCount}
+                </div>
+              </div>
+              <div className="rounded-xl border border-[rgba(242,183,5,0.15)] bg-[rgba(242,183,5,0.05)] px-3 py-2.5">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-[#A0A0A0]/60">
+                  Token Unlocks
+                </div>
+                <div className="mt-0.5 font-mono text-[15px] font-bold text-[#A0A0A0]">
+                  {events.filter((e) => e.category === "tokenUnlock" && daysUntil(e.date) >= 0).length}
+                </div>
+              </div>
+              <div className="rounded-xl border border-[rgba(242,183,5,0.12)] bg-[rgba(242,183,5,0.04)] px-3 py-2.5">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-[#F2B705]/60">
+                  Conferences
+                </div>
+                <div className="mt-0.5 font-mono text-[15px] font-bold text-[#F2B705]">
+                  {events.filter((e) => e.category === "conference" && daysUntil(e.date) >= 0).length}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Category filter pills */}
+          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-1">
+              {ALL_CATEGORIES.map((cat) => {
+                const meta = cat === "all" ? null : CATEGORY_META[cat];
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setCatFilter(cat)}
+                    className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all ${
+                      catFilter === cat
+                        ? "bg-[rgba(242,183,5,0.16)] text-[#F2B705]"
+                        : "text-[#6B6B6B] hover:text-[#A0A0A0]"
+                    }`}
+                  >
+                    {meta?.icon}
+                    {cat === "all" ? "All" : meta?.label}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => setShowPast((p) => !p)}
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[10px] font-bold transition-all ${
+                showPast
+                  ? "bg-[rgba(242,183,5,0.1)] text-[#A0A0A0]"
+                  : "text-[#6B6B6B] hover:text-[#A0A0A0]"
+              }`}
+            >
+              <ChevronRight
+                className={`h-3 w-3 transition-transform ${showPast ? "rotate-90" : ""}`}
+              />
+              Show past
+            </button>
           </div>
-        )}
+
+          {/* Content */}
+          {loading ? (
+            <div className="space-y-6">
+              {[1, 2].map((g) => (
+                <div key={g}>
+                  <Skeleton className="mb-3 h-4 w-32 rounded" />
+                  <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <Skeleton key={i} className="h-36 rounded-xl" />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : Object.keys(groups).length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-20 text-[#6B6B6B]">
+              <Calendar className="h-8 w-8 opacity-30" />
+              <p className="text-sm">No upcoming events found.</p>
+              <p className="text-[11px] text-[#3A3A3A]">
+                Check back soon or{" "}
+                <a
+                  href="https://t.me/traderbross"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[#F2B705]/70 transition hover:text-[#F2B705] underline underline-offset-2"
+                >
+                  join our Telegram
+                </a>{" "}
+                for live updates.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {Object.entries(groups).map(([month, evts]) => (
+                <MonthGroup key={month} month={month} events={evts} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </PageWrapper>
   );
