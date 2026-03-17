@@ -12,8 +12,8 @@ const LOGO_SRC = "/Brand/logo.png";
 
 function CompactFallback() {
   return (
-    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-[linear-gradient(180deg,rgba(30,22,8,0.98),rgba(10,10,10,0.96))] shadow-[0_14px_32px_rgba(0,0,0,0.34)]">
-      <span className="text-[13px] font-bold tracking-[0.18em] text-amber-200">TB</span>
+    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[rgba(242,183,5,0.25)] bg-[rgba(18,18,18,0.98)] shadow-[0_14px_32px_rgba(0,0,0,0.34)]">
+      <span className="text-[13px] font-bold tracking-[0.18em] text-[#F2B705]">TB</span>
     </div>
   );
 }
@@ -23,8 +23,8 @@ function FullFallback() {
     <div className="flex items-center gap-3">
       <CompactFallback />
       <div className="leading-none">
-        <div className="text-[15px] font-semibold tracking-[0.24em] text-zinc-100">TRADERBROSS</div>
-        <div className="mt-1 text-[9px] tracking-[0.34em] text-zinc-500">MULTI-VENUE TERMINAL</div>
+        <div className="text-[15px] font-semibold tracking-[0.24em] text-[#FFFFFF]">TRADERBROSS</div>
+        <div className="mt-1 text-[9px] tracking-[0.34em] text-[#6B6B6B]">MULTI-VENUE TERMINAL</div>
       </div>
     </div>
   );
