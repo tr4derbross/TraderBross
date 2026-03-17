@@ -101,6 +101,8 @@ export const binanceAdapter: VenueAdapter = {
           entryPx: number;
           pnl: number;
           liquidationPx: number | null;
+          leverage: number;
+          marginMode: "isolated" | "cross";
         }>;
       }>("positions", token);
       return data.positions.map((p) => ({
@@ -110,6 +112,8 @@ export const binanceAdapter: VenueAdapter = {
         entryPrice: p.entryPx,
         pnl: p.pnl,
         liquidationPrice: p.liquidationPx,
+        leverage: p.leverage,
+        marginMode: p.marginMode,
       }));
     } catch {
       return [];

@@ -28,9 +28,10 @@ import BrandMark from "@/components/BrandMark";
 import MarketStatsBar from "@/components/MarketStatsBar";
 import MarketSessionBar from "@/components/MarketSessionBar";
 import { useTradingState } from "@/hooks/useTradingState";
+import type { Position } from "@/hooks/useTradingState";
 import type { ActiveVenueState, TradingVenueConnectionStatus, TradingVenueType } from "@/lib/active-venue";
 import { getVenueAdapter } from "@/lib/venues";
-import type { VenueBalance, VenueConnectionInput } from "@/lib/venues/types";
+import type { VenueBalance, VenueConnectionInput, VenuePosition } from "@/lib/venues/types";
 import { validateExecutionRequest } from "@/lib/execution-validation";
 import type { NewsTradePreset } from "@/lib/news-trade";
 import {
@@ -473,42 +474,91 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     updatePositionTpSl,
   } = useTradingState(wsPrices);
 
-  // ── Real venue balance (overwrites paper balance when connected) ────────────
+  // ── Real venue balance + positions (overwrites paper state when connected) ──
   const [venueBalance, setVenueBalance] = useState<VenueBalance | null>(null);
+  const [venuePositions, setVenuePositions] = useState<VenuePosition[] | null>(null);
+  const [venueRefreshTick, setVenueRefreshTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
 
-    const fetchVenueBalance = async () => {
+    const fetchVenueData = async () => {
       const isConnected =
         activeVenueState.connectionStatus === "connected" ||
         activeVenueState.connectionStatus === "saved_locally";
 
       if (!isConnected) {
         setVenueBalance(null);
+        setVenuePositions(null);
         return;
       }
 
       try {
         const connection = buildActiveVenueConnection();
-        const result = await getVenueAdapter(activeVenueState.venueId).getBalance(connection);
-        if (!cancelled) setVenueBalance(result);
+        const adapter = getVenueAdapter(activeVenueState.venueId);
+        const [balance, pos] = await Promise.all([
+          adapter.getBalance(connection),
+          adapter.getPositions(connection),
+        ]);
+        if (!cancelled) {
+          setVenueBalance(balance);
+          // null = not fetched yet (show paper), array = real data (even if empty)
+          setVenuePositions(pos);
+        }
       } catch {
-        if (!cancelled) setVenueBalance(null);
+        if (!cancelled) {
+          setVenueBalance(null);
+          setVenuePositions(null);
+        }
       }
     };
 
-    void fetchVenueBalance();
+    void fetchVenueData();
+
+    // Poll every 10s while connected
+    const pollInterval = setInterval(() => {
+      void fetchVenueData();
+    }, 10_000);
+
     return () => {
       cancelled = true;
+      clearInterval(pollInterval);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeVenueState.venueId, activeVenueState.connectionStatus, hlVaultToken, vaultTokens, orders.length, positions.length]);
+  }, [activeVenueState.venueId, activeVenueState.connectionStatus, hlVaultToken, vaultTokens, venueRefreshTick]);
 
-  // Use real venue balance if available, otherwise paper trading balance
+  // Use real venue balance/positions if available, otherwise paper trading state
   const displayBalance = venueBalance != null
     ? (venueBalance.available ?? venueBalance.total)
     : balance;
+  const displayPositions: Position[] = useMemo(() => {
+    if (!venuePositions) return positions;
+    return venuePositions.map((p): Position => {
+      // Derive current mark price: use live ws price if available, else back-compute from pnl
+      const markPrice = wsPrices[p.symbol] ??
+        (p.size > 0
+          ? p.side === "long"
+            ? p.entryPrice + (p.pnl ?? 0) / p.size
+            : p.entryPrice - (p.pnl ?? 0) / p.size
+          : p.entryPrice);
+      const lev = p.leverage ?? 1;
+      return {
+        id: `${p.symbol}_${p.side}`,
+        ticker: p.symbol,
+        side: p.side,
+        amount: p.size,
+        entryPrice: p.entryPrice,
+        currentPrice: markPrice,
+        leverage: lev,
+        margin: (p.size * p.entryPrice) / lev,
+        marginMode: p.marginMode ?? "isolated",
+        liquidationPrice: p.liquidationPrice ?? 0,
+        tpPrice: undefined,
+        slPrice: undefined,
+        timestamp: new Date(),
+      };
+    });
+  }, [venuePositions, positions, wsPrices]);
 
   const handleSelectItem = (item: NewsItem) => {
     setSelectedItem(item);
@@ -683,6 +733,11 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         },
         connection
       );
+
+      if (result.ok) {
+        // Trigger a positions refresh ~2s after the order is accepted
+        setTimeout(() => setVenueRefreshTick((t) => t + 1), 2000);
+      }
 
       return result.ok
         ? { ok: true, message: `${adapter.id.toUpperCase()} accepted the order request.` }
@@ -983,7 +1038,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         marketDataSourceLabel={activeVenueMarketLabel}
         liveTickerPrice={getTickerDisplayPrice(activeVenueTicker) ?? undefined}
         liveFeedConnected={activeVenueFeedState === "connected"}
-        positions={positions}
+        positions={displayPositions}
         orders={orders}
         onUpdatePositionTpSl={updatePositionTpSl}
         onPlaceOrder={placeOrder}
@@ -1034,7 +1089,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           selectedNews={selectedItem}
           newsTradeIntent={newsTradeIntent}
           balance={displayBalance}
-          positions={positions}
+          positions={displayPositions}
           prices={activeVenuePriceMap}
           marketDataSourceLabel={activeVenueMarketLabel}
           onActiveSymbolChange={setActiveSymbol}
@@ -1328,7 +1383,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           {showBottomPanel && (
             <div className={isMobile ? "" : "pt-2"}>
               <TradingActivityDrawer
-                positions={positions}
+                positions={displayPositions}
                 orders={orders}
                 balance={displayBalance}
                 equityHistory={equityHistory}
