@@ -8,7 +8,7 @@ type Props = {
   compact?: boolean;
 };
 
-const LOGO_SRC = "/brand/logo.png";
+const LOGO_SRC = "/Brand/logo.png";
 
 function CompactFallback() {
   return (
