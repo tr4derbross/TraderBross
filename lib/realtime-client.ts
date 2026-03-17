@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import type { BackendSnapshot, LiquidationEvent, RealtimeEnvelope } from "@/lib/backend-types";
+import type { BackendSnapshot, ForexData, LiquidationEvent, RealtimeEnvelope } from "@/lib/backend-types";
 import { apiFetch } from "@/lib/api-client";
 import { runtimeEnv } from "@/lib/runtime-env";
 
@@ -11,6 +11,7 @@ type ConnectionState = "idle" | "connecting" | "connected" | "disconnected";
 type RealtimeStore = BackendSnapshot & {
   connectionStatus: ConnectionState;
   lastUpdatedAt: number;
+  forex: ForexData;
 };
 
 const fallbackSnapshot: RealtimeStore = {
@@ -21,6 +22,7 @@ const fallbackSnapshot: RealtimeStore = {
   fearGreed: null,
   ethGas: null,
   defiTvl: null,
+  forex: null,
   liquidations: [] as LiquidationEvent[],
   news: [],
   whales: [],
@@ -83,6 +85,9 @@ function applyEnvelope(envelope: RealtimeEnvelope) {
       break;
     case "defiTvl":
       setState({ defiTvl: envelope.payload });
+      break;
+    case "forex":
+      setState({ forex: envelope.payload });
       break;
     case "liquidation":
       setState({

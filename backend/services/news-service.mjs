@@ -117,7 +117,7 @@ function parseRssXml(xml) {
     const pubDate = (content.match(/<pubDate>([\s\S]*?)<\/pubDate>/) ||
                      content.match(/<dc:date>([\s\S]*?)<\/dc:date>/))?.[1]?.trim();
     if (title) items.push({ title, link, desc, pubDate });
-    if (items.length >= 8) break;
+    if (items.length >= 10) break;
   }
   return items;
 }
@@ -285,7 +285,7 @@ export async function getNews(config, filters = {}) {
     const [ccItems, cpItems, ...rssResults] = await Promise.allSettled([
       fetchCryptoCompareNews(),
       fetchCryptoPanicNews(config),
-      ...FREE_RSS_FEEDS.slice(0, 8).map((f) => fetchRssFeed(f)),
+      ...FREE_RSS_FEEDS.map((f) => fetchRssFeed(f)),
     ]);
 
     const allItems = [
@@ -298,7 +298,7 @@ export async function getNews(config, filters = {}) {
 
     return dedupeNews(allItems)
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-      .slice(0, 60);
+      .slice(0, 120);
   });
 
   return applyFilters(feed, filters);

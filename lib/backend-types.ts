@@ -15,7 +15,23 @@ export type MarketStats = {
   btcDominance: number | null;
   ethDominance: number | null;
   marketCapChange24h: number | null;
+  /** CoinGecko: total global 24h trading volume in USD */
+  total24hVolume: number | null;
+  /** CoinGecko: DeFi-specific market cap in USD */
+  defiMarketCap: number | null;
+  /** CoinGecko: number of tracked cryptocurrencies */
+  activeCryptos: number | null;
 };
+
+/** Frankfurter (ECB) forex rates — free, no API key required */
+export type ForexData = {
+  /** EUR/USD – how many USD per 1 EUR, e.g. 1.086 */
+  eurUsd: number | null;
+  /** GBP/USD – how many USD per 1 GBP, e.g. 1.272 */
+  gbpUsd: number | null;
+  /** USD/JPY – how many JPY per 1 USD, e.g. 149.2 */
+  usdJpy: number | null;
+} | null;
 
 export type MempoolStats = {
   fees: { fastestFee: number; halfHourFee: number; hourFee: number } | null;
@@ -58,6 +74,7 @@ export type BackendSnapshot = {
   fearGreed: FearGreedData | null;
   ethGas: EthGasData;
   defiTvl: DefiTvlData;
+  forex: ForexData;
   liquidations: LiquidationEvent[];
   news: NewsItem[];
   whales: NewsItem[];
@@ -74,6 +91,7 @@ export type RealtimeEnvelope =
   | { type: "fearGreed"; payload: FearGreedData; timestamp: string }
   | { type: "ethGas"; payload: EthGasData; timestamp: string }
   | { type: "defiTvl"; payload: DefiTvlData; timestamp: string }
+  | { type: "forex"; payload: ForexData; timestamp: string }
   | { type: "liquidation"; payload: LiquidationEvent; timestamp: string }
   | { type: "news"; payload: NewsItem; timestamp: string }
   | { type: "social"; payload: NewsItem[]; timestamp: string }

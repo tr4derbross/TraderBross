@@ -17,6 +17,9 @@ export default function MarketStatsBar() {
     btcDominance: null,
     ethDominance: null,
     marketCapChange24h: null,
+    total24hVolume: null,
+    defiMarketCap: null,
+    activeCryptos: null,
   };
   const mempool = useRealtimeSelector((state) => state.mempoolStats) ?? {
     fees: null,
@@ -26,6 +29,7 @@ export default function MarketStatsBar() {
   };
   const ethGas = useRealtimeSelector((state) => state.ethGas);
   const defiTvl = useRealtimeSelector((state) => state.defiTvl);
+  const forex = useRealtimeSelector((state) => state.forex);
 
   const failed = connectionStatus === "disconnected";
   const capChange = market.marketCapChange24h;
@@ -50,6 +54,11 @@ export default function MarketStatsBar() {
       warn: failed && capChange == null,
     },
     {
+      label: "VOL 24H",
+      value: market.total24hVolume != null ? fmtMarketCap(market.total24hVolume) : nullVal(null),
+      warn: failed && market.total24hVolume == null,
+    },
+    {
       label: "BTC DOM",
       value: market.btcDominance != null ? `${market.btcDominance.toFixed(1)}%` : nullVal(null),
       warn: failed && market.btcDominance == null,
@@ -58,6 +67,16 @@ export default function MarketStatsBar() {
       label: "ETH DOM",
       value: market.ethDominance != null ? `${market.ethDominance.toFixed(1)}%` : nullVal(null),
       warn: failed && market.ethDominance == null,
+    },
+    {
+      label: "EUR/USD",
+      value: forex?.eurUsd != null ? forex.eurUsd.toFixed(4) : nullVal(null),
+      warn: failed && forex == null,
+    },
+    {
+      label: "USD/JPY",
+      value: forex?.usdJpy != null ? forex.usdJpy.toFixed(2) : nullVal(null),
+      warn: failed && forex == null,
     },
     {
       label: "BLOCK",

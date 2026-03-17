@@ -52,13 +52,38 @@ export async function getDefiLlamaTvl() {
 
 export async function getMarketStats() {
   return cache.remember("stats:market", 60000, async () => {
+    // Primary: CoinGecko /global — real BTC/ETH dominance, 24h volume, DeFi mcap
+    try {
+      const payload = await fetchJson("https://api.coingecko.com/api/v3/global", { timeoutMs: 5000 });
+      const d = payload?.data;
+      if (d) {
+        return {
+          marketCapUsd: d.total_market_cap?.usd ?? null,
+          btcDominance: d.market_cap_percentage?.btc != null ? Math.round(d.market_cap_percentage.btc * 10) / 10 : null,
+          ethDominance: d.market_cap_percentage?.eth != null ? Math.round(d.market_cap_percentage.eth * 10) / 10 : null,
+          marketCapChange24h: d.market_cap_change_percentage_24h_usd ?? null,
+          total24hVolume: d.total_volume?.usd ?? null,
+          defiMarketCap: d.defi_market_cap ?? null,
+          activeCryptos: d.active_cryptocurrencies ?? null,
+        };
+      }
+    } catch {
+      // fall through to CoinPaprika fallback
+    }
+
+    // Fallback: CoinPaprika
     try {
       const payload = await fetchJson("https://api.coinpaprika.com/v1/global", { timeoutMs: 4000 });
       return {
         marketCapUsd: payload.market_cap_usd ?? null,
         btcDominance: payload.bitcoin_dominance_percentage ?? null,
-        ethDominance: payload.cryptocurrencies_number ? Math.max(0, 100 - (payload.bitcoin_dominance_percentage || 0) - 34) : null,
+        ethDominance: payload.cryptocurrencies_number
+          ? Math.max(0, 100 - (payload.bitcoin_dominance_percentage || 0) - 34)
+          : null,
         marketCapChange24h: payload.market_cap_change_24h ?? null,
+        total24hVolume: null,
+        defiMarketCap: null,
+        activeCryptos: payload.cryptocurrencies_number ?? null,
       };
     } catch {
       return {
@@ -66,7 +91,33 @@ export async function getMarketStats() {
         btcDominance: null,
         ethDominance: null,
         marketCapChange24h: null,
+        total24hVolume: null,
+        defiMarketCap: null,
+        activeCryptos: null,
       };
+    }
+  });
+}
+
+// ─── Frankfurter Forex (ECB rates, free, no API key required) ─────────────────
+export async function getForexRates() {
+  return cache.remember("stats:forex", 5 * 60 * 1000, async () => {
+    try {
+      const payload = await fetchJson(
+        "https://api.frankfurter.app/latest?from=USD&to=EUR,GBP,JPY",
+        { timeoutMs: 5000 }
+      );
+      const r = payload?.rates;
+      if (!r) return null;
+      return {
+        // Standard forex notation: EUR/USD = how many USD per 1 EUR
+        eurUsd: r.EUR ? Math.round((1 / r.EUR) * 10000) / 10000 : null,
+        gbpUsd: r.GBP ? Math.round((1 / r.GBP) * 10000) / 10000 : null,
+        // USD/JPY = how many JPY per 1 USD
+        usdJpy: r.JPY ? Math.round(r.JPY * 100) / 100 : null,
+      };
+    } catch {
+      return null;
     }
   });
 }
