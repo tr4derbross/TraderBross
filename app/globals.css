@@ -159,14 +159,38 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
   }
   body {
     @apply bg-background text-foreground;
     background-color: #0B0B0B;
     background-image: none;
     background-attachment: fixed;
+    -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
   }
-  html { @apply font-sans; }
+  html {
+    @apply font-sans;
+    scroll-behavior: smooth;
+  }
+  /* Prevent iOS input zoom — inputs use font-size 16px on mobile */
+  @media (max-width: 767px) {
+    input[type="text"],
+    input[type="number"],
+    input[type="email"],
+    input[type="password"],
+    input[type="search"],
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+  /* Smooth scroll momentum on iOS */
+  .overflow-y-auto,
+  .overflow-y-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 /* Fine grid overlay */

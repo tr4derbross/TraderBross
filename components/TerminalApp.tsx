@@ -1430,31 +1430,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-black">
-      {/* Mobile warning overlay */}
-      {isMobile && (
-        <div className="fixed inset-0 z-[999] flex flex-col items-center justify-center gap-5 bg-[#07060a] px-8 text-center md:hidden">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/8">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-amber-300">
-              <rect x="5" y="2" width="14" height="20" rx="2" />
-              <circle cx="12" cy="17" r="1" fill="currentColor" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-base font-bold text-[#f0e8d3]">Best on Desktop</p>
-            <p className="mt-2 text-sm leading-6 text-zinc-500">
-              TraderBross Terminal is optimized for desktop.<br />
-              For the best experience, open on a larger screen.
-            </p>
-          </div>
-          <a
-            href="/"
-            className="rounded-xl border border-[rgba(212,161,31,0.2)] bg-[rgba(212,161,31,0.08)] px-5 py-2.5 text-[11px] font-bold uppercase tracking-[0.14em] text-amber-400 transition hover:bg-[rgba(212,161,31,0.16)]"
-          >
-            Back to Home
-          </a>
-        </div>
-      )}
-      <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-3 py-3 sm:px-4 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
+      <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-3 py-2 sm:py-3 sm:px-4 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
         {/* Left: Fear & Greed + page nav */}
         <div className="absolute left-3 top-1/2 z-10 -translate-y-1/2 sm:left-4 flex items-center gap-2">
           <FearGreedPill />
@@ -1539,18 +1515,22 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       <div className="px-2 pt-2">
         <div className="panel-shell soft-divider overflow-hidden rounded-xl border terminal-glow-pulse">
           <TickerTape quotes={wsQuotes} />
-          <MarketStatsBar />
-          <MarketSessionBar />
+          <div className="hidden sm:block">
+            <MarketStatsBar />
+          </div>
+          <div className="hidden md:block">
+            <MarketSessionBar />
+          </div>
         </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 pb-2 pt-2">
         {isMobile && (
-          <div className="mb-2 flex shrink-0 items-center gap-1 overflow-x-auto rounded-xl border border-[rgba(212,161,31,0.12)] bg-[rgba(13,12,11,0.9)] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mb-2 flex shrink-0 items-center gap-1 rounded-xl border border-[rgba(242,183,5,0.12)] bg-[rgba(13,12,11,0.95)] p-1">
             {[
-              { id: "news" as const, label: "News", icon: Newspaper },
+              { id: "news"  as const, label: "News",  icon: Newspaper        },
               { id: "chart" as const, label: "Chart", icon: CandlestickChart },
-              { id: "tools" as const, label: "Tools", icon: PanelsTopLeft },
+              { id: "tools" as const, label: "Trade", icon: PanelsTopLeft    },
             ].map((item) => {
               const Icon = item.icon;
               return (
@@ -1558,12 +1538,14 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                   key={item.id}
                   type="button"
                   onClick={() => setMobileWorkspaceTab(item.id)}
-                  className={`flex min-w-[96px] flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] ${
-                    mobileWorkspaceTab === item.id ? "brand-chip-active" : "terminal-chip text-zinc-300"
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[10px] font-bold uppercase tracking-[0.14em] transition-all ${
+                    mobileWorkspaceTab === item.id
+                      ? "bg-[rgba(242,183,5,0.18)] text-[#F2B705] shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
                   }`}
                 >
-                  <Icon className="h-3.5 w-3.5" />
-                  {item.label}
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span>{item.label}</span>
                 </button>
               );
             })}
@@ -1589,12 +1571,13 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
             </div>
           ) : isTablet ? (
             <>
-              <div className="min-h-0 flex-[1.15] overflow-hidden">
+              {/* Tablet: chart top, tabs + panels bottom */}
+              <div className="min-h-0 flex-[1.2] overflow-hidden">
                 {renderChartPanelWrapped("rounded-xl")}
               </div>
-              <div className="grid min-h-0 flex-1 gap-2 md:grid-cols-2">
-                <div className="min-h-0 overflow-hidden">{renderNewsPanel()}</div>
-                <div className="min-h-0 overflow-hidden">{renderRightPanel()}</div>
+              <div className="flex min-h-0 flex-1 overflow-hidden gap-2">
+                <div className="min-h-0 flex-1 overflow-hidden">{renderNewsPanel()}</div>
+                <div className="min-h-0 overflow-hidden" style={{ width: 320 }}>{renderRightPanel()}</div>
               </div>
             </>
           ) : (
