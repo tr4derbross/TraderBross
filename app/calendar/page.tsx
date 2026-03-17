@@ -307,7 +307,14 @@ export default function CalendarPage() {
         ) : Object.keys(groups).length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-20 text-zinc-600">
             <Calendar className="h-8 w-8 opacity-30" />
-            <p className="text-sm">No events match your filters.</p>
+            <p className="text-sm">No upcoming events found.</p>
+            <p className="text-[11px] text-zinc-700">
+              Check back soon or{" "}
+              <a href="https://t.me/traderbross" target="_blank" rel="noreferrer" className="text-amber-500/70 hover:text-amber-400 transition underline underline-offset-2">
+                join our Telegram
+              </a>{" "}
+              for live updates.
+            </p>
           </div>
         ) : (
           <div className="space-y-8">
@@ -317,9 +324,6 @@ export default function CalendarPage() {
           </div>
         )}
 
-        <p className="mt-8 text-center text-[10px] text-zinc-700">
-          Add <code className="rounded bg-zinc-800 px-1 py-0.5">COINMARKETCAL_API_KEY</code> to .env for live event data
-        </p>
       </div>
     </div>
   );

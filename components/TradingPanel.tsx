@@ -26,6 +26,7 @@ type Props = {
   selectedNews: NewsItem | null;
   newsTradeIntent?: (NewsTradePreset & { sourceItemId?: string }) | null;
   balance: number;
+  isDemoMode?: boolean;
   positions: Position[];
   prices: Record<string, number>;
   marketDataSourceLabel: string;
@@ -92,6 +93,7 @@ export default function TradingPanel({
   selectedNews,
   newsTradeIntent,
   balance,
+  isDemoMode = false,
   positions,
   prices,
   marketDataSourceLabel,
@@ -360,7 +362,14 @@ export default function TradingPanel({
           </span>
         </div>
         <div className="text-right">
-          <div className="text-[9px] uppercase tracking-widest text-zinc-600">Balance</div>
+          <div className="flex items-center justify-end gap-1.5">
+            {isDemoMode && (
+              <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-400">
+                PAPER
+              </span>
+            )}
+            <div className="text-[9px] uppercase tracking-widest text-zinc-600">Balance</div>
+          </div>
           <div className="text-[12px] font-semibold text-amber-300">
             ${balance.toLocaleString("en-US", { maximumFractionDigits: 2 })}
           </div>

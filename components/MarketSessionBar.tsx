@@ -65,10 +65,12 @@ export default function MarketSessionBar() {
       <div className="flex shrink-0 items-center gap-1.5 border-r border-white/[0.06] pr-3 mr-3">
         {SESSIONS.map((s) => {
           const on = isOpen(s, utcH);
+          const tooltip = `${s.name} session — ${pad(s.openHour)}:00–${pad(s.closeHour)}:00 UTC · ${on ? "Currently open" : "Currently closed"}`;
           return (
             <div
               key={s.short}
-              className="flex items-center gap-1 rounded-md px-2 py-[3px] transition-all duration-500"
+              title={tooltip}
+              className="flex items-center gap-1 rounded-md px-2 py-[3px] transition-all duration-500 cursor-default"
               style={{
                 background: on ? `${s.color}16` : "rgba(20,18,15,0.5)",
                 border: `1px solid ${on ? `${s.color}40` : "rgba(255,255,255,0.05)"}`,

@@ -41,7 +41,7 @@ export function useNews({
   const connectionStatus = useRealtimeSelector((state) => state.connectionStatus);
   const previousHeadlines = useRef<Set<string>>(new Set());
 
-  const loading = connectionStatus === "connecting" && newsItems.length === 0;
+  const loading = (connectionStatus === "idle" || connectionStatus === "connecting") && newsItems.length === 0;
   const allItems = useMemo(() => [...newsItems, ...whaleItems, ...socialItems], [newsItems, whaleItems, socialItems]);
 
   const filtered = useMemo(() => {

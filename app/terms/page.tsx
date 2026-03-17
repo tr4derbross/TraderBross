@@ -129,7 +129,7 @@ export default function TermsPage() {
         <h2>12. Contact</h2>
         <p>For questions regarding these Terms, contact:</p>
         <p>
-          <strong>Nikokaya24@gmail.com</strong>
+          <strong>hello@traderbross.com</strong>
         </p>
       </section>
     </LegalPage>

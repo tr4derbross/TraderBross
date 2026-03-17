@@ -77,9 +77,9 @@ const iconBgMap: Record<string, string> = {
 };
 
 const stats = [
-  { value: "6+", label: "Exchanges" },
+  { value: "4", label: "Exchanges" },
   { value: "AI", label: "Powered" },
-  { value: "0ms", label: "Lag" },
+  { value: "Low", label: "Latency" },
   { value: "Free", label: "Always" },
 ];
 
@@ -88,7 +88,7 @@ const footerLinks = [
   { label: "Telegram", href: "https://t.me/traderbross" },
   { label: "Privacy", href: "/privacy" },
   { label: "Terms", href: "/terms" },
-  { label: "Contact", href: "mailto:Nikokaya24@gmail.com" },
+  { label: "Contact", href: "mailto:hello@traderbross.com" },
 ];
 
 /* ─── Page ──────────────────────────────────────────────────────────────────── */
@@ -222,13 +222,6 @@ export default function HomePage() {
               A premium workspace for<br className="hidden sm:block" /> reaction traders
             </h2>
           </div>
-          <Link
-            href="/terminal"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(212,161,31,0.2)] bg-[rgba(212,161,31,0.07)] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300 transition-all hover:border-[rgba(212,161,31,0.38)] md:self-auto self-start"
-          >
-            Enter terminal
-            <ArrowUpRight className="h-3 w-3" />
-          </Link>
         </div>
 
         {/* Preview shell */}
@@ -424,6 +417,10 @@ export default function HomePage() {
             {/* Right — chat mock */}
             <div className="border-t border-[rgba(212,161,31,0.08)] p-6 lg:border-l lg:border-t-0 lg:p-8">
               <div className="flex h-full flex-col gap-3">
+                {/* Demo label */}
+                <p className="text-center text-[9px] uppercase tracking-[0.2em] text-zinc-700">
+                  ★ Example conversation — try the real thing in the terminal
+                </p>
                 {/* Header */}
                 <div className="flex items-center justify-between rounded-xl border border-[rgba(212,161,31,0.1)] bg-black/30 px-3 py-2">
                   <div className="flex items-center gap-2">

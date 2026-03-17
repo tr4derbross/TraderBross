@@ -8,7 +8,7 @@ type Props = {
   compact?: boolean;
 };
 
-const LOGO_SRC = "/Brand/ChatGPT%20Image%2013%20Mar%202026%2002_11_58.png?v=1";
+const LOGO_SRC = "/brand/logo.png";
 
 function CompactFallback() {
   return (

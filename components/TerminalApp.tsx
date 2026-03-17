@@ -1159,6 +1159,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           selectedNews={selectedItem}
           newsTradeIntent={newsTradeIntent}
           balance={displayBalance}
+          isDemoMode={venueBalance === null}
           positions={displayPositions}
           prices={activeVenuePriceMap}
           marketDataSourceLabel={activeVenueMarketLabel}
@@ -1306,6 +1307,30 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-black">
+      {/* Mobile warning overlay */}
+      {isMobile && (
+        <div className="fixed inset-0 z-[999] flex flex-col items-center justify-center gap-5 bg-[#07060a] px-8 text-center md:hidden">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/8">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-amber-300">
+              <rect x="5" y="2" width="14" height="20" rx="2" />
+              <circle cx="12" cy="17" r="1" fill="currentColor" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-base font-bold text-[#f0e8d3]">Best on Desktop</p>
+            <p className="mt-2 text-sm leading-6 text-zinc-500">
+              TraderBross Terminal is optimized for desktop.<br />
+              For the best experience, open on a larger screen.
+            </p>
+          </div>
+          <a
+            href="/"
+            className="rounded-xl border border-[rgba(212,161,31,0.2)] bg-[rgba(212,161,31,0.08)] px-5 py-2.5 text-[11px] font-bold uppercase tracking-[0.14em] text-amber-400 transition hover:bg-[rgba(212,161,31,0.16)]"
+          >
+            Back to Home
+          </a>
+        </div>
+      )}
       <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-3 py-3 sm:px-4 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
         {/* Left: Fear & Greed + page nav */}
         <div className="absolute left-3 top-1/2 z-10 -translate-y-1/2 sm:left-4 flex items-center gap-2">
@@ -1491,12 +1516,30 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           <span className="text-[#2a2820] hidden sm:inline">·</span>
 
           {/* Venue feeds */}
-          {(["OKX", "Bybit", "HL", "dYdX"] as const).map((v) => (
-            <div key={v} className="hidden sm:flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: "#6b7280" }} />
-              <span className="text-[9px] tracking-[0.1em] text-zinc-600">{v}</span>
-            </div>
-          ))}
+          {(["OKX", "Bybit", "HL", "dYdX"] as const).map((v) => {
+            const venueMap: Record<string, string> = { OKX: "okx", Bybit: "bybit", HL: "hyperliquid", dYdX: "dydx" };
+            const tooltipMap: Record<string, string> = {
+              OKX: "OKX — CEX data feed",
+              Bybit: "Bybit — CEX data feed",
+              HL: "Hyperliquid — DEX perp trading",
+              dYdX: "dYdX v4 — coming soon",
+            };
+            const isActive = activeVenueState.venueId === venueMap[v];
+            return (
+              <div
+                key={v}
+                title={tooltipMap[v]}
+                className={`hidden sm:flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors ${
+                  isActive
+                    ? "bg-amber-500/10 text-amber-300"
+                    : "text-zinc-600"
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isActive ? "bg-amber-400 shadow-[0_0_4px_rgba(212,161,31,0.7)]" : ""}`} style={isActive ? {} : { background: "#6b7280" }} />
+                <span className={`text-[9px] tracking-[0.1em] font-${isActive ? "bold" : "normal"}`}>{v}</span>
+              </div>
+            );
+          })}
         </div>
 
         {/* Center: selected item context */}
@@ -1520,15 +1563,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           )}
         </div>
 
-        {/* Right: layout info */}
+        {/* Right: version badge */}
         <div className="flex shrink-0 items-center gap-2 text-[9px] text-zinc-700">
-          <span className="hidden lg:inline tracking-[0.1em]">
-            {showDesktopLayout
-              ? `NEWS ${newsWidth}px · RIGHT ${rightWidth}px`
-              : isTablet
-                ? "TABLET"
-                : "MOBILE"}
-          </span>
           <span
             className="rounded px-1.5 py-0.5 tracking-[0.12em] uppercase font-semibold"
             style={{
@@ -1537,7 +1573,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
               color: "#3f3f4e",
             }}
           >
-            TB v2
+            TraderBross
           </span>
         </div>
       </div>

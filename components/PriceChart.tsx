@@ -141,6 +141,7 @@ export default function PriceChart({
   const [chartReady, setChartReady] = useState(false);
   const [chartError, setChartError] = useState<string | null>(null);
   const [isLoadingPrices, setIsLoadingPrices] = useState(true);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dragTarget, setDragTarget] = useState<"tp" | "sl" | null>(null);
   const [menu, setMenu] = useState<ChartMenu>(null);
   const activePosition = positions.find((position) => position.ticker === ticker);
@@ -402,6 +403,18 @@ export default function PriceChart({
     let active = true;
     const { interval, limit } = TF_CONFIG[timeframe];
     setIsLoadingPrices(true);
+    setChartError(null);
+
+    // 10-second timeout — if data hasn't loaded, show explicit error
+    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    loadTimeoutRef.current = setTimeout(() => {
+      if (active) {
+        console.warn("[PriceChart] chart data timeout for", ticker, timeframe);
+        setIsLoadingPrices(false);
+        setChartError("Chart data unavailable. Check your connection or try refreshing.");
+      }
+    }, 10_000);
+
     const endpoint =
       activeVenue === "okx"
         ? `/api/okx?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
@@ -411,21 +424,29 @@ export default function PriceChart({
             ? `/api/hyperliquid?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
             : `/api/prices?ticker=${ticker}&interval=${interval}&limit=${limit}`;
 
+    console.log("[PriceChart] fetching candles:", endpoint);
     apiFetch<PriceData[]>(endpoint)
       .then((payload: PriceData[]) => {
         if (!active) return;
+        if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
         setPriceData(Array.isArray(payload) ? payload : []);
         setIsLoadingPrices(false);
-      })
-      .catch(() => {
-        if (active) {
-          setPriceData([]);
-          setIsLoadingPrices(false);
+        if (!Array.isArray(payload) || payload.length === 0) {
+          console.warn("[PriceChart] empty candle response for", ticker);
         }
+      })
+      .catch((err) => {
+        if (!active) return;
+        if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+        console.error("[PriceChart] fetch error for", ticker, err);
+        setPriceData([]);
+        setIsLoadingPrices(false);
+        setChartError("Chart data unavailable. Check your connection or try refreshing.");
       });
 
     return () => {
       active = false;
+      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     };
   }, [activeVenue, ticker, timeframe]);
 
@@ -977,13 +998,25 @@ export default function PriceChart({
 
           {(!chartReady || chartError || (!isLoadingPrices && priceData.length === 0)) && (
             <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center">
-              <div className="rounded-2xl border border-white/8 bg-[#0b0f16]/92 px-5 py-4 text-center shadow-2xl backdrop-blur-xl">
+              <div className="pointer-events-auto rounded-2xl border border-white/8 bg-[#0b0f16]/92 px-5 py-4 text-center shadow-2xl backdrop-blur-xl">
                 <div className="text-sm font-semibold text-zinc-100">
-                  {chartError ? "Chart unavailable" : isLoadingPrices ? "Loading chart..." : "No chart data"}
+                  {chartError ? "Chart data unavailable" : isLoadingPrices ? "Loading chart..." : "No chart data"}
                 </div>
                 <div className="mt-1 text-[11px] text-zinc-500">
-                  {chartError ?? (isLoadingPrices ? `${ticker} ${TF_CONFIG[timeframe].label} candles are loading.` : `No candles returned for ${ticker}.`)}
+                  {chartError
+                    ? "Check your connection or try refreshing."
+                    : isLoadingPrices
+                    ? `${ticker} ${TF_CONFIG[timeframe].label} candles are loading.`
+                    : `No candles returned for ${ticker}.`}
                 </div>
+                {(chartError || (!isLoadingPrices && priceData.length === 0)) && (
+                  <button
+                    onClick={() => { setChartError(null); setIsLoadingPrices(true); }}
+                    className="mt-3 rounded-md border border-zinc-700/50 bg-zinc-800/60 px-3 py-1 text-[11px] text-zinc-300 transition hover:bg-zinc-700/60"
+                  >
+                    ⟳ Retry
+                  </button>
+                )}
               </div>
             </div>
           )}
