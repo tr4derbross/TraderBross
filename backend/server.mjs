@@ -326,6 +326,31 @@ const server = http.createServer(async (request, reply) => {
       return;
     }
 
+    // Long/Short Account Ratio (Binance Futures, free, no key) ─────────────────
+    if (request.method === "GET" && url.pathname === "/api/lsr") {
+      const symbol = (url.searchParams.get("symbol") || "BTC").toUpperCase();
+      const period = url.searchParams.get("period") || "1h";
+      const limit  = Math.min(Number(url.searchParams.get("limit") || 24), 500);
+      try {
+        const res = await fetch(
+          `https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=${symbol}USDT&period=${period}&limit=${limit}`,
+          { signal: AbortSignal.timeout(5000) }
+        );
+        const data = await res.json();
+        const rows = (Array.isArray(data) ? data : []).map((row) => ({
+          symbol,
+          longShortRatio: parseFloat(row.longShortRatio || "1"),
+          longAccount:    parseFloat(row.longAccount   || "0.5"),
+          shortAccount:   parseFloat(row.shortAccount  || "0.5"),
+          timestamp:      Number(row.timestamp || Date.now()),
+        }));
+        json(reply, 200, rows);
+      } catch {
+        json(reply, 200, []);
+      }
+      return;
+    }
+
     if (request.method === "GET" && url.pathname === "/api/coincap") {
       // CoinCap top-100 assets — real-time price + market data — free, no key
       try {

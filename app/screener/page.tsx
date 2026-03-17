@@ -13,6 +13,7 @@ import {
   ExternalLink,
   LayoutDashboard,
   Zap,
+  Activity,
 } from "lucide-react";
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
@@ -38,6 +39,13 @@ function fmtVol(v: number): string {
   return v.toFixed(0);
 }
 
+function fmtOI(v: number): string {
+  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(2)}B`;
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
+  return v.toFixed(0);
+}
+
 const SORT_TABS = [
   { key: "volume",  label: "Volume",  icon: BarChart2  },
   { key: "gainers", label: "Gainers", icon: TrendingUp  },
@@ -49,6 +57,49 @@ function getReferralUrl(symbol: string): string {
   return ref
     ? `https://www.binance.com/en/trade/${symbol}_USDT?ref=${ref}`
     : `https://www.binance.com/en/trade/${symbol}_USDT`;
+}
+
+/* ── RSI Badge ──────────────────────────────────────────────────────────────── */
+function RsiBadge({ rsi }: { rsi: number | null | undefined }) {
+  if (rsi == null) return <span className="text-[10px] text-zinc-700">—</span>;
+
+  const isOversold   = rsi < 30;
+  const isOverbought = rsi > 70;
+  const isNeutral    = rsi >= 30 && rsi <= 70;
+
+  const cls = isOversold
+    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
+    : isOverbought
+      ? "bg-rose-500/15 text-rose-400 border-rose-500/25"
+      : "bg-zinc-800/60 text-zinc-400 border-zinc-700/30";
+
+  const label = isOversold ? "OS" : isOverbought ? "OB" : "";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${cls}`}
+      title={`RSI-14 (4h): ${rsi}${isOversold ? " — Oversold" : isOverbought ? " — Overbought" : ""}`}
+    >
+      {rsi.toFixed(1)}
+      {label && (
+        <span className="text-[8px] opacity-70">{label}</span>
+      )}
+    </span>
+  );
+}
+
+/* ── L/S Ratio Badge ─────────────────────────────────────────────────────────── */
+function LSBadge({ ratio }: { ratio: number | null | undefined }) {
+  if (ratio == null) return <span className="text-[10px] text-zinc-700">—</span>;
+  const bullish = ratio >= 1;
+  return (
+    <span
+      className={`text-[10px] font-bold tabular-nums ${bullish ? "text-emerald-400" : "text-rose-400"}`}
+      title={`Global Long/Short Account Ratio (1h): ${ratio} — ${bullish ? "More longs than shorts" : "More shorts than longs"}`}
+    >
+      {ratio.toFixed(2)}
+    </span>
+  );
 }
 
 /* ── Mini sparkline bar ─────────────────────────────────────────────────────── */
@@ -99,6 +150,24 @@ function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
           {positive ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
           {positive ? "+" : ""}{coin.change24h.toFixed(2)}%
         </span>
+      </td>
+      {/* RSI-14 */}
+      <td className="hidden py-2.5 pr-4 text-right lg:table-cell">
+        <RsiBadge rsi={coin.rsi14} />
+      </td>
+      {/* Open Interest */}
+      <td className="hidden py-2.5 pr-4 text-right tabular-nums xl:table-cell">
+        {coin.openInterestUsd != null ? (
+          <span className="text-[11px] text-zinc-400" title={`Open Interest: $${coin.openInterestUsd.toLocaleString()}`}>
+            ${fmtOI(coin.openInterestUsd)}
+          </span>
+        ) : (
+          <span className="text-[10px] text-zinc-700">—</span>
+        )}
+      </td>
+      {/* Long/Short Ratio */}
+      <td className="hidden py-2.5 pr-4 text-right xl:table-cell">
+        <LSBadge ratio={coin.longShortRatio} />
       </td>
       <td className="hidden py-2.5 pr-4 text-right tabular-nums sm:table-cell">
         <span className="text-[11px] text-zinc-400">${fmtVol(coin.volume24h)}</span>
@@ -154,11 +223,11 @@ function StatCard({ label, value, sub, color = "amber" }: { label: string; value
 /* ── Page ──────────────────────────────────────────────────────────────────── */
 
 export default function ScreenerPage() {
-  const [sort, setSort]     = useState<"volume" | "gainers" | "losers">("volume");
-  const [search, setSearch] = useState("");
-  const [coins, setCoins]   = useState<ScreenerCoin[]>([]);
+  const [sort, setSort]       = useState<"volume" | "gainers" | "losers">("volume");
+  const [search, setSearch]   = useState("");
+  const [coins, setCoins]     = useState<ScreenerCoin[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState<string | null>(null);
+  const [error, setError]     = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   const load = useCallback(async () => {
@@ -181,9 +250,9 @@ export default function ScreenerPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Auto-refresh every 30s
+  // Auto-refresh every 45s
   useEffect(() => {
-    const id = setInterval(load, 30_000);
+    const id = setInterval(load, 45_000);
     return () => clearInterval(id);
   }, [load]);
 
@@ -196,6 +265,10 @@ export default function ScreenerPage() {
   const topGainer    = coins.filter((c) => c.change24h > 0).sort((a, b) => b.change24h - a.change24h)[0];
   const topLoser     = coins.filter((c) => c.change24h < 0).sort((a, b) => a.change24h - b.change24h)[0];
   const totalVol     = coins.reduce((s, c) => s + c.volume24h, 0);
+
+  // RSI stats (only enriched coins)
+  const oversoldCount   = coins.filter((c) => c.rsi14 != null && c.rsi14 < 30).length;
+  const overboughtCount = coins.filter((c) => c.rsi14 != null && c.rsi14 > 70).length;
 
   return (
     <div className="flex min-h-screen flex-col bg-[#07060a] text-[var(--text-primary)]">
@@ -212,10 +285,22 @@ export default function ScreenerPage() {
                 <span className={`h-1.5 w-1.5 rounded-full ${!loading && coins.length > 0 ? "animate-pulse bg-emerald-400" : "bg-zinc-600"}`} />
                 {loading ? "Loading" : `${coins.length} pairs`}
               </span>
+              {!loading && oversoldCount > 0 && (
+                <span className="flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/8 px-2 py-0.5 text-[9px] font-bold text-emerald-400">
+                  <Activity className="h-2.5 w-2.5" />
+                  {oversoldCount} oversold
+                </span>
+              )}
+              {!loading && overboughtCount > 0 && (
+                <span className="flex items-center gap-1 rounded-full border border-rose-500/20 bg-rose-500/8 px-2 py-0.5 text-[9px] font-bold text-rose-400">
+                  <Activity className="h-2.5 w-2.5" />
+                  {overboughtCount} overbought
+                </span>
+              )}
             </div>
             {lastUpdate && (
               <p className="text-[11px] text-zinc-600">
-                Updated {lastUpdate.toLocaleTimeString()} · Auto-refreshes every 30s
+                Updated {lastUpdate.toLocaleTimeString()} · RSI-14 &amp; OI enriched for top 20 futures pairs
               </p>
             )}
           </div>
@@ -230,11 +315,13 @@ export default function ScreenerPage() {
         </div>
 
         {/* Stats row */}
-        <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <StatCard label="24h Volume" value={fmt(totalVol)} color="amber" />
-          <StatCard label="Gainers" value={gainersCount.toString()} sub={topGainer ? `Top: ${topGainer.symbol} +${topGainer.change24h.toFixed(1)}%` : undefined} color="emerald" />
-          <StatCard label="Losers"  value={losersCount.toString()}  sub={topLoser  ? `Top: ${topLoser.symbol} ${topLoser.change24h.toFixed(1)}%`   : undefined} color="rose"    />
-          <StatCard label="Pairs"   value={coins.length.toString()} sub=">$500K vol" color="sky" />
+        <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+          <StatCard label="24h Volume"  value={fmt(totalVol)}              color="amber"   />
+          <StatCard label="Gainers"     value={gainersCount.toString()}    sub={topGainer ? `Top: ${topGainer.symbol} +${topGainer.change24h.toFixed(1)}%` : undefined} color="emerald" />
+          <StatCard label="Losers"      value={losersCount.toString()}     sub={topLoser  ? `Top: ${topLoser.symbol} ${topLoser.change24h.toFixed(1)}%`   : undefined} color="rose"    />
+          <StatCard label="Pairs"       value={coins.length.toString()}    sub=">$500K vol"                  color="sky"     />
+          <StatCard label="Oversold"    value={oversoldCount.toString()}   sub="RSI-14 < 30"                 color="emerald" />
+          <StatCard label="Overbought"  value={overboughtCount.toString()} sub="RSI-14 > 70"                 color="rose"    />
         </div>
 
         {/* Controls */}
@@ -294,6 +381,9 @@ export default function ScreenerPage() {
                   <th className="py-2.5 pr-3 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600">Coin</th>
                   <th className="py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600">Price</th>
                   <th className="py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600">24h %</th>
+                  <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600 lg:table-cell" title="RSI-14 on 4h candles · Green=Oversold(<30) Red=Overbought(>70)">RSI-14</th>
+                  <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600 xl:table-cell" title="Open Interest in USD (Binance perp futures)">OI (USD)</th>
+                  <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600 xl:table-cell" title="Global Long/Short Account Ratio (1h) · >1 = more longs">L/S</th>
                   <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600 sm:table-cell">Volume</th>
                   <th className="hidden py-2.5 pr-4 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600 md:table-cell">24h Range</th>
                   <th className="py-2.5 pr-3 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600">Action</th>
@@ -303,7 +393,7 @@ export default function ScreenerPage() {
                 {loading && coins.length === 0 ? (
                   Array.from({ length: 15 }).map((_, i) => (
                     <tr key={i} className="border-b border-[rgba(255,255,255,0.03)]">
-                      {[40, 80, 60, 50, 70, 100, 60].map((w, j) => (
+                      {[40, 80, 60, 50, 45, 55, 45, 70, 100, 60].map((w, j) => (
                         <td key={j} className="py-3 pl-4">
                           <div className="skeleton-shimmer h-3 rounded" style={{ width: w }} />
                         </td>
@@ -312,7 +402,7 @@ export default function ScreenerPage() {
                   ))
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-16 text-center">
+                    <td colSpan={10} className="py-16 text-center">
                       <div className="flex flex-col items-center gap-2 text-zinc-600">
                         <Search className="h-6 w-6 opacity-30" />
                         <p className="text-sm">No coins found</p>
@@ -331,11 +421,21 @@ export default function ScreenerPage() {
           {!loading && filtered.length > 0 && (
             <div className="flex items-center justify-between border-t border-[rgba(255,255,255,0.04)] px-4 py-2">
               <span className="text-[10px] text-zinc-700">
-                Showing {filtered.length} of {coins.length} pairs · Source: Binance
+                Showing {filtered.length} of {coins.length} pairs · Binance Spot + Futures
               </span>
-              <div className="flex items-center gap-1 text-[10px] text-zinc-700">
-                <Zap className="h-2.5 w-2.5" />
-                Auto-refresh 30s
+              <div className="flex items-center gap-3 text-[10px] text-zinc-700">
+                <span className="flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500/50" />
+                  RSI &lt;30 = Oversold
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500/50" />
+                  RSI &gt;70 = Overbought
+                </span>
+                <span className="flex items-center gap-1">
+                  <Zap className="h-2.5 w-2.5" />
+                  Auto-refresh 45s
+                </span>
               </div>
             </div>
           )}
