@@ -493,7 +493,7 @@ const server = http.createServer(async (request, reply) => {
           return;
         }
         if (body.type === "closePosition") {
-          // 1. Cancel all open orders for this symbol (TP/SL must be cleared first)
+          // 1. Cancel all open conditional orders (TP/SL) for this symbol first
           try {
             const qs0 = binanceSignedQuery(apiSecret, { symbol });
             await fetch(`${base}/fapi/v1/allOpenOrders?${qs0}`, {
@@ -501,10 +501,24 @@ const server = http.createServer(async (request, reply) => {
             });
           } catch { /* ignore — no open orders is fine */ }
 
-          // 2. Market close with closePosition=true (Binance auto-closes full position)
+          // 2. Fetch current position size from Binance for accurate quantity
+          const qsPos = binanceSignedQuery(apiSecret, { symbol });
+          const posRes = await fetch(`${base}/fapi/v2/positionRisk?${qsPos}`, {
+            headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(5000)
+          });
+          const posData = await posRes.json();
+          const posEntry = Array.isArray(posData) ? posData.find((p) => p.symbol === symbol) : null;
+          const posAmt = posEntry ? Math.abs(parseFloat(posEntry.positionAmt)) : null;
+          if (!posAmt || posAmt === 0) {
+            json(reply, 200, { ok: true, data: { msg: "No open position found" } });
+            return;
+          }
+
+          // 3. Market order with reduceOnly=true + exact quantity (closePosition=true is NOT valid for MARKET type)
           const closeSide = body.side === "long" ? "SELL" : "BUY";
           const result = await binancePost("/fapi/v1/order", {
-            symbol, side: closeSide, type: "MARKET", closePosition: "true",
+            symbol, side: closeSide, type: "MARKET",
+            quantity: String(posAmt), reduceOnly: "true",
           });
           json(reply, 200, { ok: true, data: result });
           return;
