@@ -130,6 +130,8 @@ export const binanceAdapter: VenueAdapter = {
       leverage: input.leverage,
       marginMode: input.marginMode,
       limitPrice: input.limitPrice,
+      tpPrice: input.tpPrice,
+      slPrice: input.slPrice,
       sessionToken: connection?.sessionToken,
     });
   },

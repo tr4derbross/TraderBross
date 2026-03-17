@@ -27,18 +27,29 @@ export async function getMarketStats() {
 export async function getMempoolStats() {
   return cache.remember("stats:mempool", 30000, async () => {
     try {
-      const [fees, blockHeight, mempool, halving] = await Promise.all([
-        fetchJson("https://mempool.space/api/v1/fees/recommended", { timeoutMs: 4000 }),
-        fetch("https://mempool.space/api/blocks/tip/height", { signal: AbortSignal.timeout(4000) }).then((res) => res.text()),
-        fetchJson("https://mempool.space/api/mempool", { timeoutMs: 4000 }),
-        fetchJson("https://mempool.space/api/v1/halvings/next", { timeoutMs: 4000 }),
+      const [fees, blockHeightRaw, mempool] = await Promise.all([
+        fetchJson("https://mempool.space/api/v1/fees/recommended", { timeoutMs: 5000 }),
+        fetch("https://mempool.space/api/blocks/tip/height", { signal: AbortSignal.timeout(5000) }).then((r) => r.text()),
+        fetchJson("https://mempool.space/api/mempool", { timeoutMs: 5000 }),
       ]);
+
+      const blockHeight = Number(blockHeightRaw) || null;
+
+      // Halving every 210,000 blocks; compute next halving block
+      let halving = null;
+      if (blockHeight) {
+        const HALVING_INTERVAL = 210000;
+        const nextHalvingBlock = Math.ceil(blockHeight / HALVING_INTERVAL) * HALVING_INTERVAL;
+        const remainingBlocks = nextHalvingBlock - blockHeight;
+        const estimatedDays = Math.round(remainingBlocks * 10 / 1440); // ~10 min/block
+        halving = { remainingBlocks, nextHalvingBlock, estimatedDays };
+      }
 
       return {
         fees: fees ?? null,
-        blockHeight: Number(blockHeight) || null,
+        blockHeight,
         mempool: mempool ?? null,
-        halving: halving ?? null,
+        halving,
       };
     } catch {
       return {

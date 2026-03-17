@@ -734,7 +734,10 @@ body::before {
 
 /* ─── Animations & Utilities ────────────────────────────────────────────────── */
 .animate-ticker {
-  animation: ticker 120s linear infinite;
+  animation: ticker 60s linear infinite;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 .animate-ticker:hover { animation-play-state: paused; }
 
