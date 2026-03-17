@@ -515,7 +515,7 @@ export default function TradingPanel({
                   key={value}
                   type="button"
                   onClick={() => setLeverage(value)}
-                  className={`rounded-md py-1.5 text-[10px] font-semibold transition-all ${
+                  className={`rounded-md py-1 text-[9px] font-semibold transition-all ${
                     leverage === value
                       ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40"
                       : "bg-zinc-900 text-zinc-600 hover:bg-zinc-800 hover:text-zinc-300"
@@ -598,7 +598,7 @@ export default function TradingPanel({
                   />
                   <input
                     type="number"
-                    className="w-16 rounded-lg border border-zinc-700/60 bg-zinc-900 px-2.5 py-1.5 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40"
+                    className="w-12 min-w-0 rounded-lg border border-zinc-700/60 bg-zinc-900 px-1.5 py-1.5 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40"
                     disabled={!tpEnabled}
                     placeholder="%"
                     value={tpPercent}
@@ -606,7 +606,7 @@ export default function TradingPanel({
                   />
                 </div>
                 {tpEnabled && (
-                  <div className="flex gap-0.5 pl-10">
+                  <div className="flex gap-0.5 pl-8">
                     {TPSL_PRESETS.map((pct) => (
                       <button
                         key={pct}
@@ -649,7 +649,7 @@ export default function TradingPanel({
                   />
                   <input
                     type="number"
-                    className="w-16 rounded-lg border border-zinc-700/60 bg-zinc-900 px-2.5 py-1.5 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40"
+                    className="w-12 min-w-0 rounded-lg border border-zinc-700/60 bg-zinc-900 px-1.5 py-1.5 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40"
                     disabled={!slEnabled}
                     placeholder="%"
                     value={slPercent}
@@ -657,7 +657,7 @@ export default function TradingPanel({
                   />
                 </div>
                 {slEnabled && (
-                  <div className="flex gap-0.5 pl-10">
+                  <div className="flex gap-0.5 pl-8">
                     {TPSL_PRESETS.map((pct) => (
                       <button
                         key={pct}
@@ -772,9 +772,16 @@ export default function TradingPanel({
               : "bg-red-500 text-white hover:bg-red-400 active:bg-red-600"
           }`}
         >
-          {submitState === "submitting"
-            ? "Submitting…"
-            : `Review ${side === "long" ? "Long" : "Short"} · ${activeVenueState.venueId.toUpperCase()}`}
+          {submitState === "submitting" ? (
+            "Submitting…"
+          ) : (
+            <>
+              <span className="sm:hidden">{side === "long" ? "Long ↑" : "Short ↓"}</span>
+              <span className="hidden sm:inline">
+                Review {side === "long" ? "Long" : "Short"} · {activeVenueState.venueId.toUpperCase()}
+              </span>
+            </>
+          )}
         </button>
       </div>
 
