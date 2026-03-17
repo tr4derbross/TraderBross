@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import http from "node:http";
 import { URL } from "node:url";
 import WebSocket, { WebSocketServer } from "ws";
@@ -39,6 +40,12 @@ function createState() {
 
 const state = createState();
 const clients = new Set();
+
+function binanceSignedQuery(secret, params = {}) {
+  const qs = new URLSearchParams({ ...params, timestamp: Date.now().toString(), recvWindow: "5000" }).toString();
+  const sig = crypto.createHmac("sha256", secret).update(qs).digest("hex");
+  return `${qs}&signature=${sig}`;
+}
 
 function json(reply, statusCode, payload) {
   const body = JSON.stringify(payload);
@@ -346,7 +353,148 @@ const server = http.createServer(async (request, reply) => {
     }
 
     if (request.method === "POST" && url.pathname === "/api/venues/validate") {
-      json(reply, 200, { ok: true, message: "Validation is backend-owned now. Live key validation is a follow-up." });
+      const body = await readJson(request);
+      const token = body.sessionToken;
+      const entry = token ? getSecret(token) : null;
+      const apiKey = entry?.payload?.apiKey || body.apiKey || "";
+      const apiSecret = entry?.payload?.apiSecret || body.apiSecret || "";
+      const testnet = entry?.payload?.testnet || false;
+      const base = testnet ? "https://testnet.binancefuture.com" : "https://fapi.binance.com";
+      if (!apiKey || !apiSecret) {
+        json(reply, 200, { ok: false, message: "API key and secret are required." });
+        return;
+      }
+      try {
+        const qs = binanceSignedQuery(apiSecret);
+        const res = await fetch(`${base}/fapi/v2/balance?${qs}`, { headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(8000) });
+        const data = await res.json();
+        if (!res.ok) {
+          json(reply, 200, { ok: false, message: data.msg || `Binance error ${res.status}` });
+          return;
+        }
+        const usdt = Array.isArray(data) ? data.find((b) => b.asset === "USDT") : null;
+        json(reply, 200, { ok: true, message: `Connected${usdt ? ` · USDT balance: ${parseFloat(usdt.availableBalance || "0").toFixed(2)}` : ""}` });
+      } catch (err) {
+        json(reply, 200, { ok: false, message: String(err) });
+      }
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/binance") {
+      const body = await readJson(request);
+      const entry = getSecret(body.sessionToken || "");
+      if (!entry) {
+        json(reply, 401, { error: "Session expired. Re-save your credentials." });
+        return;
+      }
+      const { apiKey, apiSecret, testnet } = entry.payload;
+      const base = testnet ? "https://testnet.binancefuture.com" : "https://fapi.binance.com";
+      try {
+        if (body.type === "balance") {
+          const qs = binanceSignedQuery(apiSecret);
+          const res = await fetch(`${base}/fapi/v2/balance?${qs}`, { headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(8000) });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.msg || `Binance error ${res.status}`);
+          const usdt = data.find((b) => b.asset === "USDT");
+          json(reply, 200, { total: parseFloat(usdt?.balance || "0"), available: parseFloat(usdt?.availableBalance || "0"), currency: "USDT" });
+          return;
+        }
+        if (body.type === "positions") {
+          const qs = binanceSignedQuery(apiSecret);
+          const res = await fetch(`${base}/fapi/v2/positionRisk?${qs}`, { headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(8000) });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.msg || `Binance error ${res.status}`);
+          const positions = data
+            .filter((p) => parseFloat(p.positionAmt) !== 0)
+            .map((p) => {
+              const size = parseFloat(p.positionAmt);
+              return {
+                coin: p.symbol.replace(/USDT$/, ""),
+                side: size > 0 ? "long" : "short",
+                size: Math.abs(size),
+                entryPx: parseFloat(p.entryPrice),
+                pnl: parseFloat(p.unRealizedProfit),
+                liquidationPx: parseFloat(p.liquidationPrice) || null,
+              };
+            });
+          json(reply, 200, { positions });
+          return;
+        }
+        json(reply, 400, { error: "Unknown type" });
+      } catch (err) {
+        json(reply, 500, { error: String(err) });
+      }
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/binance/order") {
+      const body = await readJson(request);
+      const entry = getSecret(body.sessionToken || "");
+      if (!entry) {
+        json(reply, 401, { ok: false, error: "Session expired. Re-save your credentials." });
+        return;
+      }
+      const { apiKey, apiSecret, testnet } = entry.payload;
+      const base = testnet ? "https://testnet.binancefuture.com" : "https://fapi.binance.com";
+      try {
+        const binancePost = async (path, params) => {
+          const qs = binanceSignedQuery(apiSecret, params);
+          const res = await fetch(`${base}${path}?${qs}`, { method: "POST", headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(10000) });
+          const data = await res.json();
+          if (!res.ok && data.code !== -4046) throw new Error(data.msg || `Binance error ${res.status}`);
+          return data;
+        };
+        const binanceDelete = async (path, params) => {
+          const qs = binanceSignedQuery(apiSecret, params);
+          const res = await fetch(`${base}${path}?${qs}`, { method: "DELETE", headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(10000) });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.msg || `Binance error ${res.status}`);
+          return data;
+        };
+        const symbol = `${body.symbol}USDT`;
+        if (body.type === "leverage") {
+          await binancePost("/fapi/v1/leverage", { symbol, leverage: String(Math.round(body.leverage)) });
+          json(reply, 200, { ok: true });
+          return;
+        }
+        if (body.type === "marginType") {
+          await binancePost("/fapi/v1/marginType", { symbol, marginType: body.marginMode === "cross" ? "CROSSED" : "ISOLATED" });
+          json(reply, 200, { ok: true });
+          return;
+        }
+        if (body.type === "cancel") {
+          await binanceDelete("/fapi/v1/order", { symbol, orderId: String(body.orderId) });
+          json(reply, 200, { ok: true });
+          return;
+        }
+        if (body.type === "order") {
+          // Fetch mark price
+          const mpRes = await fetch(`${base}/fapi/v1/premiumIndex?symbol=${symbol}`, { signal: AbortSignal.timeout(5000) });
+          const mpData = await mpRes.json();
+          const markPrice = parseFloat(mpData.markPrice || "0");
+          if (!markPrice) throw new Error(`Could not fetch mark price for ${symbol}`);
+          const qty = (body.marginAmount * body.leverage) / markPrice;
+          const quantity = qty >= 100 ? qty.toFixed(0) : qty >= 10 ? qty.toFixed(1) : qty >= 1 ? qty.toFixed(2) : qty >= 0.1 ? qty.toFixed(3) : qty.toFixed(4);
+          const side = body.side === "long" ? "BUY" : "SELL";
+          const params = { symbol, side, quantity };
+          if (body.orderType === "market") {
+            params.type = "MARKET";
+          } else if (body.orderType === "limit") {
+            params.type = "LIMIT";
+            params.price = String(body.limitPrice);
+            params.timeInForce = "GTC";
+          } else {
+            params.type = "STOP_MARKET";
+            params.stopPrice = String(body.limitPrice);
+          }
+          const result = await binancePost("/fapi/v1/order", params);
+          json(reply, 200, { ok: true, data: result });
+          return;
+        }
+        json(reply, 400, { ok: false, error: "Unknown action type" });
+      } catch (err) {
+        json(reply, 500, { ok: false, error: String(err) });
+      }
       return;
     }
 
