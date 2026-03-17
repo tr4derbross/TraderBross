@@ -474,7 +474,7 @@ const server = http.createServer(async (request, reply) => {
           const markPrice = parseFloat(mpData.markPrice || "0");
           if (!markPrice) throw new Error(`Could not fetch mark price for ${symbol}`);
           const qty = (body.marginAmount * body.leverage) / markPrice;
-          const quantity = qty >= 100 ? qty.toFixed(0) : qty >= 10 ? qty.toFixed(1) : qty >= 1 ? qty.toFixed(2) : qty >= 0.1 ? qty.toFixed(3) : qty.toFixed(4);
+          const quantity = qty >= 100 ? qty.toFixed(0) : qty >= 10 ? qty.toFixed(1) : qty >= 1 ? qty.toFixed(2) : qty.toFixed(3);
           const side = body.side === "long" ? "BUY" : "SELL";
           const params = { symbol, side, quantity };
           if (body.orderType === "market") {

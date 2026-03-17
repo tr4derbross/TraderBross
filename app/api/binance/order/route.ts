@@ -110,8 +110,7 @@ function roundQuantity(qty: number): string {
   if (qty >= 100) return qty.toFixed(0);
   if (qty >= 10) return qty.toFixed(1);
   if (qty >= 1) return qty.toFixed(2);
-  if (qty >= 0.1) return qty.toFixed(3);
-  return qty.toFixed(4);
+  return qty.toFixed(3);
 }
 
 export async function POST(req: NextRequest) {
