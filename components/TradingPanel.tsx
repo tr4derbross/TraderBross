@@ -709,6 +709,22 @@ export default function TradingPanel({
             <span className="text-zinc-600">Liquidation</span>
             <span className="font-medium text-zinc-300">{liqPrice ? `$${fmt(liqPrice)}` : "—"}</span>
           </div>
+          {(() => {
+            if (!tpEnabled || !slEnabled || !tpPrice || !slPrice) return null;
+            const tp = parseFloat(tpPrice);
+            const sl = parseFloat(slPrice);
+            const entry = execPrice;
+            if (!tp || !sl || !entry || Math.abs(entry - sl) < 0.000001) return null;
+            const rr = Math.abs((tp - entry) / (entry - sl));
+            const rrStr = rr.toFixed(2);
+            const rrColor = rr >= 1.5 ? "text-emerald-400" : rr >= 0.5 ? "text-amber-400" : "text-red-400";
+            return (
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-zinc-600">R/R Ratio</span>
+                <span className={`font-semibold tabular-nums ${rrColor}`}>1 : {rrStr}</span>
+              </div>
+            );
+          })()}
           <div className="flex items-center gap-1.5 pt-0.5 text-[9px] uppercase tracking-widest text-zinc-700">
             <Shield className="h-3 w-3 text-amber-500/60" />
             {riskNote}

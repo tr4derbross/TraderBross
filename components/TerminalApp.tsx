@@ -56,6 +56,127 @@ import {
   Layers,
 } from "lucide-react";
 
+/* ─── Funding Stats Bar ─────────────────────────────────────────────────────── */
+function _StatChip({ label, value, valueClass = "text-zinc-400" }: { label: string; value: string; valueClass?: string }) {
+  return (
+    <div className="flex items-center gap-1.5 shrink-0">
+      <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-zinc-600">{label}</span>
+      <span className={`text-[10px] font-semibold tabular-nums ${valueClass}`}>{value}</span>
+    </div>
+  );
+}
+
+function FundingStatsBar({ ticker }: { ticker: string }) {
+  const [funding, setFunding] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    apiFetch<{ rates?: { venue: string; rate: number | null }[] }>(`/api/funding?ticker=${ticker}`)
+      .then((d) => {
+        if (!active) return;
+        const item = d.rates?.find((r) => r.venue === "Binance") ?? d.rates?.[0];
+        setFunding(item?.rate ?? null);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [ticker]);
+
+  const fmtFund = funding !== null
+    ? `${funding >= 0 ? "+" : ""}${(funding * 100).toFixed(4)}%`
+    : "—";
+  const fundColor = funding === null ? "text-zinc-600" : funding >= 0 ? "text-emerald-400" : "text-red-400";
+
+  return (
+    <div
+      className="shrink-0 flex items-center gap-4 px-3 py-1 border-b overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      style={{ borderColor: "rgba(212,161,31,0.1)", background: "rgba(8,7,6,0.9)", minHeight: 28 }}
+    >
+      <_StatChip label="FUNDING" value={fmtFund} valueClass={fundColor} />
+      <span className="text-zinc-800 text-[8px]">·</span>
+      <_StatChip label="OI" value="—" />
+      <span className="text-zinc-800 text-[8px]">·</span>
+      <_StatChip label="L/S" value="—" />
+      <span className="text-zinc-800 text-[8px]">·</span>
+      <_StatChip label="LIQD 24H" value="—" />
+      <span className="text-zinc-800 text-[8px]">·</span>
+      <_StatChip label="CVD" value="—" />
+    </div>
+  );
+}
+
+/* ─── Order Book Mini ────────────────────────────────────────────────────────── */
+type OBEntry = [string, string, string, string]; // [price, qty, ?, ?]
+
+function OrderBookMini({ ticker }: { ticker: string }) {
+  const [bids, setBids] = useState<OBEntry[]>([]);
+  const [asks, setAsks] = useState<OBEntry[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const poll = async () => {
+      try {
+        const res = await apiFetch<{ bids: OBEntry[]; asks: OBEntry[] }>(
+          `/api/okx/orderbook?ticker=${ticker}&sz=4`
+        );
+        if (!active) return;
+        setBids((res.bids ?? []).slice(0, 4));
+        setAsks((res.asks ?? []).slice(0, 4));
+      } catch {}
+    };
+    poll();
+    const id = setInterval(poll, 2500);
+    return () => { active = false; clearInterval(id); };
+  }, [ticker]);
+
+  if (!bids.length && !asks.length) return null;
+
+  const topBid = bids[0] ? parseFloat(bids[0][0]) : null;
+  const topAsk = asks[0] ? parseFloat(asks[0][0]) : null;
+  const spread = topBid && topAsk ? (topAsk - topBid).toFixed(2) : "—";
+  const fmtP = (p: string) => {
+    const n = parseFloat(p);
+    return n >= 1000 ? n.toFixed(1) : n >= 1 ? n.toFixed(3) : n.toFixed(5);
+  };
+  const fmtS = (s: string) => parseFloat(s).toFixed(2);
+
+  return (
+    <div
+      className="hidden lg:flex shrink-0 border-t"
+      style={{ borderColor: "rgba(212,161,31,0.1)", background: "rgba(6,5,4,0.95)", height: 86 }}
+    >
+      {/* Asks (top → lowest ask first) */}
+      <div className="flex-1 flex flex-col justify-end px-3 py-1.5 gap-0.5">
+        <div className="text-[8px] font-bold uppercase tracking-[0.14em] text-zinc-700 mb-0.5">Ask</div>
+        {[...asks].reverse().map(([price, size], i) => (
+          <div key={i} className="flex items-center justify-between text-[9px] tabular-nums">
+            <span className="text-red-400 font-medium">{fmtP(price)}</span>
+            <span className="text-zinc-600">{fmtS(size)}</span>
+          </div>
+        ))}
+      </div>
+      {/* Spread */}
+      <div
+        className="flex flex-col items-center justify-center border-x px-3 text-center"
+        style={{ minWidth: 64, borderColor: "rgba(212,161,31,0.08)" }}
+      >
+        <span className="text-[8px] uppercase tracking-[0.12em] text-zinc-700 mb-0.5">SPREAD</span>
+        <span className="text-[10px] font-semibold text-zinc-400">{spread}</span>
+        <span className="text-[8px] text-zinc-700 mt-0.5">OKX</span>
+      </div>
+      {/* Bids */}
+      <div className="flex-1 flex flex-col justify-start px-3 py-1.5 gap-0.5">
+        <div className="text-[8px] font-bold uppercase tracking-[0.14em] text-zinc-700 mb-0.5">Bid</div>
+        {bids.map(([price, size], i) => (
+          <div key={i} className="flex items-center justify-between text-[9px] tabular-nums">
+            <span className="text-emerald-400 font-medium">{fmtP(price)}</span>
+            <span className="text-zinc-600">{fmtS(size)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 type RightTab = "trade" | "dex" | "signals" | "watch" | "ai";
 type DexSubTab = "hl" | "dydx";
 type WorkspaceTab = "news" | "chart" | "tools";
@@ -1102,6 +1223,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     <div
       className={`panel-shell soft-divider flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border ${extraClassName}`}
     >
+      <FundingStatsBar ticker={activeVenueState.activeSymbol} />
       <PriceChart
         activeVenue={activeVenueState.venueId}
         activeSymbol={activeVenueState.activeSymbol}
@@ -1114,6 +1236,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         onPlaceOrder={placeOrder}
         onTickerChange={setActiveSymbol}
       />
+      <OrderBookMini ticker={activeVenueState.activeSymbol} />
     </div>
   );
 
@@ -1525,17 +1648,32 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
               dYdX: "dYdX v4 — coming soon",
             };
             const isActive = activeVenueState.venueId === venueMap[v];
+            const isConnected = isActive && activeVenueFeedState === "connected";
+            const isConnecting = isActive && (activeVenueFeedState === "connecting" || activeVenueFeedState === "error");
             return (
               <div
                 key={v}
                 title={tooltipMap[v]}
                 className={`hidden sm:flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors ${
-                  isActive
-                    ? "bg-amber-500/10 text-amber-300"
-                    : "text-zinc-600"
+                  isConnected
+                    ? "bg-emerald-500/8 text-emerald-300"
+                    : isConnecting
+                      ? "bg-amber-500/10 text-amber-300"
+                      : isActive
+                        ? "bg-amber-500/10 text-amber-300"
+                        : "text-zinc-600"
                 }`}
               >
-                <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isActive ? "bg-amber-400 shadow-[0_0_4px_rgba(212,161,31,0.7)]" : ""}`} style={isActive ? {} : { background: "#6b7280" }} />
+                <span
+                  className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                    isConnected
+                      ? "status-dot-online live-dot"
+                      : isConnecting
+                        ? "status-dot-pending"
+                        : ""
+                  }`}
+                  style={!isConnected && !isConnecting ? { background: isActive ? "#d4a11f" : "#6b7280" } : undefined}
+                />
                 <span className={`text-[9px] tracking-[0.1em] font-${isActive ? "bold" : "normal"}`}>{v}</span>
               </div>
             );

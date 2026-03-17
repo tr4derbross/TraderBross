@@ -46,31 +46,6 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 
-  /* ─── New design system tokens ──────────────────────────────────── */
-  --color-base: #0a0b0e;
-  --color-surface: #0d0e11;
-  --color-elevated: #12141a;
-  --color-overlay: #181a22;
-  --color-border-tb: #1e2028;
-  --color-border-subtle-tb: #13151b;
-  --color-text-primary: #e2e4ea;
-  --color-text-secondary: #8b95a5;
-  --color-text-muted: #555d6e;
-  --color-text-dim: #3a4050;
-  --color-bull: #22c55e;
-  --color-bull-dim: #16a34a;
-  --color-bull-bg: #0d2318;
-  --color-bear: #ef4444;
-  --color-bear-dim: #dc2626;
-  --color-bear-bg: #2d1515;
-  --color-accent-tb: #3b82f6;
-  --color-accent-bg-tb: #0d1f3c;
-  --color-ai: #a78bfa;
-  --color-ai-bg: #1e1535;
-  --color-warning-tb: #f59e0b;
-  --color-warning-bg-tb: #1f1a08;
-  --font-mono-tb: 'IBM Plex Mono', monospace;
-  --font-sans-tb: 'Inter', sans-serif;
 }
 
 /* ─── Brand Design Tokens ──────────────────────────────────────────────────── */
@@ -341,7 +316,7 @@ body::before {
   100% { background-position: 200% 0; }
 }
 .skeleton {
-  background: linear-gradient(90deg, var(--color-elevated) 25%, var(--color-overlay) 50%, var(--color-elevated) 75%);
+  background: linear-gradient(90deg, rgba(22,18,13,0.92) 25%, rgba(38,30,18,0.96) 50%, rgba(22,18,13,0.92) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 4px;
@@ -368,7 +343,7 @@ body::before {
 
 /* Value flash animation */
 @keyframes flash-update {
-  0% { background-color: rgba(59, 130, 246, 0.2); }
+  0% { background-color: rgba(212, 161, 31, 0.18); }
   100% { background-color: transparent; }
 }
 .flash-update { animation: flash-update 0.5s ease-out; }
