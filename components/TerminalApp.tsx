@@ -16,7 +16,7 @@ import BottomPanel from "@/components/BottomPanel";
 import TradingActivityDrawer from "@/components/TradingActivityDrawer";
 import HyperliquidPanel from "@/components/HyperliquidPanel";
 import DydxPanel from "@/components/DydxPanel";
-import VenuesPanel from "@/components/VenuesPanel";
+import SignalsPanel from "@/components/SignalsPanel";
 import WatchlistPanel from "@/components/WatchlistPanel";
 import ChatPanel from "@/components/ChatPanel";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -56,7 +56,7 @@ import {
   Layers,
 } from "lucide-react";
 
-type RightTab = "trade" | "dex" | "connect" | "watch" | "ai";
+type RightTab = "trade" | "dex" | "signals" | "watch" | "ai";
 type DexSubTab = "hl" | "dydx";
 type WorkspaceTab = "news" | "chart" | "tools";
 type HeaderPlatform = "hyperliquid" | "dydx" | "okx" | "bybit" | "binance";
@@ -604,7 +604,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const tabs: { id: RightTab; label: string }[] = [
     { id: "trade", label: "Trade" },
     { id: "dex", label: "DEX" },
-    { id: "connect", label: "Venues" },
+    { id: "signals", label: "Signals" },
     { id: "watch", label: "Watch" },
     { id: "ai", label: "AI" },
   ];
@@ -1214,10 +1214,17 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         </div>
       )}
 
-      {rightTab === "connect" && (
-        <ErrorBoundary label="Venues">
+      {rightTab === "signals" && (
+        <ErrorBoundary label="Signals">
           <div className="tab-content-enter min-h-0 flex-1 overflow-hidden">
-            <VenuesPanel hlWallet={hlWallet} onHlWalletChange={setHlWallet} />
+            <SignalsPanel
+              quotes={wsQuotes}
+              activeTicker={activeVenueState.activeSymbol}
+              onSelectTicker={(ticker) => {
+                setActiveSymbol(ticker);
+                setRightTab("trade");
+              }}
+            />
           </div>
         </ErrorBoundary>
       )}

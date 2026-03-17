@@ -292,17 +292,40 @@ const server = http.createServer(async (request, reply) => {
       return;
     }
 
+    if (request.method === "GET" && url.pathname === "/api/leverage-brackets") {
+      // Fetch Binance leverage brackets (max leverage per symbol)
+      try {
+        const data = await fetchJson("https://fapi.binance.com/fapi/v1/leverageBracket", { timeoutMs: 6000 });
+        const result = {};
+        for (const item of (Array.isArray(data) ? data : [])) {
+          if (!item.symbol || !Array.isArray(item.brackets) || item.brackets.length === 0) continue;
+          const maxBracket = item.brackets[0]; // first bracket = highest tier
+          result[item.symbol.replace("USDT", "")] = maxBracket.initialLeverage ?? 20;
+        }
+        json(reply, 200, result);
+      } catch {
+        json(reply, 200, {});
+      }
+      return;
+    }
+
     if (request.method === "GET" && url.pathname === "/api/funding") {
-      const ticker = (url.searchParams.get("ticker") || "BTC").toUpperCase();
-      const [binance, okx, bybit] = await Promise.all([getBinanceQuotes(), getOkxQuotes(), getBybitQuotes()]);
-      const quote = (list) => list.find((item) => item.symbol === ticker);
-      json(reply, 200, {
-        rates: [
-          { venue: "Binance", rate: quote(binance)?.changePct ? quote(binance).changePct / 10000 : 0.0001, nextFundingTime: Date.now() + 4 * 60 * 60 * 1000, intervalHours: 8, status: "live" },
-          { venue: "OKX", rate: quote(okx)?.changePct ? quote(okx).changePct / 12000 : 0.00008, nextFundingTime: Date.now() + 4 * 60 * 60 * 1000, intervalHours: 8, status: quote(okx) ? "live" : "unavailable" },
-          { venue: "Bybit", rate: quote(bybit)?.changePct ? quote(bybit).changePct / 11000 : 0.00009, nextFundingTime: Date.now() + 4 * 60 * 60 * 1000, intervalHours: 8, status: quote(bybit) ? "live" : "unavailable" },
-        ],
-      });
+      // Multi-symbol funding rates from Binance premiumIndex
+      try {
+        const data = await fetchJson("https://fapi.binance.com/fapi/v1/premiumIndex", { timeoutMs: 5000 });
+        const SYMBOLS = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","DOGEUSDT","AVAXUSDT","LINKUSDT","ARBUSDT","INJUSDT","NEARUSDT","OPUSDT","DOTUSDT","SUIUSDT","APTUSDT","ATOMUSDT","HYPEUSDT"];
+        const filtered = (Array.isArray(data) ? data : [])
+          .filter((item) => SYMBOLS.includes(item.symbol))
+          .map((item) => ({
+            symbol: item.symbol,
+            fundingRate: item.lastFundingRate,
+            nextFundingTime: item.nextFundingTime,
+          }))
+          .sort((a, b) => Math.abs(Number(b.fundingRate)) - Math.abs(Number(a.fundingRate)));
+        json(reply, 200, filtered);
+      } catch {
+        json(reply, 200, []);
+      }
       return;
     }
 
