@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import SiteNav from "@/components/SiteNav";
+import PageWrapper from "@/components/PageWrapper";
 import type { ScreenerCoin } from "@/app/api/screener/route";
 import {
   TrendingUp,
@@ -14,7 +14,9 @@ import {
   LayoutDashboard,
   Zap,
   Activity,
+  AlertCircle,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 
@@ -27,8 +29,8 @@ function fmt(n: number, decimals = 2): string {
 
 function fmtPrice(p: number): string {
   if (p >= 10_000) return `$${p.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-  if (p >= 1) return `$${p.toFixed(2)}`;
-  if (p >= 0.01) return `$${p.toFixed(4)}`;
+  if (p >= 1)      return `$${p.toFixed(2)}`;
+  if (p >= 0.01)   return `$${p.toFixed(4)}`;
   return `$${p.toFixed(6)}`;
 }
 
@@ -47,7 +49,7 @@ function fmtOI(v: number): string {
 }
 
 const SORT_TABS = [
-  { key: "volume",  label: "Volume",  icon: BarChart2  },
+  { key: "volume",  label: "Volume",  icon: BarChart2   },
   { key: "gainers", label: "Gainers", icon: TrendingUp  },
   { key: "losers",  label: "Losers",  icon: TrendingDown },
 ];
@@ -60,18 +62,19 @@ function getReferralUrl(symbol: string): string {
 }
 
 /* ── RSI Badge ──────────────────────────────────────────────────────────────── */
+
 function RsiBadge({ rsi }: { rsi: number | null | undefined }) {
-  if (rsi == null) return <span className="text-[10px] text-zinc-700">—</span>;
+  if (rsi == null)
+    return <span className="text-[10px] text-[#3a4050]">—</span>;
 
   const isOversold   = rsi < 30;
   const isOverbought = rsi > 70;
-  const isNeutral    = rsi >= 30 && rsi <= 70;
 
   const cls = isOversold
-    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
+    ? "bg-[#22c55e]/15 text-[#22c55e] border-[#22c55e]/25"
     : isOverbought
-      ? "bg-rose-500/15 text-rose-400 border-rose-500/25"
-      : "bg-zinc-800/60 text-zinc-400 border-zinc-700/30";
+    ? "bg-[#ef4444]/15 text-[#ef4444] border-[#ef4444]/25"
+    : "bg-[rgba(59,130,246,0.06)] text-[#8b95a5] border-[rgba(59,130,246,0.12)]";
 
   const label = isOversold ? "OS" : isOverbought ? "OB" : "";
 
@@ -81,20 +84,20 @@ function RsiBadge({ rsi }: { rsi: number | null | undefined }) {
       title={`RSI-14 (4h): ${rsi}${isOversold ? " — Oversold" : isOverbought ? " — Overbought" : ""}`}
     >
       {rsi.toFixed(1)}
-      {label && (
-        <span className="text-[8px] opacity-70">{label}</span>
-      )}
+      {label && <span className="text-[8px] opacity-70">{label}</span>}
     </span>
   );
 }
 
 /* ── L/S Ratio Badge ─────────────────────────────────────────────────────────── */
+
 function LSBadge({ ratio }: { ratio: number | null | undefined }) {
-  if (ratio == null) return <span className="text-[10px] text-zinc-700">—</span>;
+  if (ratio == null)
+    return <span className="text-[10px] text-[#3a4050]">—</span>;
   const bullish = ratio >= 1;
   return (
     <span
-      className={`text-[10px] font-bold tabular-nums ${bullish ? "text-emerald-400" : "text-rose-400"}`}
+      className={`text-[10px] font-bold tabular-nums ${bullish ? "text-[#22c55e]" : "text-[#ef4444]"}`}
       title={`Global Long/Short Account Ratio (1h): ${ratio} — ${bullish ? "More longs than shorts" : "More shorts than longs"}`}
     >
       {ratio.toFixed(2)}
@@ -103,12 +106,13 @@ function LSBadge({ ratio }: { ratio: number | null | undefined }) {
 }
 
 /* ── Mini sparkline bar ─────────────────────────────────────────────────────── */
+
 function MiniRange({ low, high, price }: { low: number; high: number; price: number }) {
   const pct = high > low ? ((price - low) / (high - low)) * 100 : 50;
   return (
-    <div className="relative h-1 w-16 rounded-full bg-[rgba(255,255,255,0.07)]">
+    <div className="relative h-1 w-16 rounded-full bg-[rgba(59,130,246,0.08)]">
       <div
-        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-rose-500/60 to-emerald-400/60"
+        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#ef4444]/60 to-[#22c55e]/60"
         style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
       />
       <div
@@ -119,62 +123,98 @@ function MiniRange({ low, high, price }: { low: number; high: number; price: num
   );
 }
 
-/* ── Row ─────────────────────────────────────────────────────────────────────── */
+/* ── Stat card ─────────────────────────────────────────────────────────────── */
+
+function StatCard({
+  label,
+  value,
+  sub,
+  variant = "default",
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  variant?: "default" | "bull" | "bear" | "accent";
+}) {
+  const colors: Record<string, string> = {
+    default: "border-[rgba(59,130,246,0.12)] bg-[rgba(59,130,246,0.04)] text-[#3b82f6]",
+    bull:    "border-[#22c55e]/15 bg-[#22c55e]/5 text-[#22c55e]",
+    bear:    "border-[#ef4444]/15 bg-[#ef4444]/5 text-[#ef4444]",
+    accent:  "border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)] text-[#3b82f6]",
+  };
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 ${colors[variant]}`}>
+      <div className="text-[10px] uppercase tracking-[0.14em] opacity-60">{label}</div>
+      <div className="mt-0.5 font-mono text-[15px] font-bold">{value}</div>
+      {sub && <div className="text-[10px] opacity-50">{sub}</div>}
+    </div>
+  );
+}
+
+/* ── Desktop table row ───────────────────────────────────────────────────────── */
+
 function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
   const positive = coin.change24h >= 0;
   return (
-    <tr className="group border-b border-[rgba(255,255,255,0.035)] transition-colors hover:bg-[rgba(212,161,31,0.03)]">
-      <td className="py-2.5 pl-4 pr-2 text-[11px] text-zinc-700 tabular-nums">{rank}</td>
+    <tr className="group border-b border-[rgba(59,130,246,0.05)] transition-colors hover:bg-[rgba(59,130,246,0.03)]">
+      <td className="py-2.5 pl-4 pr-2 text-[11px] text-[#3a4050] tabular-nums">{rank}</td>
       <td className="py-2.5 pr-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[rgba(212,161,31,0.1)] text-[10px] font-bold text-amber-300">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)] text-[10px] font-bold text-[#3b82f6]">
             {coin.symbol.slice(0, 2)}
           </div>
           <div>
-            <div className="text-[12px] font-semibold text-[#e8dfc8]">{coin.symbol}</div>
-            <div className="text-[10px] text-zinc-600">/USDT</div>
+            <div className="text-[12px] font-semibold text-[#e2e4ea]">{coin.symbol}</div>
+            <div className="text-[10px] text-[#3a4050]">/USDT</div>
           </div>
         </div>
       </td>
       <td className="py-2.5 pr-4 text-right tabular-nums">
-        <span className="text-[12px] font-medium text-[#e8dfc8]">{fmtPrice(coin.price)}</span>
+        <span className="text-[12px] font-medium text-[#e2e4ea]">
+          {fmtPrice(coin.price)}
+        </span>
       </td>
       <td className="py-2.5 pr-4 text-right tabular-nums">
         <span
           className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-bold ${
             positive
-              ? "bg-emerald-500/10 text-emerald-400"
-              : "bg-rose-500/10 text-rose-400"
+              ? "bg-[#22c55e]/10 text-[#22c55e]"
+              : "bg-[#ef4444]/10 text-[#ef4444]"
           }`}
         >
-          {positive ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
-          {positive ? "+" : ""}{coin.change24h.toFixed(2)}%
+          {positive ? (
+            <TrendingUp className="h-2.5 w-2.5" />
+          ) : (
+            <TrendingDown className="h-2.5 w-2.5" />
+          )}
+          {positive ? "+" : ""}
+          {coin.change24h.toFixed(2)}%
         </span>
       </td>
-      {/* RSI-14 */}
       <td className="hidden py-2.5 pr-4 text-right lg:table-cell">
         <RsiBadge rsi={coin.rsi14} />
       </td>
-      {/* Open Interest */}
       <td className="hidden py-2.5 pr-4 text-right tabular-nums xl:table-cell">
         {coin.openInterestUsd != null ? (
-          <span className="text-[11px] text-zinc-400" title={`Open Interest: $${coin.openInterestUsd.toLocaleString()}`}>
+          <span
+            className="text-[11px] text-[#8b95a5]"
+            title={`Open Interest: $${coin.openInterestUsd.toLocaleString()}`}
+          >
             ${fmtOI(coin.openInterestUsd)}
           </span>
         ) : (
-          <span className="text-[10px] text-zinc-700">—</span>
+          <span className="text-[10px] text-[#3a4050]">—</span>
         )}
       </td>
-      {/* Long/Short Ratio */}
       <td className="hidden py-2.5 pr-4 text-right xl:table-cell">
         <LSBadge ratio={coin.longShortRatio} />
       </td>
       <td className="hidden py-2.5 pr-4 text-right tabular-nums sm:table-cell">
-        <span className="text-[11px] text-zinc-400">${fmtVol(coin.volume24h)}</span>
+        <span className="text-[11px] text-[#8b95a5]">${fmtVol(coin.volume24h)}</span>
       </td>
       <td className="hidden py-2.5 pr-4 md:table-cell">
         <MiniRange low={coin.low24h} high={coin.high24h} price={coin.price} />
-        <div className="mt-0.5 flex justify-between text-[9px] text-zinc-700">
+        <div className="mt-0.5 flex justify-between text-[9px] text-[#3a4050]">
           <span>{fmtPrice(coin.low24h)}</span>
           <span>{fmtPrice(coin.high24h)}</span>
         </div>
@@ -183,7 +223,7 @@ function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
         <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
           <Link
             href={`/terminal?ticker=${coin.symbol}`}
-            className="flex items-center gap-1 rounded-md border border-[rgba(212,161,31,0.2)] bg-[rgba(212,161,31,0.08)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-amber-400 transition hover:bg-[rgba(212,161,31,0.16)]"
+            className="flex items-center gap-1 rounded-md border border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#3b82f6] transition hover:bg-[rgba(59,130,246,0.16)]"
           >
             <LayoutDashboard className="h-2.5 w-2.5" />
             Terminal
@@ -192,7 +232,7 @@ function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
             href={getReferralUrl(coin.symbol)}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1 rounded-md border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-zinc-500 transition hover:text-zinc-300"
+            className="flex items-center gap-1 rounded-md border border-[rgba(59,130,246,0.08)] bg-[rgba(59,130,246,0.03)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#555d6e] transition hover:text-[#8b95a5]"
           >
             <ExternalLink className="h-2.5 w-2.5" />
             Trade
@@ -203,19 +243,81 @@ function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
   );
 }
 
-/* ── Stats header ─────────────────────────────────────────────────────────── */
-function StatCard({ label, value, sub, color = "amber" }: { label: string; value: string; sub?: string; color?: string }) {
-  const colors: Record<string, string> = {
-    amber:   "border-amber-400/15 bg-amber-400/5 text-amber-300",
-    emerald: "border-emerald-400/15 bg-emerald-400/5 text-emerald-300",
-    rose:    "border-rose-400/15 bg-rose-400/5 text-rose-300",
-    sky:     "border-sky-400/15 bg-sky-400/5 text-sky-300",
-  };
+/* ── Mobile coin card ────────────────────────────────────────────────────────── */
+
+function CoinCard({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
+  const positive = coin.change24h >= 0;
   return (
-    <div className={`rounded-xl border px-3 py-2.5 ${colors[color]}`}>
-      <div className="text-[10px] uppercase tracking-[0.14em] opacity-60">{label}</div>
-      <div className="mt-0.5 font-mono text-[15px] font-bold">{value}</div>
-      {sub && <div className="text-[10px] opacity-50">{sub}</div>}
+    <div className="rounded-xl border border-[rgba(59,130,246,0.1)] bg-[#12141a] p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)] text-[11px] font-bold text-[#3b82f6]">
+            {coin.symbol.slice(0, 2)}
+          </div>
+          <div>
+            <div className="text-[13px] font-bold text-[#e2e4ea]">{coin.symbol}</div>
+            <div className="text-[10px] text-[#3a4050]">#{rank}</div>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-[13px] font-mono font-bold text-[#e2e4ea]">
+            {fmtPrice(coin.price)}
+          </div>
+          <div
+            className={`inline-flex items-center gap-0.5 text-[11px] font-bold ${
+              positive ? "text-[#22c55e]" : "text-[#ef4444]"
+            }`}
+          >
+            {positive ? (
+              <TrendingUp className="h-2.5 w-2.5" />
+            ) : (
+              <TrendingDown className="h-2.5 w-2.5" />
+            )}
+            {positive ? "+" : ""}
+            {coin.change24h.toFixed(2)}%
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-3 grid grid-cols-3 gap-2 text-center">
+        <div>
+          <div className="text-[9px] uppercase tracking-[0.12em] text-[#555d6e]">RSI-14</div>
+          <div className="mt-0.5">
+            <RsiBadge rsi={coin.rsi14} />
+          </div>
+        </div>
+        <div>
+          <div className="text-[9px] uppercase tracking-[0.12em] text-[#555d6e]">Volume</div>
+          <div className="mt-0.5 text-[11px] font-mono text-[#8b95a5]">
+            ${fmtVol(coin.volume24h)}
+          </div>
+        </div>
+        <div>
+          <div className="text-[9px] uppercase tracking-[0.12em] text-[#555d6e]">L/S</div>
+          <div className="mt-0.5">
+            <LSBadge ratio={coin.longShortRatio} />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Link
+          href={`/terminal?ticker=${coin.symbol}`}
+          className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.08)] py-1.5 text-[10px] font-bold text-[#3b82f6] transition hover:bg-[rgba(59,130,246,0.16)]"
+        >
+          <LayoutDashboard className="h-3 w-3" />
+          Terminal
+        </Link>
+        <a
+          href={getReferralUrl(coin.symbol)}
+          target="_blank"
+          rel="noreferrer"
+          className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-[rgba(59,130,246,0.08)] bg-[rgba(59,130,246,0.03)] py-1.5 text-[10px] font-bold text-[#555d6e] transition hover:text-[#8b95a5]"
+        >
+          <ExternalLink className="h-3 w-3" />
+          Trade
+        </a>
+      </div>
     </div>
   );
 }
@@ -237,7 +339,8 @@ export default function ScreenerPage() {
       const res = await fetch(`/api/screener?sort=${sort}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: ScreenerCoin[] = await res.json();
-      if (!Array.isArray(data) || data.length === 0) throw new Error("No data returned");
+      if (!Array.isArray(data) || data.length === 0)
+        throw new Error("No data returned");
       setCoins(data);
       setLastUpdate(new Date());
     } catch (err) {
@@ -248,7 +351,9 @@ export default function ScreenerPage() {
     }
   }, [sort]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   // Auto-refresh every 45s
   useEffect(() => {
@@ -256,50 +361,61 @@ export default function ScreenerPage() {
     return () => clearInterval(id);
   }, [load]);
 
-  const filtered = coins.filter((c) =>
-    search.length < 1 || c.symbol.toUpperCase().includes(search.toUpperCase())
+  const filtered = coins.filter(
+    (c) =>
+      search.length < 1 || c.symbol.toUpperCase().includes(search.toUpperCase())
   );
 
-  const gainersCount = coins.filter((c) => c.change24h > 0).length;
-  const losersCount  = coins.filter((c) => c.change24h < 0).length;
-  const topGainer    = coins.filter((c) => c.change24h > 0).sort((a, b) => b.change24h - a.change24h)[0];
-  const topLoser     = coins.filter((c) => c.change24h < 0).sort((a, b) => a.change24h - b.change24h)[0];
-  const totalVol     = coins.reduce((s, c) => s + c.volume24h, 0);
-
-  // RSI stats (only enriched coins)
+  const gainersCount  = coins.filter((c) => c.change24h > 0).length;
+  const losersCount   = coins.filter((c) => c.change24h < 0).length;
+  const topGainer     = coins.filter((c) => c.change24h > 0).sort((a, b) => b.change24h - a.change24h)[0];
+  const topLoser      = coins.filter((c) => c.change24h < 0).sort((a, b) => a.change24h - b.change24h)[0];
+  const totalVol      = coins.reduce((s, c) => s + c.volume24h, 0);
   const oversoldCount   = coins.filter((c) => c.rsi14 != null && c.rsi14 < 30).length;
   const overboughtCount = coins.filter((c) => c.rsi14 != null && c.rsi14 > 70).length;
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#07060a] text-[var(--text-primary)]">
-      <SiteNav />
-
+    <PageWrapper>
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {/* Page header */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="mb-1 flex items-center gap-2">
-              <BarChart2 className="h-4 w-4 text-amber-400" />
-              <h1 className="text-[15px] font-bold tracking-[-0.01em] text-[#f0e8d3]">Market Screener</h1>
-              <span className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${!loading ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400" : "border-zinc-700/40 bg-zinc-800/40 text-zinc-500"}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${!loading && coins.length > 0 ? "animate-pulse bg-emerald-400" : "bg-zinc-600"}`} />
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              <BarChart2 className="h-4 w-4 text-[#3b82f6]" />
+              <h1 className="text-[15px] font-bold tracking-[-0.01em] text-[#e2e4ea]">
+                Market Screener
+              </h1>
+              <span
+                className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${
+                  !loading
+                    ? "border-[#22c55e]/25 bg-[#22c55e]/10 text-[#22c55e]"
+                    : "border-[rgba(59,130,246,0.15)] bg-[rgba(59,130,246,0.06)] text-[#555d6e]"
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    !loading && coins.length > 0
+                      ? "animate-pulse bg-[#22c55e]"
+                      : "bg-[#555d6e]"
+                  }`}
+                />
                 {loading ? "Loading" : `${coins.length} pairs`}
               </span>
               {!loading && oversoldCount > 0 && (
-                <span className="flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/8 px-2 py-0.5 text-[9px] font-bold text-emerald-400">
+                <span className="flex items-center gap-1 rounded-full border border-[#22c55e]/20 bg-[#22c55e]/8 px-2 py-0.5 text-[9px] font-bold text-[#22c55e]">
                   <Activity className="h-2.5 w-2.5" />
                   {oversoldCount} oversold
                 </span>
               )}
               {!loading && overboughtCount > 0 && (
-                <span className="flex items-center gap-1 rounded-full border border-rose-500/20 bg-rose-500/8 px-2 py-0.5 text-[9px] font-bold text-rose-400">
+                <span className="flex items-center gap-1 rounded-full border border-[#ef4444]/20 bg-[#ef4444]/8 px-2 py-0.5 text-[9px] font-bold text-[#ef4444]">
                   <Activity className="h-2.5 w-2.5" />
                   {overboughtCount} overbought
                 </span>
               )}
             </div>
             {lastUpdate && (
-              <p className="text-[11px] text-zinc-600">
+              <p className="text-[11px] text-[#555d6e]">
                 Updated {lastUpdate.toLocaleTimeString()} · RSI-14 &amp; OI enriched for top 20 futures pairs
               </p>
             )}
@@ -307,35 +423,53 @@ export default function ScreenerPage() {
           <button
             onClick={load}
             disabled={loading}
-            className="flex items-center gap-1.5 self-start rounded-full border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5 text-[10px] text-zinc-400 transition hover:text-zinc-200 disabled:opacity-40"
+            className="flex items-center gap-1.5 self-start rounded-full border border-[rgba(59,130,246,0.12)] bg-[rgba(59,130,246,0.04)] px-3 py-1.5 text-[10px] text-[#8b95a5] transition hover:text-[#e2e4ea] disabled:opacity-40"
           >
             <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </button>
         </div>
 
-        {/* Stats row */}
+        {/* Stat cards */}
         <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-          <StatCard label="24h Volume"  value={fmt(totalVol)}              color="amber"   />
-          <StatCard label="Gainers"     value={gainersCount.toString()}    sub={topGainer ? `Top: ${topGainer.symbol} +${topGainer.change24h.toFixed(1)}%` : undefined} color="emerald" />
-          <StatCard label="Losers"      value={losersCount.toString()}     sub={topLoser  ? `Top: ${topLoser.symbol} ${topLoser.change24h.toFixed(1)}%`   : undefined} color="rose"    />
-          <StatCard label="Pairs"       value={coins.length.toString()}    sub=">$500K vol"                  color="sky"     />
-          <StatCard label="Oversold"    value={oversoldCount.toString()}   sub="RSI-14 < 30"                 color="emerald" />
-          <StatCard label="Overbought"  value={overboughtCount.toString()} sub="RSI-14 > 70"                 color="rose"    />
+          {loading ? (
+            Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 rounded-xl" />
+            ))
+          ) : (
+            <>
+              <StatCard label="24h Volume" value={fmt(totalVol)} variant="default" />
+              <StatCard
+                label="Gainers"
+                value={gainersCount.toString()}
+                sub={topGainer ? `Top: ${topGainer.symbol} +${topGainer.change24h.toFixed(1)}%` : undefined}
+                variant="bull"
+              />
+              <StatCard
+                label="Losers"
+                value={losersCount.toString()}
+                sub={topLoser ? `Top: ${topLoser.symbol} ${topLoser.change24h.toFixed(1)}%` : undefined}
+                variant="bear"
+              />
+              <StatCard label="Pairs" value={coins.length.toString()} sub=">$500K vol" variant="accent" />
+              <StatCard label="Oversold" value={oversoldCount.toString()} sub="RSI-14 < 30" variant="bull" />
+              <StatCard label="Overbought" value={overboughtCount.toString()} sub="RSI-14 > 70" variant="bear" />
+            </>
+          )}
         </div>
 
         {/* Controls */}
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           {/* Sort tabs */}
-          <div className="flex items-center gap-1 rounded-xl border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-1">
+          <div className="flex items-center gap-1 rounded-xl border border-[rgba(59,130,246,0.1)] bg-[rgba(59,130,246,0.03)] p-1">
             {SORT_TABS.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
                 onClick={() => setSort(key as typeof sort)}
                 className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] transition-all ${
                   sort === key
-                    ? "bg-[rgba(212,161,31,0.16)] text-amber-200 shadow-sm"
-                    : "text-zinc-600 hover:text-zinc-300"
+                    ? "bg-[rgba(59,130,246,0.16)] text-[#3b82f6] shadow-sm"
+                    : "text-[#555d6e] hover:text-[#8b95a5]"
                 }`}
               >
                 <Icon className="h-3 w-3" />
@@ -346,24 +480,25 @@ export default function ScreenerPage() {
 
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#555d6e]" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Filter symbol…"
-              className="w-full rounded-xl border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] py-1.5 pl-8 pr-3 text-[11px] text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-[rgba(212,161,31,0.2)] sm:w-[180px]"
+              className="w-full rounded-xl border border-[rgba(59,130,246,0.1)] bg-[rgba(59,130,246,0.04)] py-1.5 pl-8 pr-3 text-[11px] text-[#8b95a5] outline-none placeholder:text-[#555d6e] focus:border-[rgba(59,130,246,0.3)] sm:w-[180px] transition"
             />
           </div>
         </div>
 
         {/* Error state */}
         {error && !loading && (
-          <div className="mb-4 flex flex-col items-center gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/5 py-10">
-            <p className="text-sm text-rose-400">{error}</p>
+          <div className="mb-4 flex flex-col items-center gap-3 rounded-2xl border border-[#ef4444]/20 bg-[#ef4444]/5 py-10">
+            <AlertCircle className="h-6 w-6 text-[#ef4444]" />
+            <p className="text-sm text-[#ef4444]">{error}</p>
             <button
               onClick={load}
-              className="flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-4 py-1.5 text-[11px] font-bold text-rose-300 transition hover:bg-rose-500/20"
+              className="flex items-center gap-1.5 rounded-full border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-1.5 text-[11px] font-bold text-[#ef4444] transition hover:bg-[#ef4444]/20"
             >
               <RefreshCw className="h-3 w-3" />
               Retry
@@ -371,31 +506,31 @@ export default function ScreenerPage() {
           </div>
         )}
 
-        {/* Table */}
-        <div className="overflow-hidden rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.015)]">
+        {/* Desktop table */}
+        <div className="hidden overflow-hidden rounded-2xl border border-[rgba(59,130,246,0.1)] bg-[rgba(59,130,246,0.02)] sm:block">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)]">
-                  <th className="py-2.5 pl-4 pr-2 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600">#</th>
-                  <th className="py-2.5 pr-3 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600">Coin</th>
-                  <th className="py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600">Price</th>
-                  <th className="py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600">24h %</th>
-                  <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600 lg:table-cell" title="RSI-14 on 4h candles · Green=Oversold(<30) Red=Overbought(>70)">RSI-14</th>
-                  <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600 xl:table-cell" title="Open Interest in USD (Binance perp futures)">OI (USD)</th>
-                  <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600 xl:table-cell" title="Global Long/Short Account Ratio (1h) · >1 = more longs">L/S</th>
-                  <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600 sm:table-cell">Volume</th>
-                  <th className="hidden py-2.5 pr-4 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600 md:table-cell">24h Range</th>
-                  <th className="py-2.5 pr-3 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600">Action</th>
+                <tr className="border-b border-[rgba(59,130,246,0.08)] bg-[rgba(59,130,246,0.04)]">
+                  <th className="py-2.5 pl-4 pr-2 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e]">#</th>
+                  <th className="py-2.5 pr-3 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e]">Coin</th>
+                  <th className="py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e]">Price</th>
+                  <th className="py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e]">24h %</th>
+                  <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e] lg:table-cell" title="RSI-14 on 4h candles">RSI-14</th>
+                  <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e] xl:table-cell" title="Open Interest in USD">OI (USD)</th>
+                  <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e] xl:table-cell" title="Long/Short Account Ratio">L/S</th>
+                  <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e] sm:table-cell">Volume</th>
+                  <th className="hidden py-2.5 pr-4 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e] md:table-cell">24h Range</th>
+                  <th className="py-2.5 pr-3 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#555d6e]">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {loading && coins.length === 0 ? (
-                  Array.from({ length: 15 }).map((_, i) => (
-                    <tr key={i} className="border-b border-[rgba(255,255,255,0.03)]">
+                  Array.from({ length: 10 }).map((_, i) => (
+                    <tr key={i} className="border-b border-[rgba(59,130,246,0.04)]">
                       {[40, 80, 60, 50, 45, 55, 45, 70, 100, 60].map((w, j) => (
                         <td key={j} className="py-3 pl-4">
-                          <div className="skeleton-shimmer h-3 rounded" style={{ width: w }} />
+                          <Skeleton className="h-3 rounded" style={{ width: w }} />
                         </td>
                       ))}
                     </tr>
@@ -403,7 +538,7 @@ export default function ScreenerPage() {
                 ) : filtered.length === 0 ? (
                   <tr>
                     <td colSpan={10} className="py-16 text-center">
-                      <div className="flex flex-col items-center gap-2 text-zinc-600">
+                      <div className="flex flex-col items-center gap-2 text-[#555d6e]">
                         <Search className="h-6 w-6 opacity-30" />
                         <p className="text-sm">No coins found</p>
                       </div>
@@ -419,17 +554,17 @@ export default function ScreenerPage() {
           </div>
 
           {!loading && filtered.length > 0 && (
-            <div className="flex items-center justify-between border-t border-[rgba(255,255,255,0.04)] px-4 py-2">
-              <span className="text-[10px] text-zinc-700">
+            <div className="flex items-center justify-between border-t border-[rgba(59,130,246,0.06)] px-4 py-2">
+              <span className="text-[10px] text-[#3a4050]">
                 Showing {filtered.length} of {coins.length} pairs · Binance Spot + Futures
               </span>
-              <div className="flex items-center gap-3 text-[10px] text-zinc-700">
+              <div className="flex items-center gap-3 text-[10px] text-[#3a4050]">
                 <span className="flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500/50" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]/50" />
                   RSI &lt;30 = Oversold
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500/50" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#ef4444]/50" />
                   RSI &gt;70 = Overbought
                 </span>
                 <span className="flex items-center gap-1">
@@ -440,7 +575,25 @@ export default function ScreenerPage() {
             </div>
           )}
         </div>
+
+        {/* Mobile card grid */}
+        <div className="grid gap-3 sm:hidden">
+          {loading && coins.length === 0 ? (
+            Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-36 rounded-xl" />
+            ))
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-12 text-[#555d6e]">
+              <Search className="h-6 w-6 opacity-30" />
+              <p className="text-sm">No coins found</p>
+            </div>
+          ) : (
+            filtered.map((coin, i) => (
+              <CoinCard key={coin.symbol} coin={coin} rank={i + 1} />
+            ))
+          )}
+        </div>
       </div>
-    </div>
+    </PageWrapper>
   );
 }
