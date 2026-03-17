@@ -3,6 +3,53 @@ import { fetchJson } from "./http.mjs";
 
 const cache = new MemoryCache();
 
+export async function getEthGas(etherscanApiKey = "") {
+  return cache.remember("stats:eth-gas", 30000, async () => {
+    try {
+      // Prefer Etherscan if key available (more reliable), otherwise beaconcha.in (free, no key)
+      if (etherscanApiKey) {
+        const data = await fetchJson(
+          `https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey=${etherscanApiKey}`,
+          { timeoutMs: 5000 }
+        );
+        if (data?.status === "1" && data.result) {
+          return {
+            safe: Number(data.result.SafeGasPrice),
+            average: Number(data.result.ProposeGasPrice),
+            fast: Number(data.result.FastGasPrice),
+          };
+        }
+      }
+      // Free fallback: beaconcha.in gas tracker (gwei)
+      const beacon = await fetchJson("https://beaconcha.in/api/v1/execution/gasnow", { timeoutMs: 5000 });
+      if (beacon?.data) {
+        return {
+          safe: Math.round(Number(beacon.data.slow) / 1e9),
+          average: Math.round(Number(beacon.data.standard) / 1e9),
+          fast: Math.round(Number(beacon.data.fast) / 1e9),
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  });
+}
+
+export async function getDefiLlamaTvl() {
+  return cache.remember("stats:defillama-tvl", 5 * 60 * 1000, async () => {
+    try {
+      // Sum TVL across all chains from DefiLlama (free, no key required)
+      const chains = await fetchJson("https://api.llama.fi/v2/chains", { timeoutMs: 8000 });
+      if (!Array.isArray(chains)) return null;
+      const total = chains.reduce((sum, chain) => sum + (Number(chain.tvl) || 0), 0);
+      return { tvl: total > 0 ? total : null };
+    } catch {
+      return null;
+    }
+  });
+}
+
 export async function getMarketStats() {
   return cache.remember("stats:market", 60000, async () => {
     try {

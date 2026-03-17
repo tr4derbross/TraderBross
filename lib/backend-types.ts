@@ -30,12 +30,35 @@ export type VenueQuotes = {
   Bybit: TickerQuote[];
 };
 
+export type EthGasData = {
+  safe: number;
+  average: number;
+  fast: number;
+} | null;
+
+export type DefiTvlData = {
+  tvl: number | null;
+} | null;
+
+export type LiquidationEvent = {
+  id: string;
+  symbol: string;
+  side: "long" | "short";
+  qty: number;
+  price: number;
+  usdValue: number;
+  timestamp: string;
+};
+
 export type BackendSnapshot = {
   quotes: TickerQuote[];
   venueQuotes: VenueQuotes;
   marketStats: MarketStats | null;
   mempoolStats: MempoolStats | null;
   fearGreed: FearGreedData | null;
+  ethGas: EthGasData;
+  defiTvl: DefiTvlData;
+  liquidations: LiquidationEvent[];
   news: NewsItem[];
   whales: NewsItem[];
   social: NewsItem[];
@@ -49,6 +72,9 @@ export type RealtimeEnvelope =
   | { type: "marketStats"; payload: MarketStats; timestamp: string }
   | { type: "mempoolStats"; payload: MempoolStats; timestamp: string }
   | { type: "fearGreed"; payload: FearGreedData; timestamp: string }
+  | { type: "ethGas"; payload: EthGasData; timestamp: string }
+  | { type: "defiTvl"; payload: DefiTvlData; timestamp: string }
+  | { type: "liquidation"; payload: LiquidationEvent; timestamp: string }
   | { type: "news"; payload: NewsItem; timestamp: string }
   | { type: "social"; payload: NewsItem[]; timestamp: string }
   | { type: "whales"; payload: NewsItem[]; timestamp: string }
