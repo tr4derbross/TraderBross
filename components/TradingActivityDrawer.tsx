@@ -16,6 +16,8 @@ type Props = {
   onClosePosition: (id: string) => void;
   onCancelOrder: (id: string) => void;
   onUpdatePositionTpSl: (posId: string, tpPrice: number | undefined, slPrice: number | undefined) => void;
+  isLiveVenue?: boolean;
+  venueName?: string;
 };
 
 const CLOSED_HEIGHT = 46;
@@ -47,6 +49,8 @@ export default function TradingActivityDrawer({
   onClosePosition,
   onCancelOrder,
   onUpdatePositionTpSl,
+  isLiveVenue = false,
+  venueName,
 }: Props) {
   const [mode, setMode] = useState<DrawerMode>("closed");
   const [drawerHeight, setDrawerHeight] = useState<number>(CLOSED_HEIGHT);
@@ -216,6 +220,20 @@ export default function TradingActivityDrawer({
             {openOrders.length} ORD
           </span>
 
+          {/* Live venue badge */}
+          {isLiveVenue && (
+            <span
+              className="shrink-0 rounded-md px-2 py-[3px] text-[9px] font-bold uppercase tracking-[0.1em]"
+              style={{
+                background: "rgba(52,211,153,0.08)",
+                border: "1px solid rgba(52,211,153,0.25)",
+                color: "#34d399",
+              }}
+            >
+              ● {venueName ?? "LIVE"}
+            </span>
+          )}
+
           {/* Unrealized PnL chip */}
           {hasPnl && (
             <span
@@ -282,6 +300,7 @@ export default function TradingActivityDrawer({
               onCancelOrder={onCancelOrder}
               onUpdatePositionTpSl={onUpdatePositionTpSl}
               drawerMode={mode}
+              isLiveVenue={isLiveVenue}
               onCollapse={() => setMode("closed")}
               onExpand={() => setMode((current) => (current === "half" ? "full" : "half"))}
             />

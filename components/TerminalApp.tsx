@@ -23,6 +23,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { FearGreedPill } from "@/components/FearGreedWidget";
 import { useFearGreed } from "@/hooks/useFearGreed";
 import { apiFetch } from "@/lib/api-client";
+import { buildApiUrl } from "@/lib/runtime-env";
 import { useRealtimeSelector } from "@/lib/realtime-client";
 import BrandMark from "@/components/BrandMark";
 import MarketStatsBar from "@/components/MarketStatsBar";
@@ -746,6 +747,38 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     [activeVenueState, displayBalance, buildActiveVenueConnection]
   );
 
+  // Close a real venue position (Binance: reduceOnly market order opposite side)
+  const handleCloseVenuePosition = useCallback(
+    async (positionId: string) => {
+      if (venuePositions) {
+        const pos = displayPositions.find((p) => p.id === positionId);
+        if (pos) {
+          const connection = buildActiveVenueConnection();
+          await fetch(
+            buildApiUrl("/api/binance/order"),
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                type: "closePosition",
+                symbol: pos.ticker,
+                side: pos.side,
+                size: pos.amount.toFixed(3),
+                sessionToken: connection?.sessionToken,
+              }),
+            }
+          );
+          // Refresh positions after close
+          setTimeout(() => setVenueRefreshTick((t) => t + 1), 1500);
+          return;
+        }
+      }
+      // Paper trading fallback
+      closePosition(positionId);
+    },
+    [venuePositions, displayPositions, buildActiveVenueConnection, closePosition]
+  );
+
   const disconnectHeaderWallet = useCallback(async () => {
     const activeSession = headerWalletSessionRef.current;
     headerWalletSessionRef.current = null;
@@ -1387,9 +1420,11 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                 orders={orders}
                 balance={displayBalance}
                 equityHistory={equityHistory}
-                onClosePosition={closePosition}
+                onClosePosition={handleCloseVenuePosition}
                 onCancelOrder={cancelOrder}
                 onUpdatePositionTpSl={updatePositionTpSl}
+                isLiveVenue={venuePositions !== null}
+                venueName={venuePositions !== null ? activeVenueState.venueId.toUpperCase() : undefined}
               />
             </div>
           )}

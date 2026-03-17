@@ -128,6 +128,7 @@ export const binanceAdapter: VenueAdapter = {
       orderType: input.type,
       marginAmount: input.marginAmount,
       leverage: input.leverage,
+      marginMode: input.marginMode,
       limitPrice: input.limitPrice,
       sessionToken: connection?.sessionToken,
     });
