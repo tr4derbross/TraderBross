@@ -4,6 +4,7 @@ import { Wallet, Zap, TrendingUp, TrendingDown, Loader2, AlertTriangle, RefreshC
 import { useHyperliquid } from "@/hooks/useHyperliquid";
 import { signHLAction, buildMarketOrder, buildLimitOrder } from "@/lib/hyperliquid-sign";
 import { apiFetch } from "@/lib/api-client";
+import { reconnectRealtime } from "@/lib/realtime-client";
 import { useState } from "react";
 
 type Props = {
@@ -92,6 +93,16 @@ export default function HyperliquidPanel({ walletAddress, onRequestConnect }: Pr
             <span className={`h-1 w-1 rounded-full ${wsConnected ? "bg-emerald-400" : "bg-zinc-600"}`} />
             {wsConnected ? "Live" : "Offline"}
           </span>
+          {!wsConnected && (
+            <button
+              onClick={reconnectRealtime}
+              title="Reconnect to live feed"
+              className="inline-flex items-center gap-1 rounded-md border border-zinc-700/40 bg-zinc-800/50 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-zinc-400 transition hover:border-amber-500/30 hover:text-amber-400"
+            >
+              <RefreshCw className="h-2.5 w-2.5" />
+              Reconnect
+            </button>
+          )}
         </div>
         {walletAddress ? (
           <div className="flex items-center gap-2">

@@ -112,9 +112,11 @@ function connect() {
   }
 
   setState({ connectionStatus: "connecting" });
+  console.log("[Realtime] connecting to", runtimeEnv.wsUrl);
   socket = new WebSocket(runtimeEnv.wsUrl);
 
   socket.onopen = () => {
+    console.log("[Realtime] connected");
     setState({ connectionStatus: "connected" });
   };
 
@@ -127,13 +129,15 @@ function connect() {
     }
   };
 
-  socket.onclose = () => {
+  socket.onclose = (event) => {
+    console.warn("[Realtime] disconnected", event.code, event.reason);
     socket = null;
     setState({ connectionStatus: "disconnected" });
     scheduleReconnect();
   };
 
-  socket.onerror = () => {
+  socket.onerror = (err) => {
+    console.error("[Realtime] WebSocket error", err);
     socket?.close();
   };
 }
@@ -150,6 +154,19 @@ function ensureStarted() {
 
 export function refreshRealtimeSnapshot() {
   return loadBootstrap();
+}
+
+export function reconnectRealtime() {
+  if (socket) {
+    socket.close();
+    socket = null;
+  }
+  if (reconnectTimer) {
+    window.clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  console.log("[Realtime] manual reconnect triggered");
+  connect();
 }
 
 export function subscribeRealtime(listener: Listener) {

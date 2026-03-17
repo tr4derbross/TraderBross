@@ -158,17 +158,22 @@ export default function ScreenerPage() {
   const [search, setSearch] = useState("");
   const [coins, setCoins]   = useState<ScreenerCoin[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError]   = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/screener?sort=${sort}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: ScreenerCoin[] = await res.json();
+      if (!Array.isArray(data) || data.length === 0) throw new Error("No data returned");
       setCoins(data);
       setLastUpdate(new Date());
-    } catch {
-      /* ignore */
+    } catch (err) {
+      console.error("[Screener] fetch failed:", err);
+      setError("Could not load market data.");
     } finally {
       setLoading(false);
     }
@@ -264,6 +269,20 @@ export default function ScreenerPage() {
             />
           </div>
         </div>
+
+        {/* Error state */}
+        {error && !loading && (
+          <div className="mb-4 flex flex-col items-center gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/5 py-10">
+            <p className="text-sm text-rose-400">{error}</p>
+            <button
+              onClick={load}
+              className="flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-4 py-1.5 text-[11px] font-bold text-rose-300 transition hover:bg-rose-500/20"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* Table */}
         <div className="overflow-hidden rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.015)]">

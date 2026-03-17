@@ -1,6 +1,7 @@
 "use client";
 
 import { useRealtimeSelector } from "@/lib/realtime-client";
+import { AlertTriangle } from "lucide-react";
 
 function fmtMarketCap(usd: number | null): string {
   if (usd == null) return "—";
@@ -10,6 +11,7 @@ function fmtMarketCap(usd: number | null): string {
 }
 
 export default function MarketStatsBar() {
+  const connectionStatus = useRealtimeSelector((state) => state.connectionStatus);
   const market = useRealtimeSelector((state) => state.marketStats) ?? {
     marketCapUsd: null,
     btcDominance: null,
@@ -23,49 +25,63 @@ export default function MarketStatsBar() {
     halving: null,
   };
 
+  const failed = connectionStatus === "disconnected";
   const capChange = market.marketCapChange24h;
   const capChangePositive = capChange != null && capChange >= 0;
 
-  const stats: { label: string; value: string; highlight?: "up" | "down" }[] = [
+  function nullVal(val: string | null): string {
+    if (val !== null) return val;
+    return failed ? "N/A" : "—";
+  }
+
+  const stats: { label: string; value: string; highlight?: "up" | "down"; warn?: boolean }[] = [
     {
       label: "MCAP",
-      value: fmtMarketCap(market.marketCapUsd),
+      value: market.marketCapUsd != null ? fmtMarketCap(market.marketCapUsd) : nullVal(null),
       highlight: capChange != null ? (capChangePositive ? "up" : "down") : undefined,
+      warn: failed && market.marketCapUsd == null,
     },
     {
       label: "24H",
-      value: capChange != null ? `${capChangePositive ? "+" : ""}${capChange.toFixed(2)}%` : "—",
+      value: capChange != null ? `${capChangePositive ? "+" : ""}${capChange.toFixed(2)}%` : nullVal(null),
       highlight: capChange != null ? (capChangePositive ? "up" : "down") : undefined,
+      warn: failed && capChange == null,
     },
     {
       label: "BTC DOM",
-      value: market.btcDominance != null ? `${market.btcDominance.toFixed(1)}%` : "—",
+      value: market.btcDominance != null ? `${market.btcDominance.toFixed(1)}%` : nullVal(null),
+      warn: failed && market.btcDominance == null,
     },
     {
       label: "ETH DOM",
-      value: market.ethDominance != null ? `${market.ethDominance.toFixed(1)}%` : "—",
+      value: market.ethDominance != null ? `${market.ethDominance.toFixed(1)}%` : nullVal(null),
+      warn: failed && market.ethDominance == null,
     },
     {
       label: "BLOCK",
-      value: mempool.blockHeight != null ? `#${mempool.blockHeight.toLocaleString()}` : "—",
+      value: mempool.blockHeight != null ? `#${mempool.blockHeight.toLocaleString()}` : nullVal(null),
+      warn: failed && mempool.blockHeight == null,
     },
     {
       label: "FEES (SAT/VB)",
       value:
         mempool.fees != null
           ? `${mempool.fees.fastestFee} · ${mempool.fees.halfHourFee} · ${mempool.fees.hourFee}`
-          : "—",
+          : nullVal(null),
+      warn: failed && mempool.fees == null,
     },
     {
       label: "MEMPOOL",
-      value: mempool.mempool != null ? `${mempool.mempool.count.toLocaleString()} tx` : "—",
+      value: mempool.mempool != null ? `${mempool.mempool.count.toLocaleString()} tx` : nullVal(null),
+      warn: failed && mempool.mempool == null,
     },
     {
       label: "HALVING",
       value:
         mempool.halving != null
           ? `${mempool.halving.remainingBlocks.toLocaleString()} blk`
-          : "—",
+          : nullVal(null),
+      warn: failed && mempool.halving == null,
     },
   ];
 
@@ -80,14 +96,17 @@ export default function MarketStatsBar() {
             {stat.label}
           </span>
           <span
-            className={`text-[10px] tabular-nums ${
+            className={`flex items-center gap-0.5 text-[10px] tabular-nums ${
               stat.highlight === "up"
                 ? "text-emerald-400"
                 : stat.highlight === "down"
                   ? "text-red-400"
-                  : "text-zinc-400"
+                  : stat.warn
+                    ? "text-amber-600"
+                    : "text-zinc-400"
             }`}
           >
+            {stat.warn && <AlertTriangle className="h-2.5 w-2.5" />}
             {stat.value}
           </span>
         </div>

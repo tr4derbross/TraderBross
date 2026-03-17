@@ -13,7 +13,6 @@ import {
   Newspaper,
   LayoutDashboard,
   ChevronDown,
-  Megaphone,
   Flame,
   BarChart2,
   Calendar,
@@ -41,38 +40,6 @@ function sentimentColor(s?: string) {
 
 /* ── Ad units ──────────────────────────────────────────────────────────────── */
 
-function AdLeaderboard() {
-  return (
-    <div className="flex h-[68px] w-full items-center justify-center rounded-xl border border-dashed border-[rgba(212,161,31,0.1)] bg-[rgba(212,161,31,0.02)]">
-      <div className="flex items-center gap-2 text-[10px] text-zinc-700">
-        <Megaphone className="h-3.5 w-3.5" />
-        <span className="uppercase tracking-[0.18em]">Advertisement · 728×90</span>
-      </div>
-    </div>
-  );
-}
-
-function AdMediumRect() {
-  return (
-    <div className="flex h-[200px] w-full items-center justify-center rounded-xl border border-dashed border-[rgba(212,161,31,0.1)] bg-[rgba(212,161,31,0.02)]">
-      <div className="flex flex-col items-center gap-2 text-zinc-700">
-        <Megaphone className="h-4 w-4" />
-        <span className="text-[10px] uppercase tracking-[0.18em]">Advertisement · 300×250</span>
-      </div>
-    </div>
-  );
-}
-
-function AdInlineBanner() {
-  return (
-    <div className="mx-4 my-1 flex h-[56px] items-center justify-center rounded-lg border border-dashed border-[rgba(255,255,255,0.04)] bg-[rgba(255,255,255,0.01)]">
-      <div className="flex items-center gap-2 text-[9px] text-zinc-800">
-        <Megaphone className="h-3 w-3" />
-        <span className="uppercase tracking-[0.16em]">Advertisement · 468×60</span>
-      </div>
-    </div>
-  );
-}
 
 /* ── Avatar ────────────────────────────────────────────────────────────────── */
 
@@ -372,19 +339,11 @@ export default function NewsPage() {
     feedItems.push(
       <NewsCard key={item.id} item={item} onSelect={handleSelect} selected={selectedItem?.id === item.id} />
     );
-    if ((i + 1) % 8 === 0 && i < news.length - 1) {
-      feedItems.push(<AdInlineBanner key={`ad-inline-${i}`} />);
-    }
   });
 
   return (
     <div className="flex min-h-screen flex-col bg-[#07060a] text-[var(--text-primary)]">
       <SiteNav />
-
-      {/* Leaderboard banner */}
-      <div className="border-b border-[rgba(255,255,255,0.04)] px-4 py-2 sm:px-6 lg:px-8">
-        <AdLeaderboard />
-      </div>
 
       {/* Main layout */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -572,21 +531,6 @@ export default function NewsPage() {
             </>
           )}
 
-          {/* Ad units */}
-          <div className="mx-3 mb-3 shrink-0">
-            <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-zinc-800">Sponsorlu</p>
-            <AdMediumRect />
-          </div>
-
-          <div className="mx-3 mb-3 shrink-0">
-            <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-zinc-800">Sponsorlu</p>
-            <div className="flex h-[80px] w-full items-center justify-center rounded-xl border border-dashed border-[rgba(212,161,31,0.08)] bg-[rgba(212,161,31,0.015)]">
-              <div className="flex items-center gap-2 text-[9px] text-zinc-800">
-                <Megaphone className="h-3 w-3" />
-                <span className="uppercase tracking-[0.16em]">Advertisement · 300×90</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

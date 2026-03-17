@@ -98,7 +98,7 @@ export default function PrivacyPage() {
         <h2>10. Contact</h2>
         <p>For privacy-related questions, contact us at:</p>
         <p>
-          <strong>Nikokaya24@gmail.com</strong>
+          <strong>hello@traderbross.com</strong>
         </p>
       </section>
     </LegalPage>
