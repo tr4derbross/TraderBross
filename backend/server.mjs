@@ -472,11 +472,31 @@ const server = http.createServer(async (request, reply) => {
         if (body.type === "closePosition") {
           // Reduce-only market order to close a position
           const closeSide = body.side === "long" ? "SELL" : "BUY";
-          const closeQty = String(body.size);
           const result = await binancePost("/fapi/v1/order", {
-            symbol, side: closeSide, type: "MARKET", quantity: closeQty, reduceOnly: "true",
+            symbol, side: closeSide, type: "MARKET", quantity: String(body.size), reduceOnly: "true",
           });
           json(reply, 200, { ok: true, data: result });
+          return;
+        }
+        if (body.type === "tpsl") {
+          // Place TP and/or SL conditional orders with closePosition=true
+          const tpslSide = body.side === "long" ? "SELL" : "BUY";
+          const results = [];
+          if (body.tpPrice) {
+            const r = await binancePost("/fapi/v1/order", {
+              symbol, side: tpslSide, type: "TAKE_PROFIT_MARKET",
+              stopPrice: String(body.tpPrice), closePosition: "true", workingType: "CONTRACT_PRICE",
+            }).catch((e) => ({ error: String(e) }));
+            results.push({ tp: r });
+          }
+          if (body.slPrice) {
+            const r = await binancePost("/fapi/v1/order", {
+              symbol, side: tpslSide, type: "STOP_MARKET",
+              stopPrice: String(body.slPrice), closePosition: "true", workingType: "CONTRACT_PRICE",
+            }).catch((e) => ({ error: String(e) }));
+            results.push({ sl: r });
+          }
+          json(reply, 200, { ok: true, data: results });
           return;
         }
         if (body.type === "order") {
