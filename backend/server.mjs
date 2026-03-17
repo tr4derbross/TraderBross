@@ -17,7 +17,7 @@ import {
   getOkxQuotes,
 } from "./services/market-service.mjs";
 import { getNews, getNewsFeed, getSocial, getWhales } from "./services/news-service.mjs";
-import { getFearGreed, getMarketStats, getMempoolStats, getEthGas, getDefiLlamaTvl } from "./services/stats-service.mjs";
+import { getFearGreed, getMarketStats, getMempoolStats, getEthGas, getDefiLlamaTvl, getForexRates } from "./services/stats-service.mjs";
 import { getVenueQuotes } from "./services/venue-service.mjs";
 import { clearSecret, getSecret, storeSecret } from "./services/vault-service.mjs";
 
@@ -33,6 +33,7 @@ function createState() {
     fearGreed: null,
     ethGas: null,
     defiTvl: null,
+    forex: null,
     liquidations: [],
     news: [],
     whales: [],
@@ -92,7 +93,7 @@ function broadcast(type, payload) {
 }
 
 async function refreshCoreState() {
-  const [quotes, venueQuotes, marketStats, mempoolStats, fearGreed, ethGas, defiTvl, newsFeed] = await Promise.all([
+  const [quotes, venueQuotes, marketStats, mempoolStats, fearGreed, ethGas, defiTvl, forex, newsFeed] = await Promise.all([
     getBinanceQuotes(),
     getVenueQuotes(),
     getMarketStats(),
@@ -100,6 +101,7 @@ async function refreshCoreState() {
     getFearGreed(),
     getEthGas(config.etherscanApiKey),
     getDefiLlamaTvl(),
+    getForexRates(),
     getNewsFeed(config),
   ]);
 
@@ -110,6 +112,7 @@ async function refreshCoreState() {
   state.fearGreed = fearGreed;
   state.ethGas = ethGas;
   state.defiTvl = defiTvl;
+  state.forex = forex;
   state.news = newsFeed.news;
   state.whales = newsFeed.whales;
   state.social = newsFeed.social;
@@ -134,23 +137,26 @@ async function refreshNewsOnly() {
 }
 
 async function refreshStatsOnly() {
-  const [marketStats, mempoolStats, fearGreed, ethGas, defiTvl] = await Promise.all([
+  const [marketStats, mempoolStats, fearGreed, ethGas, defiTvl, forex] = await Promise.all([
     getMarketStats(),
     getMempoolStats(),
     getFearGreed(),
     getEthGas(config.etherscanApiKey),
     getDefiLlamaTvl(),
+    getForexRates(),
   ]);
   state.marketStats = marketStats;
   state.mempoolStats = mempoolStats;
   state.fearGreed = fearGreed;
   state.ethGas = ethGas;
   state.defiTvl = defiTvl;
+  state.forex = forex;
   broadcast("marketStats", state.marketStats);
   broadcast("mempoolStats", state.mempoolStats);
   broadcast("fearGreed", state.fearGreed);
   broadcast("ethGas", state.ethGas);
   broadcast("defiTvl", state.defiTvl);
+  broadcast("forex", state.forex);
 }
 
 async function refreshVenueQuotesOnly() {
@@ -167,6 +173,7 @@ function buildSnapshot() {
     fearGreed: state.fearGreed,
     ethGas: state.ethGas,
     defiTvl: state.defiTvl,
+    forex: state.forex,
     liquidations: state.liquidations,
     news: state.news,
     whales: state.whales,
@@ -313,10 +320,43 @@ const server = http.createServer(async (request, reply) => {
       return;
     }
 
+    if (request.method === "GET" && url.pathname === "/api/forex") {
+      // Frankfurter (ECB) forex rates — EUR/USD, GBP/USD, USD/JPY — free, no key
+      json(reply, 200, await getForexRates());
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/coincap") {
+      // CoinCap top-100 assets — real-time price + market data — free, no key
+      try {
+        const limit = Math.min(Number(url.searchParams.get("limit") || 100), 200);
+        const res = await fetch(`https://api.coincap.io/v2/assets?limit=${limit}`, { signal: AbortSignal.timeout(6000) });
+        const data = await res.json();
+        const assets = (data?.data || []).map((a) => ({
+          id: a.id,
+          symbol: (a.symbol || "").toUpperCase(),
+          name: a.name,
+          rank: Number(a.rank),
+          priceUsd: a.priceUsd ? Number(a.priceUsd) : null,
+          changePercent24h: a.changePercent24Hr ? Number(a.changePercent24Hr) : null,
+          marketCapUsd: a.marketCapUsd ? Number(a.marketCapUsd) : null,
+          volumeUsd24h: a.volumeUsd24Hr ? Number(a.volumeUsd24Hr) : null,
+          supply: a.supply ? Number(a.supply) : null,
+          maxSupply: a.maxSupply ? Number(a.maxSupply) : null,
+          vwap24h: a.vwap24Hr ? Number(a.vwap24Hr) : null,
+        }));
+        json(reply, 200, assets);
+      } catch {
+        json(reply, 200, []);
+      }
+      return;
+    }
+
     if (request.method === "GET" && url.pathname === "/api/leverage-brackets") {
       // Fetch Binance leverage brackets (max leverage per symbol)
       try {
-        const data = await fetchJson("https://fapi.binance.com/fapi/v1/leverageBracket", { timeoutMs: 6000 });
+        const r0 = await fetch("https://fapi.binance.com/fapi/v1/leverageBracket", { signal: AbortSignal.timeout(6000) });
+        const data = await r0.json();
         const result = {};
         for (const item of (Array.isArray(data) ? data : [])) {
           if (!item.symbol || !Array.isArray(item.brackets) || item.brackets.length === 0) continue;
@@ -333,7 +373,8 @@ const server = http.createServer(async (request, reply) => {
     if (request.method === "GET" && url.pathname === "/api/funding") {
       // Multi-symbol funding rates from Binance premiumIndex
       try {
-        const data = await fetchJson("https://fapi.binance.com/fapi/v1/premiumIndex", { timeoutMs: 5000 });
+        const r1 = await fetch("https://fapi.binance.com/fapi/v1/premiumIndex", { signal: AbortSignal.timeout(5000) });
+        const data = await r1.json();
         const SYMBOLS = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","DOGEUSDT","AVAXUSDT","LINKUSDT","ARBUSDT","INJUSDT","NEARUSDT","OPUSDT","DOTUSDT","SUIUSDT","APTUSDT","ATOMUSDT","HYPEUSDT"];
         const filtered = (Array.isArray(data) ? data : [])
           .filter((item) => SYMBOLS.includes(item.symbol))
