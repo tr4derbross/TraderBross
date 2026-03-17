@@ -493,7 +493,15 @@ const server = http.createServer(async (request, reply) => {
           return;
         }
         if (body.type === "closePosition") {
-          // closePosition=true closes the entire position without needing quantity
+          // 1. Cancel all open orders for this symbol (TP/SL must be cleared first)
+          try {
+            const qs0 = binanceSignedQuery(apiSecret, { symbol });
+            await fetch(`${base}/fapi/v1/allOpenOrders?${qs0}`, {
+              method: "DELETE", headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(5000)
+            });
+          } catch { /* ignore — no open orders is fine */ }
+
+          // 2. Market close with closePosition=true (Binance auto-closes full position)
           const closeSide = body.side === "long" ? "SELL" : "BUY";
           const result = await binancePost("/fapi/v1/order", {
             symbol, side: closeSide, type: "MARKET", closePosition: "true",
