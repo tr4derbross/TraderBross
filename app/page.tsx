@@ -97,14 +97,24 @@ export default function LandingPage() {
         className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 text-center"
         style={{
           background:
-            "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(59,130,246,0.12), #0a0b0e)",
+            "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(242,183,5,0.08), #0B0B0B)",
         }}
       >
+        {/* Background watermark */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-0 overflow-hidden">
+          <img
+            src="/Brand/logo.png"
+            alt=""
+            aria-hidden="true"
+            style={{ opacity: 0.04, width: "60%", maxWidth: 700, objectFit: "contain" }}
+          />
+        </div>
+
         {/* Ambient orbs */}
         <div className="pointer-events-none absolute inset-0 z-0">
-          <div className="hero-orb hero-orb-1" style={{ background: "radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)" }} />
-          <div className="hero-orb hero-orb-2" style={{ background: "radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)" }} />
-          <div className="hero-scan" style={{ background: "linear-gradient(90deg, transparent, rgba(59,130,246,0.3), transparent)" }} />
+          <div className="hero-orb hero-orb-1" />
+          <div className="hero-orb hero-orb-2" />
+          <div className="hero-scan" />
         </div>
 
         <motion.div
@@ -115,21 +125,21 @@ export default function LandingPage() {
         >
           <motion.p
             variants={fadeUp}
-            className="font-mono text-[10px] tracking-[0.2em] text-[#3b82f6] uppercase"
+            className="font-mono text-[10px] tracking-[0.2em] text-[#F2B705] uppercase"
           >
             News-First Trading Workflow
           </motion.p>
 
           <motion.h1
             variants={fadeUp}
-            className="text-4xl font-bold leading-tight tracking-tight text-[#e2e4ea] sm:text-5xl md:text-6xl"
+            className="text-4xl font-bold leading-tight tracking-tight text-[#FFFFFF] sm:text-5xl md:text-6xl"
           >
             Trade the news<br />faster.
           </motion.h1>
 
           <motion.p
             variants={fadeUp}
-            className="max-w-lg text-base text-[#8b95a5] sm:text-lg"
+            className="max-w-lg text-base text-[#A0A0A0] sm:text-lg"
           >
             A professional crypto terminal that surfaces breaking news before the
             price moves — with AI analysis and one-click trading.
@@ -141,7 +151,7 @@ export default function LandingPage() {
           >
             <Link
               href="/terminal"
-              className="flex items-center gap-2 rounded-lg bg-[#3b82f6] px-6 py-3 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+              className="flex items-center gap-2 rounded-lg bg-[#F2B705] px-6 py-3 text-[13px] font-semibold text-[#0B0B0B] transition-opacity hover:opacity-90"
             >
               Open Terminal <ArrowRight size={15} />
             </Link>
@@ -149,7 +159,7 @@ export default function LandingPage() {
               href="https://t.me/traderbross"
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-2 rounded-lg border border-[rgba(59,130,246,0.2)] px-6 py-3 text-[13px] font-medium text-[#8b95a5] transition-colors hover:border-[rgba(59,130,246,0.4)] hover:text-[#e2e4ea]"
+              className="flex items-center gap-2 rounded-lg border border-[rgba(242,183,5,0.2)] px-6 py-3 text-[13px] font-medium text-[#A0A0A0] transition-colors hover:border-[rgba(242,183,5,0.4)] hover:text-[#FFFFFF]"
             >
               <Send size={14} /> Join Telegram
             </a>
@@ -162,10 +172,10 @@ export default function LandingPage() {
           >
             {STATS.map(({ value, label }) => (
               <div key={label} className="text-center">
-                <div className="font-mono text-xl font-bold text-[#e2e4ea]">
+                <div className="font-mono text-xl font-bold text-[#FFFFFF]">
                   {value}
                 </div>
-                <div className="mt-0.5 text-[10px] uppercase tracking-[0.15em] text-[#555d6e]">
+                <div className="mt-0.5 text-[10px] uppercase tracking-[0.15em] text-[#6B6B6B]">
                   {label}
                 </div>
               </div>
@@ -174,7 +184,7 @@ export default function LandingPage() {
         </motion.div>
 
         {/* Fade to base at bottom */}
-        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#0a0b0e] to-transparent" />
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#0B0B0B] to-transparent" />
       </section>
 
       {/* ── Features ─────────────────────────────────────────────────────── */}
@@ -186,10 +196,10 @@ export default function LandingPage() {
           viewport={{ once: true }}
           className="mb-10 text-center"
         >
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F2B705]">
             Features
           </p>
-          <h2 className="mt-2 text-2xl font-bold text-[#e2e4ea] sm:text-3xl">
+          <h2 className="mt-2 text-2xl font-bold text-[#FFFFFF] sm:text-3xl">
             Everything you need to trade smarter
           </h2>
         </motion.div>
@@ -202,15 +212,15 @@ export default function LandingPage() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25, delay: i * 0.05 }}
               viewport={{ once: true }}
-              className="group rounded-xl border border-[rgba(59,130,246,0.12)] bg-[#12141a] p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[rgba(59,130,246,0.3)]"
+              className="group rounded-xl border border-[#2A2A2A] bg-[#121212] p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[rgba(242,183,5,0.25)]"
             >
-              <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-[rgba(59,130,246,0.12)]">
-                <Icon size={18} className="text-[#3b82f6]" />
+              <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-[rgba(242,183,5,0.1)]">
+                <Icon size={18} className="text-[#F2B705]" />
               </div>
-              <h3 className="mb-1.5 text-[14px] font-semibold text-[#e2e4ea]">
+              <h3 className="mb-1.5 text-[14px] font-semibold text-[#FFFFFF]">
                 {title}
               </h3>
-              <p className="text-[12px] leading-relaxed text-[#8b95a5]">
+              <p className="text-[12px] leading-relaxed text-[#A0A0A0]">
                 {desc}
               </p>
             </motion.div>
@@ -219,7 +229,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── AI Demo ───────────────────────────────────────────────────────── */}
-      <section className="border-y border-[rgba(59,130,246,0.1)] bg-[#0d0e11] py-20">
+      <section className="border-y border-[#2A2A2A] bg-[#0B0B0B] py-20">
         <div className="mx-auto max-w-2xl px-4">
           <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -228,13 +238,13 @@ export default function LandingPage() {
             viewport={{ once: true }}
             className="mb-6 text-center"
           >
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F2B705]">
               AI Assistant
             </p>
-            <h2 className="mt-2 text-2xl font-bold text-[#e2e4ea]">
+            <h2 className="mt-2 text-2xl font-bold text-[#FFFFFF]">
               Market analysis, on demand
             </h2>
-            <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.15em] text-[#555d6e]">
+            <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.15em] text-[#6B6B6B]">
               ★ Example conversation — not live data
             </p>
           </motion.div>
@@ -244,7 +254,7 @@ export default function LandingPage() {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25, delay: 0.1 }}
             viewport={{ once: true }}
-            className="space-y-3 rounded-xl border border-[rgba(59,130,246,0.15)] bg-[#12141a] p-4"
+            className="space-y-3 rounded-xl border border-[#2A2A2A] bg-[#121212] p-4"
           >
             {DEMO_MESSAGES.map((msg, i) => (
               <div
@@ -254,12 +264,12 @@ export default function LandingPage() {
                 <div
                   className={`max-w-[85%] rounded-lg px-3.5 py-2.5 text-[12px] leading-relaxed ${
                     msg.role === "user"
-                      ? "border border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.1)] text-[#3b82f6]"
-                      : "border border-[rgba(59,130,246,0.08)] bg-[#181a22] text-[#8b95a5]"
+                      ? "border border-[rgba(242,183,5,0.25)] bg-[rgba(242,183,5,0.08)] text-[#F2B705]"
+                      : "border border-[#2A2A2A] bg-[#1A1A1A] text-[#A0A0A0]"
                   }`}
                 >
                   {msg.role === "ai" && (
-                    <span className="mb-1 block font-mono text-[8px] uppercase tracking-widest text-[#a78bfa]">
+                    <span className="mb-1 block font-mono text-[8px] uppercase tracking-widest text-[#6B6B6B]">
                       AI ·
                     </span>
                   )}
@@ -278,7 +288,7 @@ export default function LandingPage() {
           >
             <Link
               href="/terminal"
-              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#3b82f6] hover:underline"
+              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#F2B705] hover:underline"
             >
               Try it live in the terminal <ChevronRight size={14} />
             </Link>
@@ -295,7 +305,7 @@ export default function LandingPage() {
           viewport={{ once: true }}
           className="mx-auto max-w-lg px-4"
         >
-          <h2 className="text-2xl font-bold text-[#e2e4ea] sm:text-3xl">
+          <h2 className="text-2xl font-bold text-[#FFFFFF] sm:text-3xl">
             Start trading smarter today
           </h2>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
@@ -303,7 +313,7 @@ export default function LandingPage() {
               (pill) => (
                 <span
                   key={pill}
-                  className="rounded-full border border-[rgba(59,130,246,0.15)] px-3 py-1 text-[11px] text-[#555d6e]"
+                  className="rounded-full border border-[#2A2A2A] px-3 py-1 text-[11px] text-[#6B6B6B]"
                 >
                   {pill}
                 </span>
@@ -312,7 +322,7 @@ export default function LandingPage() {
           </div>
           <Link
             href="/terminal"
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#3b82f6] px-8 py-3.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#F2B705] px-8 py-3.5 text-[13px] font-semibold text-[#0B0B0B] transition-opacity hover:opacity-90"
           >
             Open Terminal — Free <ArrowRight size={15} />
           </Link>
