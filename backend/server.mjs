@@ -469,7 +469,21 @@ const server = http.createServer(async (request, reply) => {
           json(reply, 200, { ok: true });
           return;
         }
+        if (body.type === "closePosition") {
+          // Reduce-only market order to close a position
+          const closeSide = body.side === "long" ? "SELL" : "BUY";
+          const closeQty = String(body.size);
+          const result = await binancePost("/fapi/v1/order", {
+            symbol, side: closeSide, type: "MARKET", quantity: closeQty, reduceOnly: "true",
+          });
+          json(reply, 200, { ok: true, data: result });
+          return;
+        }
         if (body.type === "order") {
+          // Pre-set margin type and leverage before placing
+          const marginType = body.marginMode === "cross" ? "CROSSED" : "ISOLATED";
+          await binancePost("/fapi/v1/marginType", { symbol, marginType }).catch(() => {});
+          await binancePost("/fapi/v1/leverage", { symbol, leverage: String(Math.round(body.leverage || 1)) });
           // Fetch mark price
           const mpRes = await fetch(`${base}/fapi/v1/premiumIndex?symbol=${symbol}`, { signal: AbortSignal.timeout(5000) });
           const mpData = await mpRes.json();

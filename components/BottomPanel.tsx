@@ -13,6 +13,7 @@ type Props = {
   onCancelOrder: (id: string) => void;
   onUpdatePositionTpSl: (posId: string, tpPrice: number | undefined, slPrice: number | undefined) => void;
   drawerMode?: "half" | "full";
+  isLiveVenue?: boolean;
   onCollapse?: () => void;
   onExpand?: () => void;
 };
@@ -239,6 +240,7 @@ export default function BottomPanel({
   onCancelOrder,
   onUpdatePositionTpSl,
   drawerMode = "half",
+  isLiveVenue = false,
   onCollapse,
   onExpand,
 }: Props) {
@@ -497,8 +499,8 @@ export default function BottomPanel({
                           )}
                         </div>
 
-                        {/* TP/SL editor */}
-                        <div className="mt-1">
+                        {/* TP/SL editor — paper trading only */}
+                        {!isLiveVenue && <div className="mt-1">
                           {editingPosId === pos.id ? (
                             <div
                               className="mt-1 space-y-1.5 rounded-xl p-2.5"
@@ -585,7 +587,7 @@ export default function BottomPanel({
                               <PencilLine className="h-3 w-3" />
                             </button>
                           )}
-                        </div>
+                        </div>}
                       </td>
 
                       {/* Margin */}
@@ -613,20 +615,20 @@ export default function BottomPanel({
                       <td className="px-3 py-2">
                         <button
                           onClick={() => onClosePosition(pos.id)}
-                          className="rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors"
+                          className="rounded-md px-2.5 py-1 text-[10px] font-bold transition-colors"
                           style={{
-                            background: "rgba(239,68,68,0.08)",
-                            border: "1px solid rgba(239,68,68,0.22)",
+                            background: isLiveVenue ? "rgba(239,68,68,0.14)" : "rgba(239,68,68,0.08)",
+                            border: "1px solid rgba(239,68,68,0.35)",
                             color: "#f87171",
                           }}
                           onMouseEnter={(e) => {
-                            (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.18)";
+                            (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.28)";
                           }}
                           onMouseLeave={(e) => {
-                            (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.08)";
+                            (e.currentTarget as HTMLElement).style.background = isLiveVenue ? "rgba(239,68,68,0.14)" : "rgba(239,68,68,0.08)";
                           }}
                         >
-                          Close
+                          {isLiveVenue ? "Market Close" : "Close"}
                         </button>
                       </td>
                     </tr>
