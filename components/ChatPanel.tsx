@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { buildApiUrl } from "@/lib/runtime-env";
-import { Bot, Send, Loader2, Sparkles, Trash2, ChevronDown } from "lucide-react";
+import { Bot, Send, Loader2, Sparkles, Trash2, ChevronDown, Cpu } from "lucide-react";
 
 interface Message {
   id: string;
@@ -24,52 +24,53 @@ interface ChatPanelProps {
 }
 
 const QUICK_PROMPTS = [
-  "What's driving this move?",
-  "Key levels to watch?",
-  "Analyze recent news sentiment",
-  "Risk/reward setup ideas",
+  { label: "What's driving this move?", icon: "📊" },
+  { label: "Key support & resistance levels?", icon: "📐" },
+  { label: "Analyze recent news sentiment", icon: "📰" },
+  { label: "Best risk/reward setup?", icon: "⚖️" },
+  { label: "Funding rate interpretation?", icon: "💹" },
+  { label: "Bullish or bearish market structure?", icon: "🔍" },
 ];
 
 function formatTime(date: Date) {
-  return date.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
+  return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function renderInline(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*.*?\*\*|`[^`]+`)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={i} className="font-semibold text-amber-200/90">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return (
+        <code key={i} className="rounded bg-zinc-800 px-1 py-0.5 font-mono text-[10px] text-amber-300">
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    return <span key={i}>{part}</span>;
   });
 }
 
-function MessageBubble({ message }: { message: Message }) {
-  const isUser = message.role === "user";
-  return (
-    <div className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}>
-      <div
-        className={`max-w-[88%] rounded-2xl px-3 py-2 text-[11px] leading-5 ${
-          isUser
-            ? "bg-amber-500/10 border border-amber-400/20 text-[#f3ead7]"
-            : "panel-shell-alt border text-zinc-200"
-        }`}
-        style={{ wordBreak: "break-word" }}
-      >
-        {isUser ? (
-          message.content
-        ) : (
-          <AssistantText content={message.content} />
-        )}
-      </div>
-      <span className="px-1 text-[9px] text-zinc-600">{formatTime(message.timestamp)}</span>
-    </div>
-  );
-}
-
 function AssistantText({ content }: { content: string }) {
-  // Render markdown-lite: bold, bullets, line breaks
   const lines = content.split("\n");
   return (
     <div className="space-y-1">
       {lines.map((line, i) => {
         if (!line.trim()) return <div key={i} className="h-1" />;
-
-        // Bullet points
+        const headingMatch = line.match(/^#{1,3}\s+(.+)/);
+        if (headingMatch) {
+          return (
+            <p key={i} className="font-bold text-amber-200/80 text-[11px]">
+              {headingMatch[1]}
+            </p>
+          );
+        }
         const bulletMatch = line.match(/^[-•*]\s+(.+)/);
         if (bulletMatch) {
           return (
@@ -79,37 +80,37 @@ function AssistantText({ content }: { content: string }) {
             </div>
           );
         }
-
-        // Numbered list
         const numMatch = line.match(/^(\d+)\.\s+(.+)/);
         if (numMatch) {
           return (
             <div key={i} className="flex gap-1.5">
-              <span className="mt-0.5 shrink-0 text-amber-400/60 text-[10px] font-mono">
-                {numMatch[1]}.
-              </span>
+              <span className="mt-0.5 shrink-0 text-amber-400/60 text-[10px] font-mono">{numMatch[1]}.</span>
               <span>{renderInline(numMatch[2])}</span>
             </div>
           );
         }
-
         return <p key={i}>{renderInline(line)}</p>;
       })}
     </div>
   );
 }
 
-function renderInline(text: string): React.ReactNode {
-  // Bold: **text**
-  const parts = text.split(/\*\*(.*?)\*\*/g);
-  return parts.map((part, i) =>
-    i % 2 === 1 ? (
-      <strong key={i} className="font-semibold text-amber-200/90">
-        {part}
-      </strong>
-    ) : (
-      <span key={i}>{part}</span>
-    )
+function MessageBubble({ message }: { message: Message }) {
+  const isUser = message.role === "user";
+  return (
+    <div className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}>
+      <div
+        className={`max-w-[90%] rounded-2xl px-3 py-2 text-[11px] leading-5 ${
+          isUser
+            ? "bg-amber-500/10 border border-amber-400/20 text-[#f3ead7]"
+            : "panel-shell-alt border text-zinc-200"
+        }`}
+        style={{ wordBreak: "break-word" }}
+      >
+        {isUser ? message.content : <AssistantText content={message.content} />}
+      </div>
+      <span className="px-1 text-[9px] text-zinc-700">{formatTime(message.timestamp)}</span>
+    </div>
   );
 }
 
@@ -122,9 +123,7 @@ function TypingIndicator() {
             <span
               key={i}
               className="h-1.5 w-1.5 rounded-full bg-amber-400/60"
-              style={{
-                animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
-              }}
+              style={{ animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite` }}
             />
           ))}
         </span>
@@ -148,7 +147,6 @@ export default function ChatPanel({ context }: ChatPanelProps) {
     messagesEndRef.current?.scrollIntoView({ behavior });
   }, []);
 
-  // Fetch active AI provider label
   useEffect(() => {
     fetch(buildApiUrl("/api/chat"))
       .then((r) => r.json())
@@ -185,23 +183,14 @@ export default function ChatPanel({ context }: ChatPanelProps) {
       setInput("");
       setIsStreaming(true);
 
-      // Reset textarea height
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
-      }
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
 
       const assistantId = crypto.randomUUID();
       let accumulated = "";
 
-      // Add empty assistant message placeholder
       setMessages((prev) => [
         ...prev,
-        {
-          id: assistantId,
-          role: "assistant",
-          content: "",
-          timestamp: new Date(),
-        },
+        { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
       ]);
 
       abortRef.current = new AbortController();
@@ -211,32 +200,23 @@ export default function ChatPanel({ context }: ChatPanelProps) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            messages: updatedMessages.map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
+            messages: updatedMessages.map((m) => ({ role: m.role, content: m.content })),
             context,
           }),
           signal: abortRef.current.signal,
         });
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
-
         if (!reader) throw new Error("No response body");
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
-
-          for (const line of lines) {
+          for (const line of chunk.split("\n")) {
             if (!line.startsWith("data: ")) continue;
             const data = line.slice(6).trim();
             if (data === "[DONE]") break;
@@ -245,14 +225,10 @@ export default function ChatPanel({ context }: ChatPanelProps) {
               if (parsed.text) {
                 accumulated += parsed.text;
                 setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantId ? { ...m, content: accumulated } : m
-                  )
+                  prev.map((m) => (m.id === assistantId ? { ...m, content: accumulated } : m))
                 );
               }
-            } catch {
-              // ignore parse errors
-            }
+            } catch { /* ignore */ }
           }
         }
       } catch (err) {
@@ -260,10 +236,7 @@ export default function ChatPanel({ context }: ChatPanelProps) {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
-              ? {
-                  ...m,
-                  content: "⚠️ Connection error. Check your API key configuration.",
-                }
+              ? { ...m, content: "⚠️ Connection error. Check your API key configuration in the backend." }
               : m
           )
         );
@@ -284,20 +257,22 @@ export default function ChatPanel({ context }: ChatPanelProps) {
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
-    // Auto-resize
     e.target.style.height = "auto";
     e.target.style.height = Math.min(e.target.scrollHeight, 100) + "px";
   };
 
   const clearChat = () => {
-    if (isStreaming) {
-      abortRef.current?.abort();
-      setIsStreaming(false);
-    }
+    if (isStreaming) { abortRef.current?.abort(); setIsStreaming(false); }
     setMessages([]);
   };
 
   const isEmpty = messages.length === 0;
+
+  const contextSummary = [
+    context?.ticker,
+    context?.price && `$${context.price}`,
+    context?.fearGreed && `F&G ${context.fearGreed.value}`,
+  ].filter(Boolean).join(" · ");
 
   return (
     <>
@@ -314,26 +289,19 @@ export default function ChatPanel({ context }: ChatPanelProps) {
           <div className="flex items-center gap-2">
             <Sparkles className="h-3.5 w-3.5 text-amber-300" />
             <span className="brand-section-title text-xs">AI Assistant</span>
-            {context?.ticker && (
-              <span className="brand-badge rounded-full px-1.5 py-0.5 text-[10px] text-zinc-400">
-                {context.ticker}
-              </span>
-            )}
-            {context?.fearGreed && (
-              <span
-                className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold border"
-                style={{
-                  color: context.fearGreed.value <= 40 ? "#f97316" : context.fearGreed.value >= 60 ? "#22c55e" : "#a1a1aa",
-                  borderColor: context.fearGreed.value <= 40 ? "#f9731640" : context.fearGreed.value >= 60 ? "#22c55e40" : "#a1a1aa40",
-                  background: context.fearGreed.value <= 40 ? "#f9731610" : context.fearGreed.value >= 60 ? "#22c55e10" : "#a1a1aa10",
-                }}
-                title="Fear & Greed Index"
-              >
-                F&G {context.fearGreed.value}
+            {contextSummary && (
+              <span className="brand-badge rounded-full px-1.5 py-0.5 text-[9px] text-zinc-500">
+                {contextSummary}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
+            {providerLabel && (
+              <span className="flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-900/50 px-1.5 py-0.5 text-[9px] text-zinc-600">
+                <Cpu className="h-2.5 w-2.5" />
+                {providerLabel}
+              </span>
+            )}
             {messages.length > 0 && (
               <button
                 onClick={clearChat}
@@ -354,23 +322,29 @@ export default function ChatPanel({ context }: ChatPanelProps) {
         >
           {isEmpty ? (
             <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-500/5">
-                <Bot className="h-5 w-5 text-amber-300/70" />
+              <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-500/5">
+                <Bot className="h-6 w-6 text-amber-300/70" />
+                <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-zinc-900 bg-emerald-500 text-[6px] font-bold text-zinc-900">
+                  AI
+                </span>
               </div>
               <div>
-                <p className="text-[11px] font-medium text-zinc-300">TraderBross AI</p>
+                <p className="text-[12px] font-semibold text-zinc-200">TraderBross AI</p>
                 <p className="mt-0.5 text-[10px] text-zinc-600">
-                  Ask about markets, news, or strategies
+                  {context?.ticker
+                    ? `Analyzing ${context.ticker} · Ask me anything`
+                    : "Ask about markets, setups, or news"}
                 </p>
               </div>
-              <div className="flex w-full flex-col gap-1.5">
+              <div className="flex w-full flex-col gap-1">
                 {QUICK_PROMPTS.map((prompt) => (
                   <button
-                    key={prompt}
-                    onClick={() => sendMessage(prompt)}
-                    className="w-full rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 text-left text-[10px] text-zinc-400 transition hover:border-amber-400/20 hover:text-zinc-200"
+                    key={prompt.label}
+                    onClick={() => sendMessage(prompt.label)}
+                    className="flex w-full items-center gap-2.5 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 text-left text-[10px] text-zinc-400 transition hover:border-amber-400/20 hover:bg-white/[0.04] hover:text-zinc-200"
                   >
-                    {prompt}
+                    <span className="text-[12px]">{prompt.icon}</span>
+                    {prompt.label}
                   </button>
                 ))}
               </div>
@@ -389,7 +363,7 @@ export default function ChatPanel({ context }: ChatPanelProps) {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Scroll to bottom button */}
+        {/* Scroll to bottom */}
         {showScrollBtn && (
           <div className="absolute bottom-20 right-4 z-10">
             <button
@@ -401,16 +375,16 @@ export default function ChatPanel({ context }: ChatPanelProps) {
           </div>
         )}
 
-        {/* Quick prompts when there are messages */}
+        {/* Inline quick prompts after first message */}
         {!isEmpty && !isStreaming && (
-          <div className="flex shrink-0 gap-1.5 overflow-x-auto px-3 pb-1 pt-1 scrollbar-none">
-            {QUICK_PROMPTS.slice(0, 2).map((prompt) => (
+          <div className="flex shrink-0 gap-1.5 overflow-x-auto px-3 pb-1 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {QUICK_PROMPTS.slice(0, 3).map((prompt) => (
               <button
-                key={prompt}
-                onClick={() => sendMessage(prompt)}
+                key={prompt.label}
+                onClick={() => sendMessage(prompt.label)}
                 className="shrink-0 rounded-lg border border-white/5 px-2 py-1 text-[10px] text-zinc-500 transition hover:border-amber-400/20 hover:text-zinc-300"
               >
-                {prompt}
+                {prompt.icon} {prompt.label}
               </button>
             ))}
           </div>
@@ -425,7 +399,9 @@ export default function ChatPanel({ context }: ChatPanelProps) {
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
               disabled={isStreaming}
-              placeholder="Ask anything… (Enter to send)"
+              placeholder={
+                context?.ticker ? `Ask about ${context.ticker}… (Enter)` : "Ask anything… (Enter to send)"
+              }
               rows={1}
               className="min-h-0 flex-1 resize-none bg-transparent text-[11px] text-zinc-200 outline-none placeholder:text-zinc-600 disabled:opacity-50"
               style={{ height: "20px", maxHeight: "100px" }}
@@ -444,7 +420,6 @@ export default function ChatPanel({ context }: ChatPanelProps) {
           </div>
           <p className="mt-1.5 text-center text-[9px] text-zinc-700">
             Shift+Enter for new line · Not financial advice
-            {providerLabel && <> · <span className="text-zinc-600">{providerLabel}</span></>}
           </p>
         </div>
       </div>

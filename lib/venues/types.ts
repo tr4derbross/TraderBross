@@ -53,6 +53,7 @@ export type VenueOrderInput = {
   size?: number;
   marginAmount?: number;
   leverage?: number;
+  marginMode?: "isolated" | "cross";
   limitPrice?: number;
   tpPrice?: number;
   slPrice?: number;

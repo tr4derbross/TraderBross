@@ -169,7 +169,7 @@ function EmptyRow({ cols, label }: { cols: number; label: string }) {
   );
 }
 
-function TH({ children, right }: { children: React.ReactNode; right?: boolean }) {
+function TH({ children = null, right }: { children?: React.ReactNode; right?: boolean }) {
   return (
     <th className={`whitespace-nowrap px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.13em] text-zinc-600 ${right ? "text-right" : "text-left"}`}>
       {children}

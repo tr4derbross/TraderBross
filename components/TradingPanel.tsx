@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AVAILABLE_TICKERS, type NewsItem } from "@/lib/mock-data";
 import type { ActiveVenueState } from "@/lib/active-venue";
+import { buildApiUrl } from "@/lib/runtime-env";
 import type { NewsTradePreset } from "@/lib/news-trade";
 import {
   type MarginMode,
@@ -46,7 +47,9 @@ type Props = {
 type TicketType = "market" | "limit" | "stop";
 type SubmitState = "idle" | "submitting" | "success" | "failure";
 
-const LEVERAGE_PRESETS = [2, 5, 10, 20, 50];
+// Dynamic leverage presets computed from Binance exchange info
+const DEFAULT_LEVERAGE_PRESETS = [2, 5, 10, 20, 50];
+const LEVERAGE_PRESETS = DEFAULT_LEVERAGE_PRESETS; // used as fallback
 const TPSL_PRESETS = [1, 2, 3, 5, 10];
 const MARGIN_PCT_PRESETS = [5, 10, 25, 50];
 const FUTURES_TICKERS = AVAILABLE_TICKERS.filter((ticker) => !["COIN", "MSTR"].includes(ticker));
@@ -98,6 +101,8 @@ export default function TradingPanel({
 }: Props) {
   const [ticker, setTicker] = useState(activeVenueState.activeSymbol);
   const [ticketType, setTicketType] = useState<TicketType>("market");
+  const [leverageBrackets, setLeverageBrackets] = useState<Record<string, number>>({});
+  const leverageFetchedRef = useRef(false);
   const [side, setSide] = useState<Side>("long");
   const [marginMode, setMarginMode] = useState<MarginMode>("isolated");
   const [leverage, setLeverage] = useState(10);
@@ -118,6 +123,16 @@ export default function TradingPanel({
   useEffect(() => {
     setTicker(activeVenueState.activeSymbol);
   }, [activeVenueState.activeSymbol]);
+
+  // Fetch leverage brackets once on mount (Binance only)
+  useEffect(() => {
+    if (leverageFetchedRef.current) return;
+    leverageFetchedRef.current = true;
+    fetch(buildApiUrl("/api/leverage-brackets"), { signal: AbortSignal.timeout(6000) })
+      .then((r) => r.json())
+      .then((data: Record<string, number>) => setLeverageBrackets(data))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!newsTradeIntent) return;
@@ -148,6 +163,16 @@ export default function TradingPanel({
     setSubmitState("idle");
     onConsumeNewsTradeIntent();
   }, [newsTradeIntent, onActiveSymbolChange, onConsumeNewsTradeIntent]);
+
+  // Dynamic leverage presets based on coin's max leverage from Binance
+  const maxLeverage = leverageBrackets[ticker] ?? 100;
+  const dynamicLeveragePresets = useMemo(() => {
+    if (maxLeverage <= 10) return [1, 2, 3, 5, maxLeverage];
+    if (maxLeverage <= 20) return [2, 5, 10, 15, maxLeverage];
+    if (maxLeverage <= 50) return [2, 5, 10, 20, maxLeverage];
+    if (maxLeverage <= 75) return [5, 10, 20, 50, maxLeverage];
+    return [5, 10, 20, 50, 100];
+  }, [maxLeverage]);
 
   const currentPrice = prices[ticker] ?? getBasePrice(ticker);
   const execPrice =
@@ -469,9 +494,14 @@ export default function TradingPanel({
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-[10px] uppercase tracking-widest text-zinc-600">Leverage</label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-[10px] uppercase tracking-widest text-zinc-600">Leverage</label>
+              {maxLeverage > 0 && (
+                <span className="text-[9px] text-zinc-700">max {maxLeverage}x</span>
+              )}
+            </div>
             <div className="grid grid-cols-5 gap-0.5">
-              {LEVERAGE_PRESETS.map((value) => (
+              {dynamicLeveragePresets.map((value) => (
                 <button
                   key={value}
                   type="button"
