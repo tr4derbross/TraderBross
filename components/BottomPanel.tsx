@@ -500,7 +500,8 @@ export default function BottomPanel({
                         </div>
 
                         {/* TP/SL editor — paper trading only */}
-                        {!isLiveVenue && <div className="mt-1">
+                        {!isLiveVenue && (
+                        <div className="mt-1">
                           {editingPosId === pos.id ? (
                             <div
                               className="mt-1 space-y-1.5 rounded-xl p-2.5"
@@ -587,7 +588,8 @@ export default function BottomPanel({
                               <PencilLine className="h-3 w-3" />
                             </button>
                           )}
-                        </div>}
+                        </div>
+                        )}
                       </td>
 
                       {/* Margin */}
