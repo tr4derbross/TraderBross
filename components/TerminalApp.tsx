@@ -779,6 +779,34 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     [venuePositions, displayPositions, buildActiveVenueConnection, closePosition]
   );
 
+  // Set TP/SL on a live Binance position
+  const handleSetVenueTpSl = useCallback(
+    async (positionId: string, tpPrice: number | undefined, slPrice: number | undefined) => {
+      if (venuePositions) {
+        const pos = displayPositions.find((p) => p.id === positionId);
+        if (pos) {
+          const connection = buildActiveVenueConnection();
+          await fetch(buildApiUrl("/api/binance/order"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "tpsl",
+              symbol: pos.ticker,
+              side: pos.side,
+              tpPrice: tpPrice ?? null,
+              slPrice: slPrice ?? null,
+              sessionToken: connection?.sessionToken,
+            }),
+          });
+          return;
+        }
+      }
+      // Paper trading fallback
+      updatePositionTpSl(positionId, tpPrice, slPrice);
+    },
+    [venuePositions, displayPositions, buildActiveVenueConnection, updatePositionTpSl]
+  );
+
   const disconnectHeaderWallet = useCallback(async () => {
     const activeSession = headerWalletSessionRef.current;
     headerWalletSessionRef.current = null;
@@ -1422,7 +1450,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                 equityHistory={equityHistory}
                 onClosePosition={handleCloseVenuePosition}
                 onCancelOrder={cancelOrder}
-                onUpdatePositionTpSl={updatePositionTpSl}
+                onUpdatePositionTpSl={handleSetVenueTpSl}
                 isLiveVenue={venuePositions !== null}
                 venueName={venuePositions !== null ? activeVenueState.venueId.toUpperCase() : undefined}
               />
