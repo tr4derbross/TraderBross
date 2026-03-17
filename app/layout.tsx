@@ -1,15 +1,22 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono } from "next/font/google";
+import { Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
-const jetbrainsMono = JetBrains_Mono({
+const inter = Inter({
   subsets: ["latin"],
+  variable: "--font-sans",
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-mono",
 });
 
 export const metadata: Metadata = {
   title: "TraderBross",
-  description: "TraderBross multi-venue trading terminal with live market data, news intelligence, and chart execution.",
+  description:
+    "TraderBross multi-venue trading terminal with live market data, news intelligence, and chart execution.",
 };
 
 export default function RootLayout({
@@ -20,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${jetbrainsMono.variable} font-mono bg-black text-[var(--text-primary)] antialiased`}
+        className={`${inter.variable} ${ibmPlexMono.variable} font-sans bg-black text-[var(--text-primary)] antialiased`}
       >
         {children}
       </body>

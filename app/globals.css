@@ -4,7 +4,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@theme inline {
+@theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
@@ -45,6 +45,32 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* ─── New design system tokens ──────────────────────────────────── */
+  --color-base: #0a0b0e;
+  --color-surface: #0d0e11;
+  --color-elevated: #12141a;
+  --color-overlay: #181a22;
+  --color-border-tb: #1e2028;
+  --color-border-subtle-tb: #13151b;
+  --color-text-primary: #e2e4ea;
+  --color-text-secondary: #8b95a5;
+  --color-text-muted: #555d6e;
+  --color-text-dim: #3a4050;
+  --color-bull: #22c55e;
+  --color-bull-dim: #16a34a;
+  --color-bull-bg: #0d2318;
+  --color-bear: #ef4444;
+  --color-bear-dim: #dc2626;
+  --color-bear-bg: #2d1515;
+  --color-accent-tb: #3b82f6;
+  --color-accent-bg-tb: #0d1f3c;
+  --color-ai: #a78bfa;
+  --color-ai-bg: #1e1535;
+  --color-warning-tb: #f59e0b;
+  --color-warning-bg-tb: #1f1a08;
+  --font-mono-tb: 'IBM Plex Mono', monospace;
+  --font-sans-tb: 'Inter', sans-serif;
 }
 
 /* ─── Brand Design Tokens ──────────────────────────────────────────────────── */
@@ -309,12 +335,46 @@ body::before {
   50%       { opacity: 0.8; }
 }
 
+/* Shimmer skeleton animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--color-elevated) 25%, var(--color-overlay) 50%, var(--color-elevated) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
 /* Count-up flicker for numbers */
 @keyframes num-flicker {
   0%   { opacity: 0.6; }
   50%  { opacity: 1; }
   100% { opacity: 0.6; }
 }
+
+/* Pulse animations */
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes pulse-amber {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.pulse-green { animation: pulse-green 1.5s ease-in-out infinite; }
+.pulse-amber { animation: pulse-amber 1s ease-in-out infinite; }
+
+/* Value flash animation */
+@keyframes flash-update {
+  0% { background-color: rgba(59, 130, 246, 0.2); }
+  100% { background-color: transparent; }
+}
+.flash-update { animation: flash-update 0.5s ease-out; }
+
+/* No scroll on terminal */
+.terminal-layout { overflow: hidden; height: 100dvh; }
 
 /* ─── Panel Shells ──────────────────────────────────────────────────────────── */
 .panel-shell {
@@ -879,8 +939,8 @@ body::after {
 .status-dot-pending { background: #d4a11f; box-shadow: 0 0 6px rgba(212,161,31,0.6); animation: livePulse 1.2s ease-in-out infinite; }
 
 /* ─── Scrollbar ─────────────────────────────────────────────────────────────── */
-::-webkit-scrollbar       { width: 4px; }
-::-webkit-scrollbar-track { background: #080706; }
+::-webkit-scrollbar       { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #3a2d12; border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: #5c4618; }
 
@@ -918,9 +978,6 @@ html {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
-
-/* Better horizontal scrollbar */
-::-webkit-scrollbar:horizontal { height: 4px; }
 
 /* ─── Screener / Calendar page cards ───────────────────────────────────────── */
 @keyframes card-in {
