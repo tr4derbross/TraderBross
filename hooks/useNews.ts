@@ -4,7 +4,7 @@ import { useMemo, useRef } from "react";
 import { MOCK_NEWS, NewsItem } from "@/lib/mock-data";
 import { refreshRealtimeSnapshot, useRealtimeSelector } from "@/lib/realtime-client";
 
-export type SourceFilter = "all" | "news" | "social" | "whale";
+export type SourceFilter = "all" | "news" | "social" | "whale" | "liquidation";
 export type ImportanceFilter = "all" | "breaking" | "market-moving" | "watch" | "noise";
 export type SentimentFilter = "all" | "bullish" | "bearish" | "neutral";
 
@@ -38,6 +38,7 @@ export function useNews({
   const newsItems = useRealtimeSelector((state) => state.news);
   const whaleItems = useRealtimeSelector((state) => state.whales);
   const socialItems = useRealtimeSelector((state) => state.social);
+  const liquidationCount = useRealtimeSelector((state) => (state.liquidations ?? []).length);
   const connectionStatus = useRealtimeSelector((state) => state.connectionStatus);
   const previousHeadlines = useRef<Set<string>>(new Set());
 
@@ -110,6 +111,7 @@ export function useNews({
       news: newsItems.length,
       whale: whaleItems.length,
       social: socialItems.length,
+      liquidation: liquidationCount,
       all: allItems.length,
     },
   };

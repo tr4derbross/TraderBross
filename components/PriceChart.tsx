@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Maximize2, Minimize2, Newspaper } from "lucide-react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { AVAILABLE_TICKERS } from "@/lib/mock-data";
 import type { TradingVenueId } from "@/lib/active-venue";
 import { MarginMode, Order, OrderType, Position, Side } from "@/hooks/useTradingState";
@@ -132,6 +132,7 @@ export default function PriceChart({
   const openOrderLinesRef = useRef<unknown[]>([]);
   const ticker = activeSymbol;
 
+  const [isMobile, setIsMobile] = useState(false);
   const [timeframe, setTimeframe] = useState<Timeframe>("1D");
   const [chartType, setChartType] = useState<ChartType>("candles");
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -204,6 +205,14 @@ export default function PriceChart({
       /* ignore */
     }
   };
+
+  // Track mobile breakpoint
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -693,156 +702,230 @@ export default function PriceChart({
       className={`flex flex-col select-none ${isFullscreen ? "fixed inset-0 z-[100]" : "h-full min-h-0"}`}
       style={{ background: "linear-gradient(180deg, #060504 0%, #0a0908 100%)" }}
     >
-      <div className="flex items-center justify-between border-b border-[rgba(212,161,31,0.1)] bg-[linear-gradient(180deg,rgba(24,20,15,0.96),rgba(9,8,7,0.96))] px-3 py-1.5 text-[11px] text-zinc-400">
-        <div className="flex min-w-0 items-center gap-2">
-          <Newspaper className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-          <span className="truncate">
-            {activePosition
-              ? `${ticker} position live · ${activePosition.side.toUpperCase()} ${activePosition.leverage}x`
-              : `${ticker} local chart live · streamlined execution mode`}
-          </span>
+      {/* ── Mobile: single compact header row ─────────────────────────────────── */}
+      {isMobile ? (
+        <div
+          className="flex items-center gap-2 border-b shrink-0 px-2"
+          style={{
+            borderColor: "rgba(39,39,42,0.72)",
+            background: "linear-gradient(180deg, rgba(27,22,16,0.98), rgba(12,11,10,0.96))",
+            minHeight: 46,
+          }}
+        >
+          {/* Ticker select + PERP */}
+          <div className="flex items-center gap-1.5 shrink-0 border-r pr-2" style={{ borderColor: "rgba(39,39,42,0.72)" }}>
+            <select
+              className="cursor-pointer bg-transparent text-[13px] font-bold text-white outline-none"
+              value={ticker}
+              onChange={(event) => onTickerChange?.(event.target.value)}
+            >
+              {AVAILABLE_TICKERS.map((item) => (
+                <option key={item} value={item} className="bg-[#0d0d14]">{item}</option>
+              ))}
+            </select>
+            <span
+              className="rounded-full px-1.5 py-0.5 text-[8px] font-bold shrink-0"
+              style={{ color: "#f0b90b", background: "rgba(240,185,11,0.1)", border: "1px solid rgba(240,185,11,0.24)" }}
+            >
+              PERP
+            </span>
+          </div>
+
+          {/* Compact timeframe buttons */}
+          <div className="flex items-center gap-0.5 flex-1 justify-center">
+            {(["5m", "1H", "4H", "1D", "1W"] as Timeframe[]).map((item) => (
+              <button
+                key={item}
+                onClick={() => setTimeframe(item)}
+                className="rounded px-2 py-1 text-[11px] font-semibold transition-all"
+                style={
+                  timeframe === item
+                    ? { color: "#f1d48f", background: "rgba(212,161,31,0.18)", border: "1px solid rgba(212,161,31,0.28)" }
+                    : { color: "#52525b" }
+                }
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+
+          {/* Chart type toggle + fullscreen */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => setChartType(chartType === "candles" ? "line" : "candles")}
+              className="rounded px-2 py-1 text-[10px] font-semibold transition-all"
+              style={{ color: "#71717a", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
+              title={`Switch to ${chartType === "candles" ? "line" : "candles"}`}
+            >
+              {chartType === "candles" ? "C" : "L"}
+            </button>
+            <button
+              onClick={toggleFullscreen}
+              className="rounded p-1.5 transition-all"
+              style={{ color: "#71717a", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
+              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            >
+              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-[10px]">
-          <span className="brand-badge brand-badge-gold rounded-full px-2 py-0.5">Native Chart</span>
-          <span className="text-zinc-600">{TF_CONFIG[timeframe].label}</span>
+      ) : (
+        /* ── Desktop: single compact header row ──────────────────────────────── */
+        <div
+          className="flex items-center gap-0 border-b px-3 shrink-0"
+          style={{
+            borderColor: "rgba(39,39,42,0.72)",
+            background: "linear-gradient(180deg, rgba(27,22,16,0.97), rgba(12,11,10,0.95))",
+            minHeight: 44,
+          }}
+        >
+          {/* Ticker + PERP + position badge */}
+          <div className="mr-3 flex items-center gap-2 border-r pr-3 shrink-0" style={{ borderColor: "rgba(39,39,42,0.72)" }}>
+            <select
+              className="cursor-pointer bg-transparent text-sm font-bold text-white outline-none"
+              value={ticker}
+              onChange={(event) => onTickerChange?.(event.target.value)}
+            >
+              {AVAILABLE_TICKERS.map((item) => (
+                <option key={item} value={item} className="bg-[#0d0d14]">
+                  {item}USDT
+                </option>
+              ))}
+            </select>
+            <span
+              className="rounded-full px-1.5 py-0.5 text-[9px] font-bold shrink-0"
+              style={{
+                color: "#f0b90b",
+                background: "linear-gradient(180deg, rgba(240,185,11,0.18), rgba(240,185,11,0.08))",
+                border: "1px solid rgba(240,185,11,0.28)",
+              }}
+            >
+              PERP
+            </span>
+            {activePosition && (
+              <span
+                className="rounded-full px-2 py-0.5 text-[9px] font-bold shrink-0"
+                style={{
+                  color: activePosition.side === "long" ? "#0ecb81" : "#f6465d",
+                  background: activePosition.side === "long" ? "rgba(14,203,129,0.12)" : "rgba(246,70,93,0.12)",
+                  border: `1px solid ${activePosition.side === "long" ? "rgba(14,203,129,0.28)" : "rgba(246,70,93,0.28)"}`,
+                }}
+              >
+                {activePosition.side.toUpperCase()} {activePosition.leverage}x
+              </span>
+            )}
+          </div>
+
+          {/* Timeframe buttons */}
+          <div className="flex items-center gap-0.5">
+            {(["1m", "5m", "15m", "30m", "1H", "4H", "1D", "1W"] as Timeframe[]).map((item) => (
+              <button
+                key={item}
+                onClick={() => setTimeframe(item)}
+                className="rounded-md px-2 py-0.5 text-[11px] font-medium transition-all"
+                style={
+                  timeframe === item
+                    ? {
+                        color: "#f1d48f",
+                        background: "linear-gradient(180deg, rgba(212,161,31,0.24), rgba(212,161,31,0.1))",
+                        border: "1px solid rgba(212,161,31,0.28)",
+                      }
+                    : { color: "#6b7280" }
+                }
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+
+          {/* Chart type toggle */}
+          <div className="ml-2 flex items-center gap-1 border-l pl-2" style={{ borderColor: "rgba(39,39,42,0.72)" }}>
+            {(["candles", "line"] as ChartType[]).map((item) => (
+              <button
+                key={item}
+                onClick={() => setChartType(item)}
+                className="rounded-md px-2 py-0.5 text-[11px] font-medium capitalize transition-all"
+                style={
+                  chartType === item
+                    ? {
+                        color: "#f5efe1",
+                        background: "linear-gradient(180deg, rgba(43,35,22,0.94), rgba(26,22,17,0.94))",
+                        border: "1px solid rgba(212,161,31,0.16)",
+                      }
+                    : { color: "#6b7280" }
+                }
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+
+          {/* Funding rate cards — pushed to right */}
+          <div className="ml-auto flex items-center gap-2 border-l pl-3" style={{ borderColor: "rgba(39,39,42,0.72)" }}>
+            {fundingRates.length > 0 ? (
+              fundingRates.map((item) => {
+                const positive = (item.rate ?? 0) >= 0;
+                return (
+                  <div
+                    key={item.venue}
+                    className="rounded-lg px-2 py-1"
+                    style={{
+                      minWidth: 86,
+                      background: "linear-gradient(180deg, rgba(24,27,36,0.95), rgba(15,17,24,0.92))",
+                      border: `1px solid ${
+                        item.status === "live"
+                          ? positive
+                            ? "rgba(14,203,129,0.24)"
+                            : "rgba(246,70,93,0.24)"
+                          : "rgba(113,113,122,0.24)"
+                      }`,
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="text-[9px] uppercase tracking-[0.14em]" style={{ color: "#7c8292" }}>
+                        {item.venue}
+                      </span>
+                      <span
+                        className="text-[10px] font-bold tabular-nums"
+                        style={{ color: item.status === "live" ? (positive ? "#0ecb81" : "#f6465d") : "#71717a" }}
+                      >
+                        {fmtFunding(item.rate)}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-[8px]" style={{ color: "#5f6473" }}>
+                      {item.status === "live" ? `Next ${fmtFundingEta(item.nextFundingTime)}` : "Unavailable"}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div
+                className="rounded-lg px-2 py-1 text-[10px]"
+                style={{
+                  background: "linear-gradient(180deg, rgba(24,27,36,0.95), rgba(15,17,24,0.92))",
+                  border: "1px solid rgba(113,113,122,0.22)",
+                  color: "#71717a",
+                }}
+              >
+                Funding…
+              </div>
+            )}
+          </div>
+
+          {/* Fullscreen button */}
           <button
             onClick={toggleFullscreen}
-            className="rounded-md border border-white/8 bg-white/[0.03] p-1.5 text-zinc-400 transition hover:bg-white/[0.06] hover:text-zinc-100"
-            title={isFullscreen ? "Exit fullscreen" : "Open fullscreen"}
+            className="ml-2 rounded-md p-1.5 transition-all shrink-0"
+            style={{ color: "#71717a", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
+            title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
           >
             {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
           </button>
         </div>
-      </div>
-
-      <div
-        className="flex items-center gap-0 border-b px-3 shrink-0 flex-wrap"
-        style={{
-          borderColor: "rgba(39,39,42,0.72)",
-          background: "linear-gradient(180deg, rgba(27,22,16,0.96), rgba(12,11,10,0.94))",
-          minHeight: 48,
-        }}
-      >
-        <div className="mr-4 flex items-center gap-2 border-r pr-4" style={{ borderColor: "rgba(39,39,42,0.72)" }}>
-          <select
-            className="cursor-pointer bg-transparent text-sm font-bold text-white outline-none"
-            value={ticker}
-            onChange={(event) => onTickerChange?.(event.target.value)}
-          >
-            {AVAILABLE_TICKERS.map((item) => (
-              <option key={item} value={item} className="bg-[#0d0d14]">
-                {item}USDT
-              </option>
-            ))}
-          </select>
-          <span
-            className="rounded-full px-2 py-0.5 text-[9px] font-bold"
-            style={{
-              color: "#f0b90b",
-              background: "linear-gradient(180deg, rgba(240,185,11,0.18), rgba(240,185,11,0.08))",
-              border: "1px solid rgba(240,185,11,0.28)",
-            }}
-          >
-            PERP
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1 py-2">
-          {(["1m", "5m", "15m", "30m", "1H", "4H", "1D", "1W"] as Timeframe[]).map((item) => (
-            <button
-              key={item}
-              onClick={() => setTimeframe(item)}
-              className="rounded-md px-2 py-0.5 text-[11px] font-medium transition-all"
-              style={
-                timeframe === item
-                  ? {
-                      color: "#f1d48f",
-                      background: "linear-gradient(180deg, rgba(212,161,31,0.24), rgba(212,161,31,0.1))",
-                      border: "1px solid rgba(212,161,31,0.28)",
-                    }
-                  : { color: "#6b7280" }
-              }
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-
-        <div className="ml-3 flex items-center gap-1 border-l pl-3" style={{ borderColor: "rgba(39,39,42,0.72)" }}>
-          {(["candles", "line"] as ChartType[]).map((item) => (
-            <button
-              key={item}
-              onClick={() => setChartType(item)}
-              className="rounded-md px-2 py-0.5 text-[11px] font-medium capitalize transition-all"
-              style={
-                chartType === item
-                  ? {
-                      color: "#f5efe1",
-                      background: "linear-gradient(180deg, rgba(43,35,22,0.94), rgba(26,22,17,0.94))",
-                      border: "1px solid rgba(212,161,31,0.16)",
-                    }
-                  : { color: "#6b7280" }
-              }
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-
-        <div className="ml-auto flex items-center gap-2 border-l pl-4 py-2" style={{ borderColor: "rgba(39,39,42,0.72)" }}>
-          {fundingRates.length > 0 ? (
-            fundingRates.map((item) => {
-              const positive = (item.rate ?? 0) >= 0;
-              return (
-                <div
-                  key={item.venue}
-                  className="rounded-lg px-2.5 py-1"
-                  style={{
-                    minWidth: 94,
-                    background: "linear-gradient(180deg, rgba(24,27,36,0.95), rgba(15,17,24,0.92))",
-                    border: `1px solid ${
-                      item.status === "live"
-                        ? positive
-                          ? "rgba(14,203,129,0.24)"
-                          : "rgba(246,70,93,0.24)"
-                        : "rgba(113,113,122,0.24)"
-                    }`,
-                  }}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[9px] uppercase tracking-[0.16em]" style={{ color: "#7c8292" }}>
-                      {item.venue}
-                    </span>
-                    <span
-                      className="text-[11px] font-bold tabular-nums"
-                      style={{ color: item.status === "live" ? (positive ? "#0ecb81" : "#f6465d") : "#71717a" }}
-                    >
-                      {fmtFunding(item.rate)}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 text-[9px]" style={{ color: "#5f6473" }}>
-                    {item.status === "live" ? `Next ${fmtFundingEta(item.nextFundingTime)}` : "Feed unavailable"}
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div
-              className="rounded-lg px-2.5 py-1 text-[10px]"
-              style={{
-                background: "linear-gradient(180deg, rgba(24,27,36,0.95), rgba(15,17,24,0.92))",
-                border: "1px solid rgba(113,113,122,0.22)",
-                color: "#71717a",
-              }}
-            >
-              Funding loading...
-            </div>
-          )}
-        </div>
-      </div>
+      )}
 
       <div className="flex flex-1 min-h-0 bg-white/5">
-        <div className="relative min-h-[320px] min-w-0 flex-1 bg-[#06080d] sm:min-h-[420px] xl:min-h-[520px]">
+        <div className="relative min-h-[200px] min-w-0 flex-1 bg-[#06080d] sm:min-h-[360px] xl:min-h-[520px]">
 
           {displayBar && (
             <div

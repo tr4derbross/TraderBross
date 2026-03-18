@@ -708,6 +708,18 @@ websocketServer.on("connection", (socket) => {
   clients.add(socket);
   sendToClient(socket, { type: "snapshot", payload: buildSnapshot(), timestamp: new Date().toISOString() });
 
+  // Handle client messages (ping keepalive)
+  socket.on("message", (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.type === "ping") {
+        sendToClient(socket, { type: "heartbeat", payload: { ok: true, ts: Date.now() }, timestamp: new Date().toISOString() });
+      }
+    } catch {
+      // ignore malformed messages
+    }
+  });
+
   socket.on("close", () => {
     clients.delete(socket);
   });

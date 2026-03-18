@@ -37,9 +37,11 @@ const listeners = new Set<Listener>();
 let socket: WebSocket | null = null;
 let started = false;
 let reconnectTimer: number | null = null;
+let heartbeatTimer: number | null = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const BASE_DELAY = 1000;
+const HEARTBEAT_INTERVAL = 20_000; // ping every 20s to keep connection alive
 const isDev = process.env.NODE_ENV === 'development';
 
 function log(...args: unknown[]) {
@@ -173,6 +175,17 @@ function connect() {
     log("[Realtime] connected");
     reconnectAttempts = 0;
     setState({ connectionStatus: "connected" });
+    // Start heartbeat ping every 20s
+    if (heartbeatTimer) window.clearInterval(heartbeatTimer);
+    heartbeatTimer = window.setInterval(() => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        try {
+          socket.send(JSON.stringify({ type: "ping", ts: Date.now() }));
+        } catch {
+          // ignore send errors — close will trigger reconnect
+        }
+      }
+    }, HEARTBEAT_INTERVAL);
   };
 
   socket.onmessage = (event) => {
@@ -187,6 +200,11 @@ function connect() {
   socket.onclose = (event) => {
     warn("[Realtime] disconnected", event.code, event.reason);
     socket = null;
+    // Stop heartbeat on disconnect
+    if (heartbeatTimer) {
+      window.clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
     setState({ connectionStatus: "disconnected" });
     scheduleReconnect();
   };
@@ -219,6 +237,10 @@ export function reconnectRealtime() {
   if (reconnectTimer) {
     window.clearTimeout(reconnectTimer);
     reconnectTimer = null;
+  }
+  if (heartbeatTimer) {
+    window.clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
   }
   reconnectAttempts = 0;
   log("[Realtime] manual reconnect triggered");
