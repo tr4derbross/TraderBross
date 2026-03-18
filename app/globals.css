@@ -1043,6 +1043,75 @@ tr.group:hover td { background-color: rgba(242, 183, 5, 0.02); }
 }
 .alert-armed { animation: alert-ready 2.5s ease-in-out infinite; }
 
+/* ─── Mobile Bottom Navigation Bar ─────────────────────────────────────────── */
+.mobile-bottom-nav {
+  background: rgba(9, 9, 10, 0.99);
+  border-top: 1px solid rgba(42, 42, 42, 0.9);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5), 0 -1px 0 rgba(255,255,255,0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  flex-shrink: 0;
+}
+
+.mobile-bottom-nav-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 24px;
+  min-width: 72px;
+  color: #3f3f46;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.mobile-bottom-nav-btn:active {
+  transform: scale(0.92);
+  transition-duration: 80ms;
+}
+.mobile-bottom-nav-btn.active {
+  color: #F2B705;
+}
+.mobile-bottom-nav-btn:not(.active):hover {
+  color: #71717a;
+}
+
+.mobile-nav-indicator {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 2px;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(90deg, rgba(242,183,5,0.6), rgba(242,183,5,1), rgba(242,183,5,0.6));
+  box-shadow: 0 0 8px rgba(242,183,5,0.4);
+}
+
+/* ─── Mobile Edge-to-Edge Panels ────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Remove border-radius on panels when edge-to-edge */
+  .panel-shell,
+  .panel-shell-alt {
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+  }
+  /* Keep top/bottom borders for panel separation */
+  .panel-shell {
+    border-top: 1px solid rgba(42,42,42,0.7) !important;
+    border-bottom: 1px solid rgba(42,42,42,0.7) !important;
+  }
+}
+
 /* ─── Right Panel Tab System ────────────────────────────────────────────────── */
 .right-panel-tab {
   position: relative;
