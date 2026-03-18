@@ -270,16 +270,19 @@ async function fetchGNews(options: QueryOptions): Promise<NewsItem[]> {
 
 async function fetchCryptoPanicNews(options: QueryOptions): Promise<NewsItem[]> {
   const apiKey = process.env.CRYPTOPANIC_KEY;
-  if (!apiKey) return [];
 
   try {
     const params = new URLSearchParams({
-      auth_token: apiKey,
       public: "true",
       kind: "news",
       metadata: "true",
       regions: "en",
     });
+
+    // Add auth token only if API key is available
+    if (apiKey) {
+      params.set("auth_token", apiKey);
+    }
 
     if (options.ticker) params.set("currencies", options.ticker.toUpperCase());
 
@@ -318,10 +321,14 @@ async function fetchCryptoPanicNews(options: QueryOptions): Promise<NewsItem[]> 
 
 async function fetchCryptoCompareNews(): Promise<NewsItem[]> {
   const apiKey = process.env.CRYPTOCOMPARE_KEY;
-  if (!apiKey) return [];
 
   try {
-    const res = await fetch(`${CRYPTOCOMPARE_NEWS_URL}&api_key=${apiKey}`, {
+    let url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest";
+    if (apiKey) {
+      url += `&api_key=${apiKey}`;
+    }
+
+    const res = await fetch(url, {
       next: { revalidate: 180 },
       signal: AbortSignal.timeout(3500),
     });

@@ -37,6 +37,26 @@ const listeners = new Set<Listener>();
 let socket: WebSocket | null = null;
 let started = false;
 let reconnectTimer: number | null = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const BASE_DELAY = 1000;
+const isDev = process.env.NODE_ENV === 'development';
+
+function log(...args: unknown[]) {
+  if (isDev) console.log(...args);
+}
+
+function warn(...args: unknown[]) {
+  if (isDev) console.warn(...args);
+}
+
+function error(...args: unknown[]) {
+  if (isDev) console.error(...args);
+}
+
+function getReconnectDelay(): number {
+  return Math.min(BASE_DELAY * Math.pow(2, reconnectAttempts), 30000);
+}
 
 function emit() {
   listeners.forEach((listener) => listener());
@@ -72,7 +92,7 @@ function applyEnvelope(envelope: RealtimeEnvelope) {
       setState({ fearGreed: envelope.payload });
       break;
     case "news":
-      setState({ news: [envelope.payload, ...state.news.filter((item) => item.id !== envelope.payload.id)].slice(0, 60) });
+      setState({ news: [envelope.payload, ...(state.news ?? []).filter((item) => item.id !== envelope.payload.id)].slice(0, 60) });
       break;
     case "social":
       setState({ social: envelope.payload });
@@ -91,7 +111,7 @@ function applyEnvelope(envelope: RealtimeEnvelope) {
       break;
     case "liquidation":
       setState({
-        liquidations: [envelope.payload, ...state.liquidations.filter((l) => l.id !== envelope.payload.id)].slice(0, 100),
+        liquidations: [envelope.payload, ...(state.liquidations ?? []).filter((l) => l.id !== envelope.payload.id)].slice(0, 100),
       });
       break;
     case "heartbeat":
@@ -119,10 +139,25 @@ function scheduleReconnect() {
     window.clearTimeout(reconnectTimer);
   }
 
+  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    // After 5 failures, wait 30s then reset counter
+    const delay = 30000;
+    warn("[Realtime] Max reconnect attempts reached. Waiting 30s before retry...");
+    reconnectTimer = window.setTimeout(() => {
+      reconnectAttempts = 0;
+      reconnectTimer = null;
+      connect();
+    }, delay);
+    return;
+  }
+
+  const delay = getReconnectDelay();
+  reconnectAttempts++;
+  warn(`[Realtime] Scheduling reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms`);
   reconnectTimer = window.setTimeout(() => {
     reconnectTimer = null;
     connect();
-  }, 2000);
+  }, delay);
 }
 
 function connect() {
@@ -131,11 +166,12 @@ function connect() {
   }
 
   setState({ connectionStatus: "connecting" });
-  console.log("[Realtime] connecting to", runtimeEnv.wsUrl);
+  log("[Realtime] connecting to", runtimeEnv.wsUrl);
   socket = new WebSocket(runtimeEnv.wsUrl);
 
   socket.onopen = () => {
-    console.log("[Realtime] connected");
+    log("[Realtime] connected");
+    reconnectAttempts = 0;
     setState({ connectionStatus: "connected" });
   };
 
@@ -149,14 +185,14 @@ function connect() {
   };
 
   socket.onclose = (event) => {
-    console.warn("[Realtime] disconnected", event.code, event.reason);
+    warn("[Realtime] disconnected", event.code, event.reason);
     socket = null;
     setState({ connectionStatus: "disconnected" });
     scheduleReconnect();
   };
 
   socket.onerror = (err) => {
-    console.error("[Realtime] WebSocket error", err);
+    error("[Realtime] WebSocket error", err);
     socket?.close();
   };
 }
@@ -184,7 +220,8 @@ export function reconnectRealtime() {
     window.clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
-  console.log("[Realtime] manual reconnect triggered");
+  reconnectAttempts = 0;
+  log("[Realtime] manual reconnect triggered");
   connect();
 }
 
