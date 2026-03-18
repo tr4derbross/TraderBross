@@ -1322,3 +1322,55 @@ button, a {
 .font-sans-label {
   font-family: "IBM Plex Sans", ui-sans-serif, sans-serif;
 }
+
+/* ─── Mobile Single-Page Stacked Layout ─────────────────────────────────────── */
+.mobile-scroll-page {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+}
+
+@media (max-width: 767px) {
+  /* Smooth scrollable page */
+  .mobile-scroll-page::-webkit-scrollbar { display: none; }
+  .mobile-scroll-page { scrollbar-width: none; }
+
+  /* Compact header */
+  .panel-header { padding-top: 4px !important; padding-bottom: 4px !important; }
+
+  /* Font scale down globally on mobile */
+  .tt-price, .tt-change { font-size: 9px !important; }
+
+  /* Chart toolbar compacted */
+  [data-chart-toolbar] button { padding: 2px 6px !important; font-size: 8px !important; }
+
+  /* Right panel tabs compact */
+  .right-panel-tab { padding: 4px 8px !important; font-size: 8px !important; }
+  .right-panel-tab .tab-icon { width: 12px !important; height: 12px !important; }
+
+  /* News feed items compact */
+  .news-item-title { font-size: 11px !important; line-height: 1.35 !important; }
+  .news-item-meta  { font-size: 9px  !important; }
+
+  /* TradingView chart iframe fills panel */
+  iframe { width: 100% !important; }
+
+  /* Watchlist / signals rows */
+  .watch-row, .signal-row { padding: 5px 10px !important; font-size: 9px !important; }
+
+  /* Trade panel inputs */
+  input[type="number"], input[type="text"] { font-size: 12px !important; }
+
+  /* Leverage buttons */
+  .leverage-btn { padding: 3px 7px !important; font-size: 9px !important; }
+
+  /* Long / Short buttons */
+  .trade-action-btn { height: 36px !important; font-size: 11px !important; }
+
+  /* Market stats bar text */
+  .market-stat-label { font-size: 7px !important; }
+  .market-stat-value { font-size: 9px !important; }
+
+  /* Panel section headers */
+  .panel-section-title { font-size: 8px !important; letter-spacing: 0.18em !important; }
+}
