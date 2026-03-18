@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import { TickerQuote } from "@/lib/mock-data";
 
 type Props = { quotes?: TickerQuote[] };
+type Q = TickerQuote & { changePct: number };
 
 const TICKER_ORDER = [
   "BTC","ETH","SOL","BNB","XRP","DOGE","AVAX","LINK","ARB","OP",
@@ -16,110 +17,80 @@ function fmtPrice(p: number) {
   return p.toFixed(5);
 }
 
-const SPEED = 0.6; // px / frame @ 60fps
-
 export default function TickerTape({ quotes: wsQuotes }: Props) {
   const rawQuotes = wsQuotes ?? [];
 
-  const quotes = useMemo(() =>
+  /* All normalized quotes — new reference on every WS tick */
+  const quotes: Q[] = useMemo(() =>
     [...rawQuotes]
       .filter(q => q && typeof q.symbol === "string" && Number.isFinite(q.price))
-      .map(q => ({
-        ...q,
-        changePct: Number.isFinite(q.changePct) ? q.changePct : 0,
-      }))
+      .map(q => ({ ...q, changePct: Number.isFinite(q.changePct) ? q.changePct : 0 }))
       .sort((a, b) => TICKER_ORDER.indexOf(a.symbol) - TICKER_ORDER.indexOf(b.symbol)),
     [wsQuotes],
   );
 
-  /* Doubled list for seamless loop */
-  const doubled = useMemo(() => [...quotes, ...quotes], [quotes]);
+  /*
+   * stableQuotes — only updates when the SYMBOL LIST changes (not prices).
+   * This prevents React from re-rendering the track DOM on every price tick,
+   * keeping the CSS marquee animation uninterrupted.
+   */
+  const [stableQuotes, setStableQuotes] = useState<Q[]>([]);
+  const lastSymKeyRef = useRef("");
 
-  const trackRef  = useRef<HTMLDivElement>(null);
-  const xRef      = useRef(0);
-  const rafRef    = useRef<number>(0);
-  const pausedRef = useRef(false);
-  const halfRef   = useRef(0); // cached half-width — only recalculated after layout
-
-  /* ── Measure half-width after DOM paints (layout effect = sync) ─────────── */
-  useLayoutEffect(() => {
-    const track = trackRef.current;
-    if (!track) return;
-    // Small delay to let browser finish layout
-    const id = requestAnimationFrame(() => {
-      halfRef.current = track.scrollWidth / 2;
-    });
-    return () => cancelAnimationFrame(id);
-  }, [doubled]); // recalculate only when coin list changes
-
-  /* ── RAF animation loop ─────────────────────────────────────────────────── */
   useEffect(() => {
-    const step = () => {
-      const track = trackRef.current;
-      const half  = halfRef.current;
-      if (track && half > 0 && !pausedRef.current) {
-        xRef.current -= SPEED;
-        if (xRef.current <= -half) xRef.current = 0;
-        track.style.transform = `translate3d(${xRef.current}px,0,0)`;
-      }
-      rafRef.current = requestAnimationFrame(step);
-    };
-    rafRef.current = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, []); // starts once, never restarts
+    if (quotes.length === 0) return;
+    const key = quotes.map(q => q.symbol).join(",");
+    if (key !== lastSymKeyRef.current) {
+      lastSymKeyRef.current = key;
+      setStableQuotes(quotes);
+    }
+  }, [quotes]);
 
-  /* ── Update prices directly in DOM — no animation disruption ────────────── */
+  /* Direct DOM price updates — zero re-render, zero animation disruption */
+  const trackRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const track = trackRef.current;
     if (!track || quotes.length === 0) return;
     quotes.forEach(q => {
       track.querySelectorAll<HTMLElement>(`[data-sym="${q.symbol}"]`).forEach(item => {
-        const priceEl  = item.querySelector<HTMLElement>(".tt-price");
-        const changeEl = item.querySelector<HTMLElement>(".tt-change");
+        const priceEl  = item.querySelector<HTMLElement>(".tt-p");
+        const changeEl = item.querySelector<HTMLElement>(".tt-c");
         if (priceEl)  priceEl.textContent = fmtPrice(q.price);
         if (changeEl) {
           const up = q.changePct >= 0;
           changeEl.textContent = `${up ? "+" : ""}${q.changePct.toFixed(2)}%`;
-          changeEl.className = `tt-change tabular-nums text-[10px] font-semibold leading-none ${up ? "text-emerald-400" : "text-red-400"}`;
+          changeEl.className   = `tt-c text-[10px] font-semibold tabular-nums ${up ? "text-emerald-400" : "text-red-400"}`;
         }
       });
     });
   }, [quotes]);
 
-  if (quotes.length === 0) return null;
+  /* Doubled list — rebuilt only when symbol list changes */
+  const doubled = useMemo(() => [...stableQuotes, ...stableQuotes], [stableQuotes]);
+
+  if (stableQuotes.length === 0) return null;
 
   return (
     <div
-      className="relative overflow-hidden border-b border-white/[0.06] bg-[#09090b] h-8 flex items-center select-none"
-      onMouseEnter={() => { pausedRef.current = true; }}
-      onMouseLeave={() => { pausedRef.current = false; }}
+      className="ticker-wrap"
+      onMouseEnter={e => (e.currentTarget.querySelector<HTMLElement>(".ticker-track")!.style.animationPlayState = "paused")}
+      onMouseLeave={e => (e.currentTarget.querySelector<HTMLElement>(".ticker-track")!.style.animationPlayState = "running")}
     >
-      {/* Edge fades */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-12 z-10 bg-gradient-to-r from-[#09090b] to-transparent" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-12 z-10 bg-gradient-to-l from-[#09090b] to-transparent" />
+      <div className="ticker-fade-l" />
+      <div className="ticker-fade-r" />
 
-      <div ref={trackRef} className="flex items-center" style={{ willChange: "transform" }}>
-        {doubled.map((q, i) => {
-          const up = q.changePct >= 0;
-          return (
-            <span
-              key={`${q.symbol}-${i}`}
-              data-sym={q.symbol}
-              className="inline-flex items-center gap-2 px-4 shrink-0"
-            >
-              <span className="text-zinc-600 text-[8px] leading-none">•</span>
-              <span className="text-[9px] font-extrabold tracking-[0.2em] text-zinc-500 uppercase leading-none">
-                {q.symbol}
-              </span>
-              <span className="tt-price text-[11px] font-mono text-zinc-100 tabular-nums leading-none">
-                {fmtPrice(q.price)}
-              </span>
-              <span className={`tt-change tabular-nums text-[10px] font-semibold leading-none ${up ? "text-emerald-400" : "text-red-400"}`}>
-                {up ? "+" : ""}{q.changePct.toFixed(2)}%
-              </span>
+      <div ref={trackRef} className="ticker-track">
+        {doubled.map((q, i) => (
+          <span key={`${q.symbol}-${i}`} data-sym={q.symbol} className="ticker-item">
+            <span className="ticker-dot">•</span>
+            <span className="ticker-sym">{q.symbol}</span>
+            <span className="tt-p ticker-price">{fmtPrice(q.price)}</span>
+            <span className={`tt-c text-[10px] font-semibold tabular-nums ${q.changePct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {q.changePct >= 0 ? "+" : ""}{q.changePct.toFixed(2)}%
             </span>
-          );
-        })}
+          </span>
+        ))}
       </div>
     </div>
   );
