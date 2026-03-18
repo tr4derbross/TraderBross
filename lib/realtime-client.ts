@@ -209,9 +209,10 @@ function connect() {
     scheduleReconnect();
   };
 
-  socket.onerror = (err) => {
-    error("[Realtime] WebSocket error", err);
-    socket?.close();
+  socket.onerror = () => {
+    // WebSocket error events intentionally carry no detail (browser security).
+    // onclose fires automatically after onerror — reconnect is handled there.
+    warn("[Realtime] WebSocket connection error — will reconnect");
   };
 }
 
