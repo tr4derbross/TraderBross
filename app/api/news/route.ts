@@ -1,19 +1,32 @@
+// TraderBross News System v2.0 — Zero-Key
+// Aggregates live news from cryptocurrency.cv + RSS + social feeds.
+// Falls back to MOCK_NEWS if all sources fail.
+
 import { NextResponse } from "next/server";
+import { aggregateNews } from "@/lib/news-aggregator";
 import { MOCK_NEWS } from "@/lib/mock-data";
-import { getNewsItems } from "@/lib/news-service";
-import { withCache } from "@/lib/server-cache";
+
+export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const sector = searchParams.get("sector");
-  const ticker = searchParams.get("ticker");
-  const keyword = searchParams.get("keyword");
+  const tab = (searchParams.get("tab") ?? "all") as "all" | "news" | "social";
+  const coin = searchParams.get("coin") ?? undefined;
+  const limit = Math.min(parseInt(searchParams.get("limit") ?? "30", 10), 60);
 
-  const cacheKey = `news:${sector ?? ""}:${ticker ?? ""}:${keyword ?? ""}`;
-
-  const news = await withCache(cacheKey, 90_000, () =>
-    getNewsItems({ sector, ticker, keyword, limit: 50 })
-  );
-
-  return NextResponse.json(news.length > 0 ? news : MOCK_NEWS);
+  try {
+    const news = await aggregateNews({ tab, coin, limit });
+    return NextResponse.json(news, {
+      headers: {
+        "Cache-Control": "s-maxage=60, stale-while-revalidate=120",
+      },
+    });
+  } catch {
+    // All sources failed — serve mock data so the UI is never empty
+    return NextResponse.json(MOCK_NEWS, {
+      headers: {
+        "Cache-Control": "s-maxage=60",
+      },
+    });
+  }
 }
