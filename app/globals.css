@@ -1323,54 +1323,65 @@ button, a {
   font-family: "IBM Plex Sans", ui-sans-serif, sans-serif;
 }
 
-/* ─── Mobile Single-Page Stacked Layout ─────────────────────────────────────── */
-.mobile-scroll-page {
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-  overscroll-behavior-y: contain;
-}
-
+/* ─── Mobile Layout: Chart top, Trade + News side by side ───────────────────── */
 @media (max-width: 767px) {
-  /* Smooth scrollable page */
-  .mobile-scroll-page::-webkit-scrollbar { display: none; }
-  .mobile-scroll-page { scrollbar-width: none; }
-
-  /* Compact header */
+  /* Compact panel headers */
   .panel-header { padding-top: 4px !important; padding-bottom: 4px !important; }
 
-  /* Font scale down globally on mobile */
-  .tt-price, .tt-change { font-size: 9px !important; }
+  /* Panel borders: only top/bottom, no side borders for edge-to-edge feel */
+  .panel-shell,
+  .panel-shell-alt {
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+  }
 
-  /* Chart toolbar compacted */
-  [data-chart-toolbar] button { padding: 2px 6px !important; font-size: 8px !important; }
-
-  /* Right panel tabs compact */
-  .right-panel-tab { padding: 4px 8px !important; font-size: 8px !important; }
-  .right-panel-tab .tab-icon { width: 12px !important; height: 12px !important; }
-
-  /* News feed items compact */
-  .news-item-title { font-size: 11px !important; line-height: 1.35 !important; }
-  .news-item-meta  { font-size: 9px  !important; }
-
-  /* TradingView chart iframe fills panel */
+  /* TradingView chart fills panel */
   iframe { width: 100% !important; }
 
-  /* Watchlist / signals rows */
-  .watch-row, .signal-row { padding: 5px 10px !important; font-size: 9px !important; }
+  /* ── News panel (left, 55%) ─────────────────── */
+  .news-item-title  { font-size: 10px !important; line-height: 1.3 !important; }
+  .news-item-meta   { font-size: 8px  !important; }
+  /* Tighten news item padding */
+  .news-item        { padding: 6px 8px !important; }
+  /* Search bar compact */
+  .news-search      { font-size: 9px !important; padding: 3px 8px !important; }
+  /* Filter/tag chips */
+  .news-tag         { font-size: 7px !important; padding: 2px 5px !important; }
 
-  /* Trade panel inputs */
-  input[type="number"], input[type="text"] { font-size: 12px !important; }
-
-  /* Leverage buttons */
-  .leverage-btn { padding: 3px 7px !important; font-size: 9px !important; }
-
+  /* ── Trade panel (right, 45%) ───────────────── */
+  /* Tab bar */
+  .right-panel-tab             { padding: 3px 5px !important; font-size: 7px !important; gap: 2px !important; }
+  .right-panel-tab .tab-icon   { width: 10px !important; height: 10px !important; }
+  /* Venue selector */
+  .venue-select                { font-size: 9px !important; padding: 3px 6px !important; }
+  /* Symbol selector */
+  .symbol-select               { font-size: 10px !important; }
+  /* Mark price */
+  .mark-price                  { font-size: 16px !important; }
+  /* Market/Limit/Stop tabs */
+  .order-type-tab              { font-size: 8px !important; padding: 3px 6px !important; }
   /* Long / Short buttons */
-  .trade-action-btn { height: 36px !important; font-size: 11px !important; }
+  .trade-action-btn            { height: 32px !important; font-size: 10px !important; }
+  /* Margin & leverage inputs */
+  input[type="number"],
+  input[type="text"]           { font-size: 11px !important; padding: 4px 6px !important; }
+  /* Leverage preset buttons */
+  .leverage-btn                { padding: 2px 5px !important; font-size: 8px !important; }
+  /* Mode / Notional labels */
+  .trade-label                 { font-size: 7px !important; letter-spacing: 0.12em !important; }
+  /* TP/SL row */
+  .tpsl-row                    { font-size: 8px !important; padding: 3px 6px !important; }
+  /* Required / Fee / Liquidation rows */
+  .trade-summary-row           { font-size: 7px !important; padding: 1px 0 !important; }
+  /* Review button */
+  .review-btn                  { font-size: 9px !important; height: 30px !important; }
 
-  /* Market stats bar text */
-  .market-stat-label { font-size: 7px !important; }
-  .market-stat-value { font-size: 9px !important; }
+  /* ── Market stats bar ───────────────────────── */
+  .market-stat-label { font-size: 6px !important; }
+  .market-stat-value { font-size: 8px !important; }
 
-  /* Panel section headers */
-  .panel-section-title { font-size: 8px !important; letter-spacing: 0.18em !important; }
+  /* ── General ────────────────────────────────── */
+  .panel-section-title { font-size: 7px !important; letter-spacing: 0.18em !important; }
+  .watch-row, .signal-row { padding: 4px 8px !important; font-size: 8px !important; }
 }
