@@ -298,11 +298,7 @@ body::before {
   50%       { transform: translateY(-8px); }
 }
 
-/* Ticker scroll */
-@keyframes ticker {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
+/* Ticker scroll — animation now handled via RAF in TickerTape.tsx */
 
 /* Panel entrance */
 @keyframes panelFadeIn {
@@ -772,13 +768,6 @@ body::before {
 }
 
 /* ─── Animations & Utilities ────────────────────────────────────────────────── */
-.animate-ticker {
-  animation: ticker 60s linear infinite;
-  will-change: transform;
-  transform: translateZ(0);
-  backface-visibility: hidden;
-}
-.animate-ticker:hover { animation-play-state: paused; }
 
 .panel-fade-in  { animation: panelFadeIn 0.2s ease-out both; }
 .tab-content-enter { animation: tabEnter 0.16s ease-out both; }
