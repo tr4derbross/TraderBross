@@ -7,7 +7,6 @@ import { useAlerts } from "@/hooks/useAlerts";
 import { useBinanceWs } from "@/hooks/useBinanceWs";
 import { useVenueMarketData } from "@/hooks/useVenueMarketData";
 import { getTickerDisplayPrice } from "@/lib/market-data/shared";
-import TickerTape from "@/components/TickerTape";
 import NewsFeed from "@/components/NewsFeed";
 import PriceChart from "@/components/PriceChart";
 import AlertPanel from "@/components/AlertPanel";
@@ -731,7 +730,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const isMobile = viewportWidth < 768;
   const isTablet = viewportWidth >= 768 && viewportWidth < 1280;
   const showDesktopLayout = viewportWidth >= 1280;
-  const showBottomPanel = !isMobile || mobileWorkspaceTab !== "tools";
+  const showBottomPanel = !isMobile;
   const selectedHeaderPlatform =
     HEADER_PLATFORMS.find((platform) => platform.id === headerPlatform) ?? HEADER_PLATFORMS[0];
   const isHeaderWalletPlatform = selectedHeaderPlatform.type === "wallet";
@@ -1219,7 +1218,6 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     <div
       className={`panel-shell soft-divider flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border ${extraClassName}`}
     >
-      <FundingStatsBar ticker={activeVenueState.activeSymbol} />
       <PriceChart
         activeVenue={activeVenueState.venueId}
         activeSymbol={activeVenueState.activeSymbol}
@@ -1232,7 +1230,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         onPlaceOrder={placeOrder}
         onTickerChange={setActiveSymbol}
       />
-      <OrderBookMini ticker={activeVenueState.activeSymbol} />
+      {!isMobile && <OrderBookMini ticker={activeVenueState.activeSymbol} />}
     </div>
   );
 
@@ -1426,7 +1424,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
   return (
     <div className="flex flex-col overflow-hidden bg-black" style={{ height: "100dvh" }}>
-      <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-3 py-2 sm:py-3 sm:px-4 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
+      <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-3 py-1.5 sm:py-2 sm:px-4 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
         {/* Left: Fear & Greed + page nav */}
         <div className="absolute left-3 top-1/2 z-10 -translate-y-1/2 sm:left-4 flex items-center gap-2">
           <FearGreedPill />
@@ -1508,44 +1506,26 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         </div>
       </div>
 
-      <div className="px-2 pt-2">
-        <div className="panel-shell soft-divider overflow-hidden rounded-xl border terminal-glow-pulse">
-          <TickerTape quotes={wsQuotes} />
-          <div className="hidden sm:block">
-            <MarketStatsBar />
-          </div>
-          <div className="hidden md:block">
-            <MarketSessionBar />
+      {/* ── Market Info Bar (compact on mobile, full on desktop) ── */}
+      {isMobile ? (
+        <div className="shrink-0 px-2 pt-1">
+          <div className="overflow-hidden rounded-lg border" style={{ borderColor: "rgba(42,42,42,0.5)", background: "rgba(11,11,11,0.99)" }}>
           </div>
         </div>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 pb-2 pt-2">
-        {isMobile && (
-          <div className="mb-2 flex shrink-0 items-center gap-1 rounded-xl border border-[rgba(242,183,5,0.14)] bg-[rgba(10,10,10,0.98)] p-1 shadow-[0_2px_16px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)]">
-            {[
-              { id: "news"  as const, label: "News",  Icon: Newspaper    },
-              { id: "chart" as const, label: "Chart", Icon: CandlestickChart },
-              { id: "tools" as const, label: "Trade", Icon: TrendingUp   },
-            ].map(({ id, label, Icon }) => {
-              const isActive = mobileWorkspaceTab === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setMobileWorkspaceTab(id)}
-                  className={`mobile-workspace-tab ${isActive ? "active" : "inactive"}`}
-                >
-                  <Icon className={`h-4 w-4 shrink-0 transition-transform duration-200 ${isActive ? "scale-110" : "scale-100"}`} />
-                  <span>{label}</span>
-                  {isActive && (
-                    <span className="absolute bottom-1 left-1/2 -translate-x-1/2 h-0.5 w-4 rounded-full bg-[#F2B705] opacity-60" />
-                  )}
-                </button>
-              );
-            })}
+      ) : (
+        <div className="px-2 pt-1.5">
+          <div className="panel-shell soft-divider overflow-hidden rounded-xl border terminal-glow-pulse">
+            <div className="hidden sm:block">
+              <MarketStatsBar />
+            </div>
+            <div className="hidden lg:block">
+              <MarketSessionBar />
+            </div>
           </div>
-        )}
+        </div>
+      )}
+
+      <div className={`flex min-h-0 flex-1 flex-col overflow-hidden pt-1.5 ${isMobile ? "px-0 pb-0" : "px-2 pb-2"}`}>
 
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
           {showDesktopLayout ? (
@@ -1578,7 +1558,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           ) : (
             <div className="min-h-0 flex-1 overflow-hidden">
               {mobileWorkspaceTab === "news"  && <div key="news"  className="panel-slide-up h-full">{renderNewsPanel()}</div>}
-              {mobileWorkspaceTab === "chart" && <div key="chart" className="panel-slide-up h-full">{renderChartPanel("rounded-xl")}</div>}
+              {mobileWorkspaceTab === "chart" && <div key="chart" className="panel-slide-up h-full">{renderChartPanel()}</div>}
               {mobileWorkspaceTab === "tools" && <div key="tools" className="panel-slide-up h-full">{renderRightPanel()}</div>}
             </div>
           )}
@@ -1601,8 +1581,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         </div>
       </div>
 
-      {/* ── Status Bar ─────────────────────────────────────────────────────────── */}
-      <div className="panel-header soft-divider flex shrink-0 items-center justify-between gap-2 border-t px-3 py-1.5 sm:px-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* ── Status Bar (desktop/tablet only) ───────────────────────────────────── */}
+      {!isMobile && <div className="panel-header soft-divider flex shrink-0 items-center justify-between gap-2 border-t px-3 py-1.5 sm:px-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {/* Left: feed status */}
         <div className="flex shrink-0 items-center gap-2">
           {/* Binance */}
@@ -1692,7 +1672,45 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
             TraderBross
           </span>
         </div>
-      </div>
+      </div>}
+
+      {/* ── Mobile Bottom Navigation ─────────────────────────────────────────────── */}
+      {isMobile && (
+        <div className="mobile-bottom-nav shrink-0">
+          <div className="flex items-center justify-around px-2" style={{ paddingTop: 6, paddingBottom: "max(10px, env(safe-area-inset-bottom))" }}>
+            {([
+              { id: "news"  as const, label: "News",   Icon: Newspaper        },
+              { id: "chart" as const, label: "Chart",  Icon: CandlestickChart },
+              { id: "tools" as const, label: "Trade",  Icon: TrendingUp       },
+            ] as const).map(({ id, label, Icon }) => {
+              const isActive = mobileWorkspaceTab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setMobileWorkspaceTab(id)}
+                  className={`mobile-bottom-nav-btn ${isActive ? "active" : ""}`}
+                >
+                  <Icon className={`h-[22px] w-[22px] transition-transform duration-200 ${isActive ? "scale-110" : "scale-100"}`} />
+                  <span>{label}</span>
+                  {isActive && <span className="mobile-nav-indicator" />}
+                </button>
+              );
+            })}
+          </div>
+          {/* Connection status strip */}
+          <div className="flex items-center justify-between border-t px-4 pb-1 pt-0.5" style={{ borderColor: "rgba(42,42,42,0.7)" }}>
+            <div className="flex items-center gap-1.5">
+              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${wsConnected ? "status-dot-online live-dot" : "status-dot-offline"}`} />
+              <span className="text-[8px] font-bold tracking-[0.16em] uppercase" style={{ color: wsConnected ? "#10b981" : "#ef4444" }}>
+                {wsConnected ? "Live" : "Reconnecting"}
+              </span>
+            </div>
+            <span className="text-[8px] font-semibold tracking-[0.14em] uppercase" style={{ color: "#2d2d2d" }}>TraderBross</span>
+          </div>
+        </div>
+      )}
+
       {headerConnectOpen &&
         typeof document !== "undefined" &&
         createPortal(
