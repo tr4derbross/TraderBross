@@ -1565,10 +1565,20 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
               </div>
             </>
           ) : (
-            <div className="min-h-0 flex-1 overflow-hidden">
-              {mobileWorkspaceTab === "news"  && <div key="news"  className="panel-slide-up h-full">{renderNewsPanel()}</div>}
-              {mobileWorkspaceTab === "chart" && <div key="chart" className="panel-slide-up h-full">{renderChartPanel()}</div>}
-              {mobileWorkspaceTab === "tools" && <div key="tools" className="panel-slide-up h-full">{renderRightPanel()}</div>}
+            /* Mobile: all panels stacked, single scrollable page */
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden mobile-scroll-page">
+              {/* Chart */}
+              <div className="shrink-0 overflow-hidden" style={{ height: 240 }}>
+                {renderChartPanel()}
+              </div>
+              {/* Trade Panel */}
+              <div className="shrink-0 overflow-hidden mt-px" style={{ height: 300 }}>
+                {renderRightPanel()}
+              </div>
+              {/* News Feed */}
+              <div className="shrink-0 overflow-hidden mt-px" style={{ minHeight: 380 }}>
+                {renderNewsPanel()}
+              </div>
             </div>
           )}
 
@@ -1683,40 +1693,16 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         </div>
       </div>}
 
-      {/* ── Mobile Bottom Navigation ─────────────────────────────────────────────── */}
+      {/* ── Mobile Status Bar ─────────────────────────────────────────────── */}
       {isMobile && (
-        <div className="mobile-bottom-nav shrink-0">
-          <div className="flex items-center justify-around px-2" style={{ paddingTop: 6, paddingBottom: "max(10px, env(safe-area-inset-bottom))" }}>
-            {([
-              { id: "news"  as const, label: "News",   Icon: Newspaper        },
-              { id: "chart" as const, label: "Chart",  Icon: CandlestickChart },
-              { id: "tools" as const, label: "Trade",  Icon: TrendingUp       },
-            ] as const).map(({ id, label, Icon }) => {
-              const isActive = mobileWorkspaceTab === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setMobileWorkspaceTab(id)}
-                  className={`mobile-bottom-nav-btn ${isActive ? "active" : ""}`}
-                >
-                  <Icon className={`h-[22px] w-[22px] transition-transform duration-200 ${isActive ? "scale-110" : "scale-100"}`} />
-                  <span>{label}</span>
-                  {isActive && <span className="mobile-nav-indicator" />}
-                </button>
-              );
-            })}
+        <div className="shrink-0 flex items-center justify-between px-4 py-1.5 border-t" style={{ borderColor: "rgba(42,42,42,0.9)", background: "rgba(9,9,10,0.99)", paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}>
+          <div className="flex items-center gap-1.5">
+            <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${wsConnected ? "status-dot-online live-dot" : "status-dot-offline"}`} />
+            <span className="text-[8px] font-bold tracking-[0.16em] uppercase" style={{ color: wsConnected ? "#10b981" : "#ef4444" }}>
+              {wsConnected ? "Live" : "Reconnecting"}
+            </span>
           </div>
-          {/* Connection status strip */}
-          <div className="flex items-center justify-between border-t px-4 pb-1 pt-0.5" style={{ borderColor: "rgba(42,42,42,0.7)" }}>
-            <div className="flex items-center gap-1.5">
-              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${wsConnected ? "status-dot-online live-dot" : "status-dot-offline"}`} />
-              <span className="text-[8px] font-bold tracking-[0.16em] uppercase" style={{ color: wsConnected ? "#10b981" : "#ef4444" }}>
-                {wsConnected ? "Live" : "Reconnecting"}
-              </span>
-            </div>
-            <span className="text-[8px] font-semibold tracking-[0.14em] uppercase" style={{ color: "#2d2d2d" }}>TraderBross</span>
-          </div>
+          <span className="text-[8px] font-semibold tracking-[0.14em] uppercase" style={{ color: "#2d2d2d" }}>TraderBross</span>
         </div>
       )}
 
