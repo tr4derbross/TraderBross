@@ -73,10 +73,10 @@ export default function TickerTape({ quotes: wsQuotes }: Props) {
     });
   }, [quotes]);
 
-  if (quotes.length === 0) return null;
-
   /* Doubled list for seamless loop — only rebuilt when coin list changes */
   const doubled = useMemo(() => [...quotes, ...quotes], [quotes]);
+
+  if (quotes.length === 0) return null;
 
   return (
     <div
