@@ -2,7 +2,7 @@
 
 import { SECTORS, AVAILABLE_TICKERS } from "@/lib/mock-data";
 import { SourceFilter, ImportanceFilter, SentimentFilter } from "@/hooks/useNews";
-import { Search, X, Newspaper, Twitter, Waves, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Search, X, Newspaper, Twitter, Waves, TrendingUp, TrendingDown, Minus, Zap } from "lucide-react";
 
 type Props = {
   sector: string;
@@ -17,7 +17,7 @@ type Props = {
   onSource: (s: SourceFilter) => void;
   onImportance: (i: ImportanceFilter) => void;
   onSentiment: (s: SentimentFilter) => void;
-  counts: { news: number; whale: number; social: number; all: number };
+  counts: { news: number; whale: number; social: number; liquidation: number; all: number };
 };
 
 const IMPORTANCE_OPTIONS: { key: ImportanceFilter; label: string; style: string }[] = [
@@ -36,10 +36,11 @@ const SENTIMENT_OPTIONS: { key: SentimentFilter; label: string; icon: React.Reac
 ];
 
 const SOURCE_TABS: { key: SourceFilter; label: string; icon: React.ReactNode; color: string }[] = [
-  { key: "all", label: "All", icon: null, color: "text-amber-50" },
-  { key: "news", label: "News", icon: <Newspaper className="h-3 w-3" />, color: "text-amber-100" },
-  { key: "social", label: "Social", icon: <Twitter className="h-3 w-3" />, color: "text-zinc-200" },
-  { key: "whale", label: "Whales", icon: <Waves className="h-3 w-3" />, color: "text-zinc-200" },
+  { key: "all",         label: "All",      icon: null,                                   color: "text-amber-50"  },
+  { key: "news",        label: "News",     icon: <Newspaper className="h-3 w-3" />,      color: "text-amber-100" },
+  { key: "social",      label: "Social",   icon: <Twitter className="h-3 w-3" />,        color: "text-zinc-200"  },
+  { key: "whale",       label: "Whales",   icon: <Waves className="h-3 w-3" />,          color: "text-amber-300" },
+  { key: "liquidation", label: "Liqd.",    icon: <Zap className="h-3 w-3" />,            color: "text-rose-300"  },
 ];
 
 export default function FilterBar({
@@ -61,7 +62,7 @@ export default function FilterBar({
     <div className="flex flex-col border-b border-[rgba(212,161,31,0.1)] bg-[linear-gradient(180deg,rgba(20,17,13,0.96),rgba(11,10,10,0.94))]">
       <div className="flex items-center gap-0 border-b border-[rgba(212,161,31,0.08)] px-3 pb-0 pt-2">
         {SOURCE_TABS.map(({ key, label, icon, color }) => {
-          const count = key === "all" ? counts.all : counts[key as keyof typeof counts];
+          const count = key === "all" ? counts.all : (counts[key as keyof typeof counts] ?? 0);
           const active = sourceFilter === key;
 
           return (
@@ -102,7 +103,7 @@ export default function FilterBar({
           )}
         </div>
 
-        {(sourceFilter === "all" || sourceFilter === "news") && (
+        {(sourceFilter === "all" || sourceFilter === "news" || sourceFilter === "social") && (
           <>
             <select
               className="terminal-input cursor-pointer rounded-lg px-2 py-1 text-xs text-zinc-100 outline-none"
@@ -153,7 +154,8 @@ export default function FilterBar({
         </div>
       </div>
 
-      {/* Importance + Sentiment quick filters */}
+      {/* Importance + Sentiment quick filters — hidden for special feeds */}
+      {sourceFilter !== "whale" && sourceFilter !== "liquidation" && (
       <div className="flex items-center gap-2 overflow-x-auto border-t border-[rgba(212,161,31,0.07)] px-3 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <span className="shrink-0 text-[9px] uppercase tracking-[0.18em] text-zinc-600">Impact</span>
         <div className="flex shrink-0 gap-1">
@@ -192,6 +194,7 @@ export default function FilterBar({
           ))}
         </div>
       </div>
+      )}
     </div>
   );
 }
