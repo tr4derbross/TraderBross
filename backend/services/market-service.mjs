@@ -158,7 +158,7 @@ export async function getOkxCandles(symbol, interval, limit) {
     return generateMockCandles(symbol, interval, limit);
   }
 
-  const bar = { "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "1H", "4h": "4H", "1d": "1D", "1w": "1W" }[interval] || "1D";
+  const bar = { "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "1H", "4h": "4H", "1d": "1D", "1w": "1W", "1H": "1H", "4H": "4H", "1D": "1D", "1W": "1W" }[interval] || "1D";
   return cache.remember(`candles:okx:${symbol}:${interval}:${limit}`, 12000, async () => {
     try {
       const payload = await fetchJson(`https://www.okx.com/api/v5/market/history-candles?instId=${instId}&bar=${bar}&limit=${limit}`, { timeoutMs: 3500 });
