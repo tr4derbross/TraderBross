@@ -394,8 +394,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const [headerAnchorRect, setHeaderAnchorRect] = useState<DOMRect | null>(null);
   const headerWalletSessionRef = useRef<ConnectedWalletSession | null>(null);
 
-  const [newsWidth, setNewsWidth] = useState(370);
-  const [rightWidth, setRightWidth] = useState(340);
+  const [newsWidth, setNewsWidth] = useState(480);
+  const [rightWidth, setRightWidth] = useState(390);
 
   const resizeNews = useCallback(
     (dx: number) => setNewsWidth((w) => Math.max(240, Math.min(580, w + dx))),
