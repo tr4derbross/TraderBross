@@ -1565,19 +1565,22 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
               </div>
             </>
           ) : (
-            /* Mobile: all panels stacked, single scrollable page */
-            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden mobile-scroll-page">
-              {/* Chart */}
-              <div className="shrink-0 overflow-hidden" style={{ height: 240 }}>
+            /* Mobile: Chart top, Trade + News side by side below */
+            <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
+              {/* Chart — top, fixed height */}
+              <div className="shrink-0 overflow-hidden" style={{ height: 230 }}>
                 {renderChartPanel()}
               </div>
-              {/* Trade Panel */}
-              <div className="shrink-0 overflow-hidden mt-px" style={{ height: 300 }}>
-                {renderRightPanel()}
-              </div>
-              {/* News Feed */}
-              <div className="shrink-0 overflow-hidden mt-px" style={{ minHeight: 380 }}>
-                {renderNewsPanel()}
+              {/* Trade + News — side by side, fill remaining space */}
+              <div className="flex min-h-0 flex-1 overflow-hidden mt-px gap-px">
+                {/* News — left, ~55% */}
+                <div className="min-h-0 overflow-hidden" style={{ flex: "0 0 55%" }}>
+                  {renderNewsPanel()}
+                </div>
+                {/* Trade — right, ~45% */}
+                <div className="min-h-0 overflow-hidden" style={{ flex: "0 0 calc(45% - 1px)" }}>
+                  {renderRightPanel()}
+                </div>
               </div>
             </div>
           )}
