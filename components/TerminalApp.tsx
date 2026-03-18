@@ -396,6 +396,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
   const [newsWidth, setNewsWidth] = useState(480);
   const [rightWidth, setRightWidth] = useState(390);
+  const panelInitRef = useRef(false);
 
   const resizeNews = useCallback(
     (dx: number) => setNewsWidth((w) => Math.max(240, Math.min(580, w + dx))),
@@ -407,7 +408,15 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   );
 
   useEffect(() => {
-    const syncViewport = () => setViewportWidth(window.innerWidth);
+    const syncViewport = () => {
+      const vw = window.innerWidth;
+      setViewportWidth(vw);
+      if (!panelInitRef.current && vw >= 1280) {
+        panelInitRef.current = true;
+        setNewsWidth(Math.round(vw * 0.26));
+        setRightWidth(Math.round(vw * 0.25));
+      }
+    };
     syncViewport();
     window.addEventListener("resize", syncViewport);
     return () => window.removeEventListener("resize", syncViewport);
