@@ -46,7 +46,6 @@ import {
   GripVertical,
   Newspaper,
   CandlestickChart,
-  PanelsTopLeft,
   Wallet,
   X,
   Loader2,
@@ -54,6 +53,11 @@ import {
   AlertTriangle,
   Unplug,
   Layers,
+  TrendingUp,
+  Activity,
+  Eye,
+  Bot,
+  Zap,
 } from "lucide-react";
 
 /* ─── Funding Stats Bar ─────────────────────────────────────────────────────── */
@@ -722,14 +726,6 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     }
   };
 
-  const tabs: { id: RightTab; label: string }[] = [
-    { id: "trade", label: "Trade" },
-    { id: "dex", label: "DEX" },
-    { id: "signals", label: "Signals" },
-    { id: "watch", label: "Watch" },
-    { id: "ai", label: "AI" },
-  ];
-
   const [watchSubTab, setWatchSubTab] = useState<"watchlist" | "alerts">("watchlist");
 
   const isMobile = viewportWidth < 768;
@@ -1249,30 +1245,30 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const renderRightPanel = () => (
     <div className="panel-shell soft-divider flex h-full min-h-0 flex-col overflow-hidden border xl:rounded-r-xl xl:border-l-0">
       <div className="panel-header soft-divider shrink-0 border-b">
-        <div className="flex overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setRightTab(tab.id)}
-              data-active={rightTab === tab.id}
-              className={`accent-tab shrink-0 rounded-lg px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.2em] transition-colors hover:text-zinc-300 ${
-                tab.id === "ai"
-                  ? rightTab === "ai"
-                    ? "text-amber-300"
-                    : "text-amber-600 hover:text-amber-300"
-                  : ""
-              }`}
-            >
-              {tab.id === "ai" ? (
-                <span className="inline-flex items-center gap-1">
-                  <span>✦</span>
-                  {tab.label}
-                </span>
-              ) : (
-                tab.label
-              )}
-            </button>
-          ))}
+        <div className="flex overflow-x-auto px-1.5 py-1.5 gap-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {([
+            { id: "trade"   as const, label: "Trade",   Icon: TrendingUp },
+            { id: "dex"     as const, label: "DEX",     Icon: Zap        },
+            { id: "signals" as const, label: "Signals", Icon: Activity   },
+            { id: "watch"   as const, label: "Watch",   Icon: Eye        },
+            { id: "ai"      as const, label: "AI",      Icon: Bot        },
+          ]).map(({ id, label, Icon }) => {
+            const isActive = rightTab === id;
+            const isAI = id === "ai";
+            return (
+              <button
+                key={id}
+                type="button"
+                title={label}
+                onClick={() => setRightTab(id)}
+                data-active={isActive}
+                className={`right-panel-tab shrink-0 ${isAI ? "tab-ai" : ""}`}
+              >
+                <Icon className="tab-icon" />
+                <span>{label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1429,7 +1425,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   );
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-black">
+    <div className="flex flex-col overflow-hidden bg-black" style={{ height: "100dvh" }}>
       <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-3 py-2 sm:py-3 sm:px-4 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
         {/* Left: Fear & Greed + page nav */}
         <div className="absolute left-3 top-1/2 z-10 -translate-y-1/2 sm:left-4 flex items-center gap-2">
@@ -1526,26 +1522,25 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 pb-2 pt-2">
         {isMobile && (
-          <div className="mb-2 flex shrink-0 items-center gap-1 rounded-xl border border-[rgba(242,183,5,0.12)] bg-[rgba(13,12,11,0.95)] p-1">
+          <div className="mb-2 flex shrink-0 items-center gap-1 rounded-xl border border-[rgba(242,183,5,0.14)] bg-[rgba(10,10,10,0.98)] p-1 shadow-[0_2px_16px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)]">
             {[
-              { id: "news"  as const, label: "News",  icon: Newspaper        },
-              { id: "chart" as const, label: "Chart", icon: CandlestickChart },
-              { id: "tools" as const, label: "Trade", icon: PanelsTopLeft    },
-            ].map((item) => {
-              const Icon = item.icon;
+              { id: "news"  as const, label: "News",  Icon: Newspaper    },
+              { id: "chart" as const, label: "Chart", Icon: CandlestickChart },
+              { id: "tools" as const, label: "Trade", Icon: TrendingUp   },
+            ].map(({ id, label, Icon }) => {
+              const isActive = mobileWorkspaceTab === id;
               return (
                 <button
-                  key={item.id}
+                  key={id}
                   type="button"
-                  onClick={() => setMobileWorkspaceTab(item.id)}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[10px] font-bold uppercase tracking-[0.14em] transition-all ${
-                    mobileWorkspaceTab === item.id
-                      ? "bg-[rgba(242,183,5,0.18)] text-[#F2B705] shadow-sm"
-                      : "text-zinc-400 hover:text-zinc-200"
-                  }`}
+                  onClick={() => setMobileWorkspaceTab(id)}
+                  className={`mobile-workspace-tab ${isActive ? "active" : "inactive"}`}
                 >
-                  <Icon className="h-3.5 w-3.5 shrink-0" />
-                  <span>{item.label}</span>
+                  <Icon className={`h-4 w-4 shrink-0 transition-transform duration-200 ${isActive ? "scale-110" : "scale-100"}`} />
+                  <span>{label}</span>
+                  {isActive && (
+                    <span className="absolute bottom-1 left-1/2 -translate-x-1/2 h-0.5 w-4 rounded-full bg-[#F2B705] opacity-60" />
+                  )}
                 </button>
               );
             })}
@@ -1571,20 +1566,20 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
             </div>
           ) : isTablet ? (
             <>
-              {/* Tablet: chart top, tabs + panels bottom */}
-              <div className="min-h-0 flex-[1.2] overflow-hidden">
+              {/* Tablet: chart top (55%), news+trade bottom (45%) */}
+              <div className="min-h-0 overflow-hidden" style={{ flex: "0 0 57%" }}>
                 {renderChartPanelWrapped("rounded-xl")}
               </div>
-              <div className="flex min-h-0 flex-1 overflow-hidden gap-2">
+              <div className="flex min-h-0 overflow-hidden gap-2" style={{ flex: "0 0 calc(43% - 8px)" }}>
                 <div className="min-h-0 flex-1 overflow-hidden">{renderNewsPanel()}</div>
-                <div className="min-h-0 overflow-hidden" style={{ width: 320 }}>{renderRightPanel()}</div>
+                <div className="min-h-0 shrink-0 overflow-hidden" style={{ width: 340 }}>{renderRightPanel()}</div>
               </div>
             </>
           ) : (
             <div className="min-h-0 flex-1 overflow-hidden">
-              {mobileWorkspaceTab === "news" && renderNewsPanel()}
-              {mobileWorkspaceTab === "chart" && renderChartPanel("rounded-xl")}
-              {mobileWorkspaceTab === "tools" && renderRightPanel()}
+              {mobileWorkspaceTab === "news"  && <div key="news"  className="panel-slide-up h-full">{renderNewsPanel()}</div>}
+              {mobileWorkspaceTab === "chart" && <div key="chart" className="panel-slide-up h-full">{renderChartPanel("rounded-xl")}</div>}
+              {mobileWorkspaceTab === "tools" && <div key="tools" className="panel-slide-up h-full">{renderRightPanel()}</div>}
             </div>
           )}
 

@@ -1,7 +1,35 @@
-# TraderBross — Production Quality Fixes
+# TraderBross — Production Quality Fixes + Terminal UI/UX Redesign
 
 ## Summary
-All critical bugs fixed. System now works without paid API keys (free fallbacks enabled). WebSocket reconnection hardened with exponential backoff. AI chat system prompt refined for trading analysis. Calendar extended with 25 curated events. Code quality improved with logger utility and null safety guards.
+All critical bugs fixed. System now works without paid API keys (free fallbacks enabled). WebSocket reconnection hardened with exponential backoff. AI chat system prompt refined for trading analysis. Calendar extended with 25 curated events. Code quality improved with logger utility and null safety guards. Terminal UI/UX redesigned for mobile/tablet with competitor analysis (Tree of Alpha, NinjaTrader).
+
+---
+
+## Phase 7: Terminal UI/UX Redesign
+
+### Competitive Analysis
+Researched Tree of Alpha and NinjaTrader UX patterns:
+- **Tree of Alpha**: Dense information layout, quick keyboard access, icon+label tabs, clear sentiment coloring, fluid panel transitions
+- **NinjaTrader**: Professional dark theme, resizable panels (already implemented), touch-friendly controls, multi-panel status indicators
+
+### What Changed
+
+#### `components/TerminalApp.tsx`
+- **Right panel tab bar** — Completely redesigned from plain-text `accent-tab` buttons to icon+label format. Each tab now has its own lucide icon (`TrendingUp` for Trade, `Zap` for DEX, `Activity` for Signals, `Eye` for Watch, `Bot` for AI) with a pill-shaped active state (amber border + warm background glow). Tabs are more readable and touch-friendly (min 30px height, 36px on mobile).
+- **Mobile workspace tab bar** — Improved with 44px minimum touch target (iOS HIG compliant), scale animation on active icon, slide-indicator dot below active tab, and a CSS-animated fade on panel switch. Replaced `PanelsTopLeft` icon with `TrendingUp` for the Trade tab (more intuitive).
+- **Mobile panel transitions** — Each workspace panel now wraps in a `panel-slide-up` div when shown, giving a smooth 0.22s entrance animation on tab switch.
+- **Viewport height** — Changed `h-screen` (100vh) to inline `height: 100dvh` for correct behavior in mobile browsers that show/hide the address bar dynamically.
+- **Tablet layout** — Right panel width increased from 320px to 340px. Chart panel now takes 57% height (up from ~54%), bottom row gets 43%. This gives the chart more prominence and the trade panel more breathing room.
+- **Removed unused `tabs` constant** — The inline tab array in `renderRightPanel` now contains the full definition including icons, removing the dead array.
+- **Cleaned imports** — Removed `PanelsTopLeft` (no longer used), added `TrendingUp`, `Activity`, `Eye`, `Bot`, `Zap`.
+
+#### `app/globals.css`
+- **`.right-panel-tab`** — New tab button class. Transparent by default, amber-tinted pill on active (border + background + box-shadow). AI tab uses brighter gold on active. Smooth 140ms transitions on color, background, border-color.
+- **`.mobile-workspace-tab`** — New mobile tab class. 44px min height, `active` and `inactive` modifier classes, scale and color transitions.
+- **`@media (max-width: 767px)`** — Mobile-specific overrides: larger tab min height (36px for right panel tabs), tap highlight removal, lighter panel shadows for performance.
+- **`@supports (padding-bottom: env(safe-area-inset-bottom))`** — Safe-area inset padding for iPhone X+ home indicator.
+- **`.panel-slide-up`** — 0.22s cubic-bezier entrance animation (translateY + opacity) for panel tab switching.
+- **Touch optimizations** — `-webkit-tap-highlight-color: transparent` on all interactive elements, `user-select: none` on tab buttons, `:active` scale(0.96) feedback.
 
 ---
 
