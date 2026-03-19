@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, memo } from "react";
-import { buildApiUrl } from "@/lib/runtime-env";
+import { apiFetch } from "@/lib/api-client";
 import { TrendingUp, TrendingDown, Activity, Zap, DollarSign, BarChart2 } from "lucide-react";
 
 type FundingRate = {
@@ -118,9 +118,7 @@ export default function SignalsPanel({ quotes = [], activeTicker, onSelectTicker
     let cancelled = false;
     async function load() {
       try {
-        const res = await fetch(buildApiUrl("/api/funding"), { signal: AbortSignal.timeout(6000) });
-        if (!res.ok) throw new Error("no data");
-        const data = await res.json() as FundingRate[];
+        const data = await apiFetch<FundingRate[]>("/api/funding");
         if (!cancelled) setFunding(data);
       } catch {
         // silently ignore

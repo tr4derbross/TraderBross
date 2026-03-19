@@ -1,18 +1,71 @@
 import { buildApiUrl } from "@/lib/runtime-env";
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(buildApiUrl(path), {
-    ...init,
-    cache: init?.cache ?? "no-store",
-    headers: {
-      "content-type": "application/json",
-      ...(init?.headers || {}),
-    },
-  });
+const DEFAULT_GET_TTL_MS = Number(process.env.NEXT_PUBLIC_CLIENT_FETCH_TTL_MS || 8000);
+const inflightRequests = new Map<string, Promise<unknown>>();
+const recentResponses = new Map<string, { expiresAt: number; value: unknown }>();
 
-  if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+function normalizeMethod(init?: RequestInit) {
+  return (init?.method || "GET").toUpperCase();
+}
+
+function getRequestKey(path: string, init?: RequestInit) {
+  const method = normalizeMethod(init);
+  return `${method}:${path}`;
+}
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = normalizeMethod(init);
+  const isGet = method === "GET";
+  const key = getRequestKey(path, init);
+
+  if (isGet) {
+    const cached = recentResponses.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value as T;
+    }
+    if (inflightRequests.has(key)) {
+      return inflightRequests.get(key) as Promise<T>;
+    }
   }
 
-  return response.json() as Promise<T>;
+  const requestPromise = (async () => {
+    const response = await fetch(buildApiUrl(path), {
+      ...init,
+      cache: init?.cache ?? "no-store",
+      headers: {
+        "content-type": "application/json",
+        ...(init?.headers || {}),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Request failed: ${response.status}`);
+    }
+
+    const payload = (await response.json()) as T;
+    if (isGet && DEFAULT_GET_TTL_MS > 0) {
+      recentResponses.set(key, {
+        value: payload,
+        expiresAt: Date.now() + DEFAULT_GET_TTL_MS,
+      });
+    }
+    return payload;
+  })();
+
+  if (isGet) {
+    inflightRequests.set(key, requestPromise);
+  }
+
+  try {
+    return await requestPromise;
+  } finally {
+    if (isGet) {
+      inflightRequests.delete(key);
+    }
+  }
+}
+
+export function clearApiClientCache() {
+  inflightRequests.clear();
+  recentResponses.clear();
 }

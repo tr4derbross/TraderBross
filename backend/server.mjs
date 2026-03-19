@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import http from "node:http";
 import { URL } from "node:url";
-import WebSocket, { WebSocketServer } from "ws";
+import { WebSocketServer } from "ws";
 import { loadConfig } from "./config.mjs";
 import { createLogger } from "./logger.mjs";
 import { getProviderLabel, streamChat, classifySentiment } from "./services/ai-service.mjs";
@@ -9,49 +9,32 @@ import { getCalendarEvents } from "./services/calendar-service.mjs";
 import { getDydxAccount, getDydxMarkets } from "./services/dydx-service.mjs";
 import { getHyperliquidAccount, getHyperliquidCandles, getHyperliquidMarket } from "./services/hyperliquid-service.mjs";
 import {
-  createBinanceQuoteStream,
   getBinanceCandles,
-  getBinanceQuotes,
   getBybitCandles,
-  getBybitQuotes,
   getOkxCandles,
-  getOkxQuotes,
 } from "./services/market-service.mjs";
-import { getNews, getNewsFeed, getSocial, getWhales } from "./services/news-service.mjs";
 import { getScreenerData } from "./services/screener-service.mjs";
-import { getFearGreed, getMarketStats, getMempoolStats, getEthGas, getDefiLlamaTvl, getForexRates } from "./services/stats-service.mjs";
+import { getMarketStats, getMempoolStats, getFearGreed, getEthGas, getDefiLlamaTvl, getForexRates } from "./services/stats-service.mjs";
 import { getTrendingData } from "./services/trending-service.mjs";
-import { getVenueQuotes } from "./services/venue-service.mjs";
 import { clearSecret, getSecret, storeSecret } from "./services/vault-service.mjs";
+import { createTerminalDataService } from "./data/terminal-data-service.mjs";
+import { canonicalSymbol } from "./data/core/symbol-map.mjs";
+import { MemoryCache } from "./services/cache.mjs";
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel);
-
-function createState() {
-  return {
-    quotes: [],
-    venueQuotes: { Binance: [], OKX: [], Bybit: [] },
-    marketStats: null,
-    mempoolStats: null,
-    fearGreed: null,
-    ethGas: null,
-    defiTvl: null,
-    forex: null,
-    liquidations: [],
-    news: [],
-    whales: [],
-    social: [],
-    connectionState: "connecting",
-  };
-}
-
-const state = createState();
+const terminalData = createTerminalDataService({ config, logger });
+const endpointCache = new MemoryCache();
 const clients = new Set();
 
 function binanceSignedQuery(secret, params = {}) {
   const qs = new URLSearchParams({ ...params, timestamp: Date.now().toString(), recvWindow: "5000" }).toString();
   const sig = crypto.createHmac("sha256", secret).update(qs).digest("hex");
   return `${qs}&signature=${sig}`;
+}
+
+function canonicalTickerParam(value, fallback = "BTC") {
+  return canonicalSymbol(value || fallback) || fallback;
 }
 
 function json(reply, statusCode, payload) {
@@ -94,95 +77,8 @@ function broadcast(type, payload) {
     sendToClient(client, envelope);
   }
 }
-
-async function refreshCoreState() {
-  const [quotes, venueQuotes, marketStats, mempoolStats, fearGreed, ethGas, defiTvl, forex, newsFeed] = await Promise.all([
-    getBinanceQuotes(),
-    getVenueQuotes(),
-    getMarketStats(),
-    getMempoolStats(),
-    getFearGreed(),
-    getEthGas(config.etherscanApiKey),
-    getDefiLlamaTvl(),
-    getForexRates(),
-    getNewsFeed(config),
-  ]);
-
-  state.quotes = quotes;
-  state.venueQuotes = venueQuotes;
-  state.marketStats = marketStats;
-  state.mempoolStats = mempoolStats;
-  state.fearGreed = fearGreed;
-  state.ethGas = ethGas;
-  state.defiTvl = defiTvl;
-  state.forex = forex;
-  state.news = newsFeed.news;
-  state.whales = newsFeed.whales;
-  state.social = newsFeed.social;
-  state.connectionState = "connected";
-}
-
-async function refreshNewsOnly() {
-  const next = await getNewsFeed(config);
-
-  const seen = new Set(state.news.map((item) => item.id));
-  next.news.forEach((item) => {
-    if (!seen.has(item.id)) {
-      broadcast("news", item);
-    }
-  });
-
-  state.news = next.news;
-  state.whales = next.whales;
-  state.social = next.social;
-  broadcast("social", state.social);
-  broadcast("whales", state.whales);
-}
-
-async function refreshStatsOnly() {
-  const [marketStats, mempoolStats, fearGreed, ethGas, defiTvl, forex] = await Promise.all([
-    getMarketStats(),
-    getMempoolStats(),
-    getFearGreed(),
-    getEthGas(config.etherscanApiKey),
-    getDefiLlamaTvl(),
-    getForexRates(),
-  ]);
-  state.marketStats = marketStats;
-  state.mempoolStats = mempoolStats;
-  state.fearGreed = fearGreed;
-  state.ethGas = ethGas;
-  state.defiTvl = defiTvl;
-  state.forex = forex;
-  broadcast("marketStats", state.marketStats);
-  broadcast("mempoolStats", state.mempoolStats);
-  broadcast("fearGreed", state.fearGreed);
-  broadcast("ethGas", state.ethGas);
-  broadcast("defiTvl", state.defiTvl);
-  broadcast("forex", state.forex);
-}
-
-async function refreshVenueQuotesOnly() {
-  state.venueQuotes = await getVenueQuotes();
-  broadcast("venueQuotes", state.venueQuotes);
-}
-
 function buildSnapshot() {
-  return {
-    quotes: state.quotes,
-    venueQuotes: state.venueQuotes,
-    marketStats: state.marketStats,
-    mempoolStats: state.mempoolStats,
-    fearGreed: state.fearGreed,
-    ethGas: state.ethGas,
-    defiTvl: state.defiTvl,
-    forex: state.forex,
-    liquidations: state.liquidations,
-    news: state.news,
-    whales: state.whales,
-    social: state.social,
-    connectionState: state.connectionState,
-  };
+  return terminalData.getSnapshot();
 }
 
 const server = http.createServer(async (request, reply) => {
@@ -212,28 +108,42 @@ const server = http.createServer(async (request, reply) => {
 
   try {
     if (request.method === "GET" && url.pathname === "/health") {
+      const status = terminalData.getStatus();
       json(reply, 200, {
         status: "ok",
         timestamp: new Date().toISOString(),
         wsClients: clients.size,
         dependencies: {
           websocket_server: "ok",
-          binance_quote_stream: state.quotes.length > 0 ? "ok" : "degraded",
-          news_feed: state.news.length > 0 ? "ok" : "degraded",
+          coingecko_market: status.providerState.coingecko_market,
+          coingecko_metadata: status.providerState.coingecko_metadata,
+          hyperliquid_stream: status.providerState.hyperliquid_ws,
+          dexscreener_discovery: status.providerState.dexscreener,
+          news_aggregate: status.providerState.news,
+          onchain_whales: status.providerState.whales,
           cache_state: {
-            quotes: state.quotes.length,
-            news: state.news.length,
-            whales: state.whales.length,
-            social: state.social.length,
-            liquidations: state.liquidations.length,
+            quotes: status.quotes,
+            news: status.news,
+            whales: status.whales,
+            liquidations: status.liquidations,
           },
         },
       });
       return;
     }
 
+    if (request.method === "GET" && url.pathname === "/api/providers/health") {
+      json(reply, 200, terminalData.getStatus());
+      return;
+    }
+
     if (request.method === "GET" && url.pathname === "/api/bootstrap") {
-      await refreshCoreState();
+      const snapshot = buildSnapshot();
+      if ((snapshot.quotes?.length || 0) === 0 && snapshot.connectionState !== "connected") {
+        await terminalData.refreshAll().catch((error) => {
+          logger.warn("data.snapshot.refresh_failed", { error: String(error) });
+        });
+      }
       json(reply, 200, buildSnapshot());
       return;
     }
@@ -257,11 +167,11 @@ const server = http.createServer(async (request, reply) => {
     if (request.method === "GET" && url.pathname === "/api/prices") {
       const type = url.searchParams.get("type");
       if (type === "quotes") {
-        json(reply, 200, await getBinanceQuotes());
+        json(reply, 200, buildSnapshot().quotes || []);
         return;
       }
 
-      const ticker = (url.searchParams.get("ticker") || "BTC").toUpperCase();
+      const ticker = canonicalTickerParam(url.searchParams.get("ticker"), "BTC");
       const interval = url.searchParams.get("interval") || "1d";
       const limit = Math.min(Number(url.searchParams.get("limit") || 120), 500);
       json(reply, 200, await getBinanceCandles(ticker, interval, limit));
@@ -271,10 +181,10 @@ const server = http.createServer(async (request, reply) => {
     if (request.method === "GET" && url.pathname === "/api/okx") {
       const type = url.searchParams.get("type");
       if (type === "quotes") {
-        json(reply, 200, await getOkxQuotes());
+        json(reply, 200, buildSnapshot().venueQuotes?.OKX || []);
         return;
       }
-      const ticker = (url.searchParams.get("ticker") || "BTC").toUpperCase();
+      const ticker = canonicalTickerParam(url.searchParams.get("ticker"), "BTC");
       const interval = url.searchParams.get("interval") || "1d";
       const limit = Math.min(Number(url.searchParams.get("limit") || 120), 500);
       json(reply, 200, await getOkxCandles(ticker, interval, limit));
@@ -284,10 +194,10 @@ const server = http.createServer(async (request, reply) => {
     if (request.method === "GET" && url.pathname === "/api/bybit") {
       const type = url.searchParams.get("type");
       if (type === "quotes") {
-        json(reply, 200, await getBybitQuotes());
+        json(reply, 200, buildSnapshot().venueQuotes?.Bybit || []);
         return;
       }
-      const ticker = (url.searchParams.get("ticker") || "BTC").toUpperCase();
+      const ticker = canonicalTickerParam(url.searchParams.get("ticker"), "BTC");
       const interval = url.searchParams.get("interval") || "1d";
       const limit = Math.min(Number(url.searchParams.get("limit") || 120), 500);
       json(reply, 200, await getBybitCandles(ticker, interval, limit));
@@ -305,7 +215,7 @@ const server = http.createServer(async (request, reply) => {
         return;
       }
       if (type === "ohlcv") {
-        const ticker = (url.searchParams.get("ticker") || "BTC").toUpperCase();
+        const ticker = canonicalTickerParam(url.searchParams.get("ticker"), "BTC");
         const interval = url.searchParams.get("interval") || "1d";
         const limit = Math.min(Number(url.searchParams.get("limit") || 120), 500);
         json(reply, 200, await getHyperliquidCandles(ticker, interval, limit));
@@ -331,11 +241,18 @@ const server = http.createServer(async (request, reply) => {
     }
 
     if (request.method === "GET" && url.pathname === "/api/news") {
-      json(reply, 200, await getNews(config, {
+      json(reply, 200, terminalData.getNews({
         sector: url.searchParams.get("sector"),
-        ticker: url.searchParams.get("ticker"),
+        ticker: url.searchParams.get("ticker")
+          ? canonicalTickerParam(url.searchParams.get("ticker"), "BTC")
+          : null,
         keyword: url.searchParams.get("keyword"),
       }));
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/news/snapshot") {
+      json(reply, 200, terminalData.getNewsSnapshot());
       return;
     }
 
@@ -343,12 +260,34 @@ const server = http.createServer(async (request, reply) => {
       request.method === "GET" &&
       (url.pathname === "/api/whales" || url.pathname === "/api/whale")
     ) {
-      json(reply, 200, await getWhales(config));
+      json(reply, 200, terminalData.getWhales());
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/whales/events") {
+      json(reply, 200, terminalData.getWhaleEvents());
       return;
     }
 
     if (request.method === "GET" && url.pathname === "/api/social") {
-      json(reply, 200, await getSocial(config));
+      json(reply, 200, terminalData.getSocial());
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/analysis") {
+      const kind = (url.searchParams.get("kind") || "news").toLowerCase() === "whale" ? "whale" : "news";
+      const id = url.searchParams.get("id") || "";
+      const analysis = terminalData.getEventAnalysis({ kind, id });
+      if (!analysis) {
+        json(reply, 404, { error: "Analysis target not found" });
+        return;
+      }
+      json(reply, 200, analysis);
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/coins/meta") {
+      json(reply, 200, buildSnapshot().coinMetadata || {});
       return;
     }
 
@@ -369,28 +308,7 @@ const server = http.createServer(async (request, reply) => {
 
     if (request.method === "GET" && url.pathname === "/api/liquidations") {
       const limit = Math.min(Number(url.searchParams.get("limit") || 20), 100);
-      const liquidations = state.liquidations.slice(0, limit).map((event) => ({
-        id: event.id,
-        symbol: `${event.symbol}USDT`,
-        displaySymbol: event.symbol,
-        side: event.side === "long" ? "LONG" : "SHORT",
-        sizeUSD: event.usdValue,
-        quantity: event.qty,
-        price: event.price,
-        exchange: "Binance",
-        timestamp: event.timestamp,
-      }));
-      const stats = liquidations.reduce(
-        (acc, event) => {
-          acc.totalUSD += event.sizeUSD;
-          if (event.side === "LONG") acc.longUSD += event.sizeUSD;
-          if (event.side === "SHORT") acc.shortUSD += event.sizeUSD;
-          acc.count += 1;
-          return acc;
-        },
-        { totalUSD: 0, longUSD: 0, shortUSD: 0, count: 0 }
-      );
-      json(reply, 200, { liquidations, stats });
+      json(reply, 200, terminalData.getLiquidations(limit));
       return;
     }
 
@@ -402,22 +320,24 @@ const server = http.createServer(async (request, reply) => {
 
     // Long/Short Account Ratio (Binance Futures, free, no key) ─────────────────
     if (request.method === "GET" && url.pathname === "/api/lsr") {
-      const symbol = (url.searchParams.get("symbol") || "BTC").toUpperCase();
+      const symbol = canonicalTickerParam(url.searchParams.get("symbol"), "BTC");
       const period = url.searchParams.get("period") || "1h";
       const limit  = Math.min(Number(url.searchParams.get("limit") || 24), 500);
       try {
-        const res = await fetch(
-          `https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=${symbol}USDT&period=${period}&limit=${limit}`,
-          { signal: AbortSignal.timeout(5000) }
-        );
-        const data = await res.json();
-        const rows = (Array.isArray(data) ? data : []).map((row) => ({
-          symbol,
-          longShortRatio: parseFloat(row.longShortRatio || "1"),
-          longAccount:    parseFloat(row.longAccount   || "0.5"),
-          shortAccount:   parseFloat(row.shortAccount  || "0.5"),
-          timestamp:      Number(row.timestamp || Date.now()),
-        }));
+        const rows = await endpointCache.remember(`lsr:${symbol}:${period}:${limit}`, config.dataTtl.lsrMs, async () => {
+          const res = await fetch(
+            `https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=${symbol}USDT&period=${period}&limit=${limit}`,
+            { signal: AbortSignal.timeout(5000) }
+          );
+          const data = await res.json();
+          return (Array.isArray(data) ? data : []).map((row) => ({
+            symbol,
+            longShortRatio: parseFloat(row.longShortRatio || "1"),
+            longAccount: parseFloat(row.longAccount || "0.5"),
+            shortAccount: parseFloat(row.shortAccount || "0.5"),
+            timestamp: Number(row.timestamp || Date.now()),
+          }));
+        });
         json(reply, 200, rows);
       } catch {
         json(reply, 200, []);
@@ -426,24 +346,29 @@ const server = http.createServer(async (request, reply) => {
     }
 
     if (request.method === "GET" && url.pathname === "/api/coincap") {
-      // CoinCap top-100 assets — real-time price + market data — free, no key
+      if (config.featureFlags.enableCoincap === false) {
+        json(reply, 200, []);
+        return;
+      }
       try {
         const limit = Math.min(Number(url.searchParams.get("limit") || 100), 200);
-        const res = await fetch(`https://api.coincap.io/v2/assets?limit=${limit}`, { signal: AbortSignal.timeout(6000) });
-        const data = await res.json();
-        const assets = (data?.data || []).map((a) => ({
-          id: a.id,
-          symbol: (a.symbol || "").toUpperCase(),
-          name: a.name,
-          rank: Number(a.rank),
-          priceUsd: a.priceUsd ? Number(a.priceUsd) : null,
-          changePercent24h: a.changePercent24Hr ? Number(a.changePercent24Hr) : null,
-          marketCapUsd: a.marketCapUsd ? Number(a.marketCapUsd) : null,
-          volumeUsd24h: a.volumeUsd24Hr ? Number(a.volumeUsd24Hr) : null,
-          supply: a.supply ? Number(a.supply) : null,
-          maxSupply: a.maxSupply ? Number(a.maxSupply) : null,
-          vwap24h: a.vwap24Hr ? Number(a.vwap24Hr) : null,
-        }));
+        const assets = await endpointCache.remember(`coincap:${limit}`, config.dataTtl.coincapMs, async () => {
+          const res = await fetch(`https://api.coincap.io/v2/assets?limit=${limit}`, { signal: AbortSignal.timeout(6000) });
+          const data = await res.json();
+          return (data?.data || []).map((a) => ({
+            id: a.id,
+            symbol: (a.symbol || "").toUpperCase(),
+            name: a.name,
+            rank: Number(a.rank),
+            priceUsd: a.priceUsd ? Number(a.priceUsd) : null,
+            changePercent24h: a.changePercent24Hr ? Number(a.changePercent24Hr) : null,
+            marketCapUsd: a.marketCapUsd ? Number(a.marketCapUsd) : null,
+            volumeUsd24h: a.volumeUsd24Hr ? Number(a.volumeUsd24Hr) : null,
+            supply: a.supply ? Number(a.supply) : null,
+            maxSupply: a.maxSupply ? Number(a.maxSupply) : null,
+            vwap24h: a.vwap24Hr ? Number(a.vwap24Hr) : null,
+          }));
+        });
         json(reply, 200, assets);
       } catch {
         json(reply, 200, []);
@@ -452,16 +377,18 @@ const server = http.createServer(async (request, reply) => {
     }
 
     if (request.method === "GET" && url.pathname === "/api/leverage-brackets") {
-      // Fetch Binance leverage brackets (max leverage per symbol)
       try {
-        const r0 = await fetch("https://fapi.binance.com/fapi/v1/leverageBracket", { signal: AbortSignal.timeout(6000) });
-        const data = await r0.json();
-        const result = {};
-        for (const item of (Array.isArray(data) ? data : [])) {
-          if (!item.symbol || !Array.isArray(item.brackets) || item.brackets.length === 0) continue;
-          const maxBracket = item.brackets[0]; // first bracket = highest tier
-          result[item.symbol.replace("USDT", "")] = maxBracket.initialLeverage ?? 20;
-        }
+        const result = await endpointCache.remember("leverage:brackets", config.dataTtl.leverageBracketsMs, async () => {
+          const r0 = await fetch("https://fapi.binance.com/fapi/v1/leverageBracket", { signal: AbortSignal.timeout(6000) });
+          const data = await r0.json();
+          const next = {};
+          for (const item of (Array.isArray(data) ? data : [])) {
+            if (!item.symbol || !Array.isArray(item.brackets) || item.brackets.length === 0) continue;
+            const maxBracket = item.brackets[0];
+            next[item.symbol.replace("USDT", "")] = maxBracket.initialLeverage ?? 20;
+          }
+          return next;
+        });
         json(reply, 200, result);
       } catch {
         json(reply, 200, {});
@@ -470,19 +397,24 @@ const server = http.createServer(async (request, reply) => {
     }
 
     if (request.method === "GET" && url.pathname === "/api/funding") {
-      // Multi-symbol funding rates from Binance premiumIndex
+      if (config.featureFlags.enableBinanceFunding === false) {
+        json(reply, 200, []);
+        return;
+      }
       try {
-        const r1 = await fetch("https://fapi.binance.com/fapi/v1/premiumIndex", { signal: AbortSignal.timeout(5000) });
-        const data = await r1.json();
-        const SYMBOLS = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","DOGEUSDT","AVAXUSDT","LINKUSDT","ARBUSDT","INJUSDT","NEARUSDT","OPUSDT","DOTUSDT","SUIUSDT","APTUSDT","ATOMUSDT","HYPEUSDT"];
-        const filtered = (Array.isArray(data) ? data : [])
-          .filter((item) => SYMBOLS.includes(item.symbol))
-          .map((item) => ({
-            symbol: item.symbol,
-            fundingRate: item.lastFundingRate,
-            nextFundingTime: item.nextFundingTime,
-          }))
-          .sort((a, b) => Math.abs(Number(b.fundingRate)) - Math.abs(Number(a.fundingRate)));
+        const filtered = await endpointCache.remember("funding:binance", config.dataTtl.fundingMs, async () => {
+          const r1 = await fetch("https://fapi.binance.com/fapi/v1/premiumIndex", { signal: AbortSignal.timeout(5000) });
+          const data = await r1.json();
+          const SYMBOLS = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","DOGEUSDT","AVAXUSDT","LINKUSDT","ARBUSDT","INJUSDT","NEARUSDT","OPUSDT","DOTUSDT","SUIUSDT","APTUSDT","ATOMUSDT","HYPEUSDT"];
+          return (Array.isArray(data) ? data : [])
+            .filter((item) => SYMBOLS.includes(item.symbol))
+            .map((item) => ({
+              symbol: item.symbol,
+              fundingRate: item.lastFundingRate,
+              nextFundingTime: item.nextFundingTime,
+            }))
+            .sort((a, b) => Math.abs(Number(b.fundingRate)) - Math.abs(Number(a.fundingRate)));
+        });
         json(reply, 200, filtered);
       } catch {
         json(reply, 200, []);
@@ -800,108 +732,10 @@ websocketServer.on("connection", (socket) => {
   });
 });
 
-await refreshCoreState();
-
-const stopBinanceStream = createBinanceQuoteStream({
-  logger,
-  onQuotes(quotes) {
-    state.quotes = quotes;
-    broadcast("quotes", quotes);
-  },
+await terminalData.start();
+const unsubscribeStream = terminalData.events.subscribe("stream", (envelope) => {
+  broadcast(envelope.type, envelope.payload);
 });
-
-// Binance Futures Liquidations stream (free, no key required)
-let liquidationSocket = null;
-let liquidationReconnectTimer = null;
-
-function connectLiquidationStream() {
-  if (liquidationSocket) return;
-  try {
-    liquidationSocket = new WebSocket("wss://fstream.binance.com/ws/!forceOrder@arr");
-
-    liquidationSocket.on("open", () => {
-      logger.info("liquidations.stream.connected");
-    });
-
-    liquidationSocket.on("message", (raw) => {
-      try {
-        const msg = JSON.parse(raw.toString());
-        const order = msg?.o;
-        if (!order) return;
-        const symbol = (order.s || "").replace("USDT", "");
-        const side = order.S === "SELL" ? "long" : "short"; // SELL = long position liquidated
-        const qty = parseFloat(order.q || "0");
-        const price = parseFloat(order.ap || order.p || "0");
-        const usdValue = qty * price;
-        if (usdValue < 10000) return; // skip tiny liquidations < $10k
-        const event = {
-          id: `liq-${order.T}-${order.s}`,
-          symbol,
-          side,
-          qty,
-          price,
-          usdValue,
-          timestamp: new Date(Number(order.T || Date.now())).toISOString(),
-        };
-        state.liquidations = [event, ...state.liquidations].slice(0, 100);
-        broadcast("liquidation", event);
-
-        // Also surface large liquidations (>$50k) in the whale feed for immediate UI visibility
-        if (usdValue >= 50000) {
-          const fmtUsd = usdValue >= 1e6
-            ? `$${(usdValue / 1e6).toFixed(2)}M`
-            : `$${(usdValue / 1e3).toFixed(0)}K`;
-          const whaleItem = {
-            id: event.id,
-            type: "whale",
-            title: `${symbol} ${side.toUpperCase()} liquidated`,
-            body: `${fmtUsd} ${symbol} ${side} position force-closed at $${price.toLocaleString()}`,
-            source: "Binance Liquidations",
-            publishedAt: event.timestamp,
-            sentiment: side === "long" ? "bearish" : "bullish",
-            tickers: [symbol],
-            whaleAmountUsd: usdValue,
-            whaleToken: symbol,
-          };
-          state.whales = [whaleItem, ...state.whales].slice(0, 50);
-          broadcast("whales", state.whales);
-        }
-      } catch {
-        // ignore malformed packets
-      }
-    });
-
-    liquidationSocket.on("close", () => {
-      logger.warn("liquidations.stream.disconnected");
-      liquidationSocket = null;
-      liquidationReconnectTimer = setTimeout(connectLiquidationStream, 5000);
-    });
-
-    liquidationSocket.on("error", () => {
-      liquidationSocket?.terminate();
-      liquidationSocket = null;
-    });
-  } catch {
-    liquidationReconnectTimer = setTimeout(connectLiquidationStream, 10000);
-  }
-}
-
-connectLiquidationStream();
-
-const intervals = [
-  setInterval(() => {
-    void refreshNewsOnly();
-  }, 60000),
-  setInterval(() => {
-    void refreshStatsOnly();
-  }, 30000),
-  setInterval(() => {
-    void refreshVenueQuotesOnly();
-  }, 15000),
-  setInterval(() => {
-    broadcast("heartbeat", { ok: true, ts: Date.now() });
-  }, 10000),
-];
 
 server.listen(config.apiPort, config.apiHost, () => {
   logger.info("backend.ready", {
@@ -912,9 +746,12 @@ server.listen(config.apiPort, config.apiHost, () => {
 });
 
 process.on("SIGINT", () => {
-  stopBinanceStream();
-  if (liquidationSocket) liquidationSocket.terminate();
-  if (liquidationReconnectTimer) clearTimeout(liquidationReconnectTimer);
-  intervals.forEach(clearInterval);
+  unsubscribeStream();
+  terminalData.stop();
   server.close(() => process.exit(0));
 });
+
+
+
+
+

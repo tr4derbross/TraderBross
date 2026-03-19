@@ -78,8 +78,119 @@ export type BackendSnapshot = {
   liquidations: LiquidationEvent[];
   news: NewsItem[];
   whales: NewsItem[];
+  whaleEvents?: Array<{
+    id: string;
+    chain: string;
+    txHash: string | null;
+    token: string;
+    amount: number;
+    usdValue: number;
+    fromLabel: string;
+    toLabel: string;
+    eventType:
+      | "large_transfer"
+      | "exchange_inflow"
+      | "exchange_outflow"
+      | "stablecoin_mint"
+      | "stablecoin_burn"
+      | "treasury_movement"
+      | "smart_money_watch"
+      | "liquidation";
+    timestamp: string;
+    confidence: number;
+    significance: number;
+    relatedAssets: string[];
+    watchlistRelevance?: number;
+    relevanceLabels?: string[];
+    priorityLabel?: string;
+  }>;
   social: NewsItem[];
-  connectionState: "connecting" | "connected" | "disconnected";
+  newsSnapshot?: {
+    generatedAt: string;
+    count: number;
+    items: Array<{
+      kind?: "news";
+      id: string;
+      source: string;
+      title: string;
+      summary: string;
+      url: string;
+      publishedAt: string;
+      tickers: string[];
+      relatedAssets?: string[];
+      tags: string[];
+      priority: {
+        score: number;
+        label: "low" | "medium" | "high";
+        components: {
+          source: number;
+          recency: number;
+          keyword: number;
+          watchlist: number;
+        };
+      };
+      sentiment: "bullish" | "bearish" | "neutral";
+      watchlistRelevance?: number;
+      relevanceLabels?: string[];
+      priorityLabel?: string;
+      eventType:
+        | "breaking"
+        | "regulation"
+        | "exchange"
+        | "listing"
+        | "exploit"
+        | "macro"
+        | "stablecoin"
+        | "onchain"
+        | "watchlist"
+        | "noise";
+    }>;
+    clusters: Array<{
+      clusterId: string;
+      headline: string;
+      size: number;
+      sources: string[];
+      itemIds: string[];
+    }>;
+    status: "ok" | "empty";
+    errors: string[];
+  };
+  coinMetadata?: Record<string, {
+    symbol: string;
+    id: string;
+    name: string;
+    image: string;
+    marketCapRank: number | null;
+    circulatingSupply: number | null;
+    totalSupply: number | null;
+    maxSupply: number | null;
+    lastUpdated: string;
+    provider: string;
+  }>;
+  discovery?: Array<{
+    baseSymbol: string;
+    quoteSymbol: string;
+    pairAddress: string;
+    dexId: string;
+    chainId: string;
+    liquidityUsd: number;
+    volume24hUsd: number;
+    priceUsd: number;
+    url: string;
+    provider: string;
+    timestamp: string;
+  }>;
+  providerState?: Record<string, string>;
+  providerHealth?: Record<string, {
+    status: string;
+    providerCalls: number;
+    cacheHits: number;
+    staleServed: number;
+    lastSuccessAt: string | null;
+    lastErrorAt: string | null;
+    lastError: string | null;
+  }>;
+  connectionState: "connecting" | "connected" | "degraded" | "disconnected";
 };
 
 export type RealtimeEnvelope =
@@ -94,6 +205,23 @@ export type RealtimeEnvelope =
   | { type: "forex"; payload: ForexData; timestamp: string }
   | { type: "liquidation"; payload: LiquidationEvent; timestamp: string }
   | { type: "news"; payload: NewsItem; timestamp: string }
+  | { type: "newsRanked"; payload: {
+      id: string;
+      source: string;
+      title: string;
+      summary: string;
+      url: string;
+      publishedAt: string;
+      tickers: string[];
+      tags: string[];
+      priority: {
+        score: number;
+        label: "low" | "medium" | "high";
+      };
+      sentiment: "bullish" | "bearish" | "neutral";
+      eventType: string;
+    }; timestamp: string }
   | { type: "social"; payload: NewsItem[]; timestamp: string }
   | { type: "whales"; payload: NewsItem[]; timestamp: string }
+  | { type: "whaleEvents"; payload: NonNullable<BackendSnapshot["whaleEvents"]>; timestamp: string }
   | { type: "heartbeat"; payload: { ok: boolean; ts: number }; timestamp: string };

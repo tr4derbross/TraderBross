@@ -12,6 +12,8 @@ function fmtMarketCap(usd: number | null): string {
 
 export default function MarketStatsBar() {
   const connectionStatus = useRealtimeSelector((state) => state.connectionStatus);
+  const providerHealth = useRealtimeSelector((state) => state.providerHealth ?? {});
+  const isDev = process.env.NODE_ENV === "development";
   const market = useRealtimeSelector((state) => state.marketStats) ?? {
     marketCapUsd: null,
     btcDominance: null,
@@ -117,31 +119,43 @@ export default function MarketStatsBar() {
   ];
 
   return (
-    <div className="flex items-center gap-0 overflow-x-auto border-b border-white/[0.04] bg-[rgba(8,10,16,0.85)] px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {stats.map((stat, i) => (
-        <div
-          key={i}
-          className="flex shrink-0 items-center gap-1.5 border-r border-white/[0.05] px-3 py-1 last:border-r-0"
-        >
-          <span className="text-[9px] font-bold tracking-[0.18em] text-zinc-600 uppercase">
-            {stat.label}
-          </span>
-          <span
-            className={`flex items-center gap-0.5 text-[10px] tabular-nums ${
-              stat.highlight === "up"
-                ? "text-emerald-400"
-                : stat.highlight === "down"
-                  ? "text-red-400"
-                  : stat.warn
-                    ? "text-amber-600"
-                    : "text-zinc-400"
-            }`}
+    <div className="border-b border-white/[0.04] bg-[rgba(8,10,16,0.85)]">
+      <div className="flex items-center gap-0 overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {stats.map((stat, i) => (
+          <div
+            key={i}
+            className="flex shrink-0 items-center gap-1.5 border-r border-white/[0.05] px-3 py-1 last:border-r-0"
           >
-            {stat.warn && <AlertTriangle className="h-2.5 w-2.5" />}
-            {stat.value}
-          </span>
+            <span className="text-[9px] font-bold tracking-[0.18em] text-zinc-600 uppercase">
+              {stat.label}
+            </span>
+            <span
+              className={`flex items-center gap-0.5 text-[10px] tabular-nums ${
+                stat.highlight === "up"
+                  ? "text-emerald-400"
+                  : stat.highlight === "down"
+                    ? "text-red-400"
+                    : stat.warn
+                      ? "text-amber-600"
+                      : "text-zinc-400"
+              }`}
+            >
+              {stat.warn && <AlertTriangle className="h-2.5 w-2.5" />}
+              {stat.value}
+            </span>
+          </div>
+        ))}
+      </div>
+      {isDev && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.05] px-2 py-1 text-[9px] text-zinc-500">
+          {Object.entries(providerHealth).map(([provider, health]) => (
+            <span key={provider} className="inline-flex items-center gap-1 rounded border border-white/10 px-1.5 py-0.5">
+              <span className="uppercase tracking-[0.1em] text-zinc-600">{provider}</span>
+              <span className="text-zinc-400">{String((health as { status?: string }).status || "unknown")}</span>
+            </span>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }

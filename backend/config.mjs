@@ -23,6 +23,14 @@ function parseOrigins(value) {
     .map(trimSlash);
 }
 
+function toBoolean(value, fallback = true) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "on", "enabled"].includes(normalized)) return true;
+  if (["0", "false", "no", "off", "disabled"].includes(normalized)) return false;
+  return fallback;
+}
+
 export function loadConfig() {
   return {
     apiHost: process.env.API_HOST || DEFAULT_API_HOST,
@@ -46,5 +54,32 @@ export function loadConfig() {
       .filter(Boolean),
     nitterBaseUrl: process.env.NITTER_BASE_URL || "",
     coinMarketCalApiKey: process.env.COINMARKETCAL_API_KEY || "",
+    watchlistTickers: (process.env.WATCHLIST_TICKERS || "BTC,ETH,SOL,BNB,XRP")
+      .split(",")
+      .map((entry) => entry.trim().toUpperCase())
+      .filter(Boolean),
+    featureFlags: {
+      enableCoinGeckoMarket: toBoolean(process.env.FEATURE_COINGECKO_MARKET, true),
+      enableCoinGeckoMetadata: toBoolean(process.env.FEATURE_COINGECKO_METADATA, true),
+      enableDexScreener: toBoolean(process.env.FEATURE_DEXSCREENER_DISCOVERY, true),
+      enableNewsRss: toBoolean(process.env.FEATURE_NEWS_RSS, true),
+      enableNewsJson: toBoolean(process.env.FEATURE_NEWS_JSON, true),
+      enableWhaleApi: toBoolean(process.env.FEATURE_WHALE_ALERT, true),
+      enableWhaleEngine: toBoolean(process.env.FEATURE_WHALE_ENGINE, true),
+      enableHyperliquidWs: toBoolean(process.env.FEATURE_HYPERLIQUID_WS, true),
+      enableBinanceFunding: toBoolean(process.env.FEATURE_BINANCE_FUNDING, true),
+      enableCoincap: toBoolean(process.env.FEATURE_COINCAP, true),
+    },
+    dataTtl: {
+      marketSnapshotMs: toNumber(process.env.TTL_MARKET_SNAPSHOT_MS, 20_000),
+      coinMetadataMs: toNumber(process.env.TTL_COIN_METADATA_MS, 6 * 60 * 60 * 1000),
+      newsFeedMs: toNumber(process.env.TTL_NEWS_FEED_MS, 60_000),
+      whaleScanMs: toNumber(process.env.TTL_WHALE_SCAN_MS, 75_000),
+      discoveryMs: toNumber(process.env.TTL_DISCOVERY_MS, 45_000),
+      fundingMs: toNumber(process.env.TTL_FUNDING_MS, 20_000),
+      leverageBracketsMs: toNumber(process.env.TTL_LEVERAGE_BRACKETS_MS, 6 * 60 * 60 * 1000),
+      lsrMs: toNumber(process.env.TTL_LSR_MS, 30_000),
+      coincapMs: toNumber(process.env.TTL_COINCAP_MS, 60_000),
+    },
   };
 }
