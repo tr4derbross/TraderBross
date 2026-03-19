@@ -25,6 +25,13 @@ export type NewsItem = {
   whaleTo?: string;          // Destination address or exchange label
   whaleTxHash?: string;      // Transaction hash
   whaleBlockchain?: string;  // e.g. "ethereum", "bitcoin"
+  whaleEventType?: string;
+  whaleConfidence?: number;
+  whaleSignificance?: number;
+  relatedAssets?: string[];
+  watchlistRelevance?: number;
+  relevanceLabels?: string[];
+  priorityLabel?: string;
 };
 
 export type PriceData = {

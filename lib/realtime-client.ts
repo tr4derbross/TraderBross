@@ -6,13 +6,21 @@ import { apiFetch } from "@/lib/api-client";
 import { runtimeEnv } from "@/lib/runtime-env";
 
 type Listener = () => void;
-type ConnectionState = "idle" | "connecting" | "connected" | "disconnected";
+export type ConnectionStatus = "connecting" | "connected" | "live" | "degraded" | "reconnecting" | "stale" | "disconnected";
 
 type RealtimeStore = BackendSnapshot & {
-  connectionStatus: ConnectionState;
+  connectionStatus: ConnectionStatus;
   lastUpdatedAt: number;
+  lastMessageAt: number;
+  lastHeartbeatAt: number;
   forex: ForexData;
 };
+
+const STALE_AFTER_MS = 35_000;
+const STALE_CHECK_MS = 5_000;
+const HEARTBEAT_INTERVAL = 20_000;
+const BASE_DELAY = 1_000;
+const MAX_RECONNECT_DELAY = 30_000;
 
 const fallbackSnapshot: RealtimeStore = {
   quotes: [],
@@ -26,10 +34,17 @@ const fallbackSnapshot: RealtimeStore = {
   liquidations: [] as LiquidationEvent[],
   news: [],
   whales: [],
+  whaleEvents: [],
   social: [],
+  coinMetadata: {},
+  discovery: [],
+  providerState: {},
+  providerHealth: {},
   connectionState: "connecting",
-  connectionStatus: "idle",
+  connectionStatus: "connecting",
   lastUpdatedAt: 0,
+  lastMessageAt: 0,
+  lastHeartbeatAt: 0,
 };
 
 let state = fallbackSnapshot;
@@ -38,89 +53,98 @@ let socket: WebSocket | null = null;
 let started = false;
 let reconnectTimer: number | null = null;
 let heartbeatTimer: number | null = null;
+let staleTimer: number | null = null;
 let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 5;
-const BASE_DELAY = 1000;
-const HEARTBEAT_INTERVAL = 20_000; // ping every 20s to keep connection alive
-const isDev = process.env.NODE_ENV === 'development';
-
-function log(...args: unknown[]) {
-  if (isDev) console.log(...args);
-}
-
-function warn(...args: unknown[]) {
-  if (isDev) console.warn(...args);
-}
-
-function error(...args: unknown[]) {
-  if (isDev) console.error(...args);
-}
-
-function getReconnectDelay(): number {
-  return Math.min(BASE_DELAY * Math.pow(2, reconnectAttempts), 30000);
-}
 
 function emit() {
   listeners.forEach((listener) => listener());
+}
+
+function deriveConnectionStatus(next: Partial<RealtimeStore>): ConnectionStatus {
+  const explicit = next.connectionStatus;
+  if (explicit) return explicit;
+  const backend = next.connectionState ?? state.connectionState;
+  if (backend === "degraded") return "degraded";
+  if (backend === "connected") return "live";
+  if (backend === "disconnected") return "disconnected";
+  return state.connectionStatus === "reconnecting" ? "reconnecting" : "connecting";
 }
 
 function setState(next: Partial<RealtimeStore>) {
   state = {
     ...state,
     ...next,
+    connectionStatus: deriveConnectionStatus(next),
     lastUpdatedAt: Date.now(),
   };
   emit();
 }
 
+function markMessage() {
+  const now = Date.now();
+  setState({
+    lastMessageAt: now,
+    lastHeartbeatAt: now,
+  });
+}
+
 function applyEnvelope(envelope: RealtimeEnvelope) {
+  markMessage();
   switch (envelope.type) {
     case "snapshot":
-      setState({ ...envelope.payload, connectionStatus: "connected" });
-      break;
+      setState({
+        ...envelope.payload,
+        connectionStatus: envelope.payload.connectionState === "degraded" ? "degraded" : "live",
+      });
+      return;
     case "quotes":
-      setState({ quotes: envelope.payload, connectionStatus: "connected" });
-      break;
+      setState({ quotes: envelope.payload });
+      return;
     case "venueQuotes":
-      setState({ venueQuotes: envelope.payload, connectionStatus: "connected" });
-      break;
+      setState({ venueQuotes: envelope.payload });
+      return;
     case "marketStats":
       setState({ marketStats: envelope.payload });
-      break;
+      return;
     case "mempoolStats":
       setState({ mempoolStats: envelope.payload });
-      break;
+      return;
     case "fearGreed":
       setState({ fearGreed: envelope.payload });
-      break;
+      return;
     case "news":
-      setState({ news: [envelope.payload, ...(state.news ?? []).filter((item) => item.id !== envelope.payload.id)].slice(0, 60) });
-      break;
+      setState({
+        news: [envelope.payload, ...(state.news ?? []).filter((item) => item.id !== envelope.payload.id)].slice(0, 80),
+      });
+      return;
     case "social":
       setState({ social: envelope.payload });
-      break;
+      return;
     case "whales":
       setState({ whales: envelope.payload });
-      break;
+      return;
+    case "whaleEvents":
+      setState({ whaleEvents: envelope.payload });
+      return;
     case "ethGas":
       setState({ ethGas: envelope.payload });
-      break;
+      return;
     case "defiTvl":
       setState({ defiTvl: envelope.payload });
-      break;
+      return;
     case "forex":
       setState({ forex: envelope.payload });
-      break;
+      return;
     case "liquidation":
       setState({
         liquidations: [envelope.payload, ...(state.liquidations ?? []).filter((l) => l.id !== envelope.payload.id)].slice(0, 100),
       });
-      break;
+      return;
     case "heartbeat":
-      setState({ connectionStatus: "connected" });
-      break;
+      setState({ lastHeartbeatAt: Date.now() });
+      return;
     default:
-      break;
+      return;
   }
 }
 
@@ -130,32 +154,27 @@ async function loadBootstrap() {
     setState({
       ...snapshot,
       connectionStatus: "connecting",
+      lastMessageAt: Date.now(),
     });
   } catch {
-    setState({ connectionStatus: "disconnected" });
+    setState({
+      connectionStatus: state.news.length > 0 || state.quotes.length > 0 ? "stale" : "disconnected",
+    });
   }
 }
 
+function reconnectDelay() {
+  const delay = Math.min(BASE_DELAY * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY);
+  reconnectAttempts += 1;
+  return delay;
+}
+
 function scheduleReconnect() {
-  if (reconnectTimer) {
-    window.clearTimeout(reconnectTimer);
-  }
-
-  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-    // After 5 failures, wait 30s then reset counter
-    const delay = 30000;
-    warn("[Realtime] Max reconnect attempts reached. Waiting 30s before retry...");
-    reconnectTimer = window.setTimeout(() => {
-      reconnectAttempts = 0;
-      reconnectTimer = null;
-      connect();
-    }, delay);
-    return;
-  }
-
-  const delay = getReconnectDelay();
-  reconnectAttempts++;
-  warn(`[Realtime] Scheduling reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms`);
+  if (reconnectTimer) window.clearTimeout(reconnectTimer);
+  const delay = reconnectDelay();
+  setState({
+    connectionStatus: state.news.length > 0 || state.quotes.length > 0 ? "reconnecting" : "connecting",
+  });
   reconnectTimer = window.setTimeout(() => {
     reconnectTimer = null;
     connect();
@@ -163,67 +182,68 @@ function scheduleReconnect() {
 }
 
 function connect() {
-  if (socket || typeof window === "undefined") {
-    return;
-  }
-
-  setState({ connectionStatus: "connecting" });
-  log("[Realtime] connecting to", runtimeEnv.wsUrl);
+  if (socket || typeof window === "undefined") return;
+  if (state.connectionStatus !== "reconnecting") setState({ connectionStatus: "connecting" });
   socket = new WebSocket(runtimeEnv.wsUrl);
 
   socket.onopen = () => {
-    log("[Realtime] connected");
     reconnectAttempts = 0;
-    setState({ connectionStatus: "connected" });
-    // Start heartbeat ping every 20s
+    setState({ connectionStatus: state.connectionState === "degraded" ? "degraded" : "live" });
     if (heartbeatTimer) window.clearInterval(heartbeatTimer);
     heartbeatTimer = window.setInterval(() => {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        try {
-          socket.send(JSON.stringify({ type: "ping", ts: Date.now() }));
-        } catch {
-          // ignore send errors — close will trigger reconnect
-        }
+      if (!socket || socket.readyState !== WebSocket.OPEN) return;
+      try {
+        socket.send(JSON.stringify({ type: "ping", ts: Date.now() }));
+      } catch {
+        // no-op
       }
     }, HEARTBEAT_INTERVAL);
   };
 
   socket.onmessage = (event) => {
     try {
-      const envelope = JSON.parse(event.data) as RealtimeEnvelope;
-      applyEnvelope(envelope);
+      applyEnvelope(JSON.parse(event.data) as RealtimeEnvelope);
     } catch {
-      // ignore malformed packets
+      // ignore malformed packet
     }
   };
 
-  socket.onclose = (event) => {
-    warn("[Realtime] disconnected", event.code, event.reason);
+  socket.onclose = () => {
     socket = null;
-    // Stop heartbeat on disconnect
     if (heartbeatTimer) {
       window.clearInterval(heartbeatTimer);
       heartbeatTimer = null;
     }
-    setState({ connectionStatus: "disconnected" });
+    if (state.news.length > 0 || state.quotes.length > 0) {
+      setState({ connectionStatus: "stale" });
+    } else {
+      setState({ connectionStatus: "disconnected" });
+    }
     scheduleReconnect();
   };
 
   socket.onerror = () => {
-    // WebSocket error events intentionally carry no detail (browser security).
-    // onclose fires automatically after onerror — reconnect is handled there.
-    warn("[Realtime] WebSocket connection error — will reconnect");
+    // handled by onclose
   };
 }
 
-function ensureStarted() {
-  if (started || typeof window === "undefined") {
-    return;
-  }
+function startStaleCheck() {
+  if (staleTimer || typeof window === "undefined") return;
+  staleTimer = window.setInterval(() => {
+    const now = Date.now();
+    const age = now - (state.lastMessageAt || 0);
+    if (age > STALE_AFTER_MS && (state.connectionStatus === "live" || state.connectionStatus === "degraded")) {
+      setState({ connectionStatus: "stale" });
+    }
+  }, STALE_CHECK_MS);
+}
 
+function ensureStarted() {
+  if (started || typeof window === "undefined") return;
   started = true;
   void loadBootstrap();
   connect();
+  startStaleCheck();
 }
 
 export function refreshRealtimeSnapshot() {
@@ -239,12 +259,7 @@ export function reconnectRealtime() {
     window.clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
-  if (heartbeatTimer) {
-    window.clearInterval(heartbeatTimer);
-    heartbeatTimer = null;
-  }
   reconnectAttempts = 0;
-  log("[Realtime] manual reconnect triggered");
   connect();
 }
 

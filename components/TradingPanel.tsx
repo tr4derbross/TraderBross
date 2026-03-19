@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AVAILABLE_TICKERS, type NewsItem } from "@/lib/mock-data";
 import type { ActiveVenueState } from "@/lib/active-venue";
-import { buildApiUrl } from "@/lib/runtime-env";
+import { apiFetch } from "@/lib/api-client";
 import type { NewsTradePreset } from "@/lib/news-trade";
 import {
   type MarginMode,
@@ -130,9 +130,8 @@ export default function TradingPanel({
   useEffect(() => {
     if (leverageFetchedRef.current) return;
     leverageFetchedRef.current = true;
-    fetch(buildApiUrl("/api/leverage-brackets"), { signal: AbortSignal.timeout(6000) })
-      .then((r) => r.json())
-      .then((data: Record<string, number>) => setLeverageBrackets(data))
+    apiFetch<Record<string, number>>("/api/leverage-brackets")
+      .then((data) => setLeverageBrackets(data))
       .catch(() => {});
   }, []);
 
