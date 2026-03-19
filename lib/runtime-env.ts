@@ -42,5 +42,10 @@ export function buildApiUrl(path: string): string {
   if (/^https?:\/\//.test(path)) return path;
 
   const normalized = path.startsWith("/") ? path : `/${path}`;
+  // In browser, always use same-origin API proxy routes.
+  // This avoids CORS and broken production env mismatches.
+  if (typeof window !== "undefined") {
+    return normalized;
+  }
   return `${runtimeEnv.apiBaseUrl}${normalized}`;
 }
