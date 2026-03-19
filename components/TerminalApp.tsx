@@ -1455,7 +1455,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
   return (
     <div className="flex flex-col overflow-hidden bg-black" style={{ height: "100dvh" }}>
-      <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-2 py-1 sm:px-4 sm:py-1.5 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
+      <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-2 py-0.5 sm:px-4 sm:py-1.5 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
         {/* Left: Fear & Greed + page nav */}
         <div className="absolute left-3 top-1/2 z-10 -translate-y-1/2 sm:left-4 flex items-center gap-2">
           <div className="hidden sm:block"><FearGreedPill /></div>
@@ -1478,25 +1478,15 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         </div>
 
         {/* Center brand */}
-        <div className="relative z-10 flex items-center justify-center px-2">
-          <div className="relative">
-            <BrandMark className="mx-auto scale-75 sm:scale-100" />
-            {/* Live data indicator */}
-            {wsConnected && (
-              <span
-                className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full px-2 py-[2px]"
-                style={{
-                  background: "rgba(16,185,129,0.08)",
-                  border: "1px solid rgba(16,185,129,0.2)",
-                }}
-              >
-                <span className="h-1 w-1 rounded-full status-dot-online live-dot" />
-                <span className="text-[8px] font-bold tracking-[0.18em] text-emerald-500 uppercase hidden sm:inline">
-                  Live
-                </span>
-              </span>
-            )}
-          </div>
+        <div className="relative z-10 flex items-center justify-center gap-1.5 px-2">
+          <BrandMark className="scale-[0.68] sm:scale-100" />
+          {/* Live dot — inline next to logo, no text */}
+          {wsConnected && (
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full status-dot-online live-dot"
+              title="Live feed connected"
+            />
+          )}
         </div>
 
         {/* Right: wallet connect */}
