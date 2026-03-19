@@ -112,10 +112,10 @@ export default function NewsFeed({
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Panel header */}
-      <div className="panel-header soft-divider flex items-center justify-between border-b px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <Activity className="h-3.5 w-3.5 text-amber-200" />
-          <span className="brand-section-title text-xs font-bold tracking-wider uppercase">
+      <div className="panel-header soft-divider flex items-center justify-between border-b px-2 py-1.5 sm:px-3 sm:py-2.5">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <Activity className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-200" />
+          <span className="brand-section-title text-[10px] sm:text-xs font-bold tracking-wider uppercase">
             {sourceLabel[sourceFilter]}
           </span>
           {/* Pulsing dot for whale/liquidation tabs */}
@@ -152,7 +152,7 @@ export default function NewsFeed({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2.5 text-[10px] text-zinc-500">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 text-[10px] text-zinc-500">
           {liveCount > 0 && !isSpecialFeed && (
             <span className="inline-flex items-center gap-1 text-amber-200">
               <Radio className="h-2.5 w-2.5 animate-pulse" />
@@ -163,14 +163,14 @@ export default function NewsFeed({
             <button
               type="button"
               onClick={refreshNews}
-              className="brand-badge inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] transition hover:border-[rgba(212,161,31,0.24)] hover:text-amber-100"
+              className="brand-badge inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] sm:px-2 sm:text-[10px] transition hover:border-[rgba(212,161,31,0.24)] hover:text-amber-100"
               title="Refresh feed"
             >
-              <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} />
-              Refresh
+              <RefreshCw className={`w-2.5 h-2.5 sm:w-3 sm:h-3 ${loading ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">Refresh</span>
             </button>
           )}
-          {!isSpecialFeed && <span>{news.length} items</span>}
+          {!isSpecialFeed && <span className="hidden sm:inline">{news.length} items</span>}
         </div>
       </div>
 

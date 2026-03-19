@@ -1439,7 +1439,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-2 py-1 sm:px-4 sm:py-1.5 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
         {/* Left: Fear & Greed + page nav */}
         <div className="absolute left-3 top-1/2 z-10 -translate-y-1/2 sm:left-4 flex items-center gap-2">
-          <FearGreedPill />
+          <div className="hidden sm:block"><FearGreedPill /></div>
           <div className="hidden items-center gap-0.5 sm:flex">
             {([
               { label: "Home",     href: "/"          },
@@ -1513,19 +1513,19 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
               className="terminal-chip shimmer-on-hover inline-flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)] sm:gap-2 sm:px-3 sm:py-2 sm:text-[10px]"
             >
               <span className="hidden md:inline text-zinc-500">{selectedHeaderPlatform.eyebrow}</span>
-              <span className="text-[#f3ead7]">{selectedHeaderPlatform.label}</span>
+              <span className="hidden sm:inline text-[#f3ead7]">{selectedHeaderPlatform.label}</span>
+              <span className="sm:hidden text-[#f3ead7]">
+                {selectedHeaderPlatform.id === "hyperliquid" ? "HL"
+                  : selectedHeaderPlatform.id === "dydx" ? "dYdX"
+                  : selectedHeaderPlatform.label.slice(0, 3).toUpperCase()}
+              </span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* ── Market Info Bar (compact on mobile, full on desktop) ── */}
-      {isMobile ? (
-        <div className="shrink-0 px-2 pt-1">
-          <div className="overflow-hidden rounded-lg border" style={{ borderColor: "rgba(42,42,42,0.5)", background: "rgba(11,11,11,0.99)" }}>
-          </div>
-        </div>
-      ) : (
+      {/* ── Market Info Bar (desktop only) ── */}
+      {!isMobile && (
         <div className="px-2 pt-1.5">
           <div className="panel-shell soft-divider overflow-hidden rounded-xl border terminal-glow-pulse">
             <div className="hidden sm:block">
@@ -1538,9 +1538,9 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         </div>
       )}
 
-      <div className={`flex min-h-0 flex-1 flex-col overflow-hidden pt-1.5 ${isMobile ? "px-0 pb-0" : "px-2 pb-2"}`}>
+      <div className={`flex min-h-0 flex-1 flex-col overflow-hidden ${isMobile ? "pt-0 px-0 pb-0" : "pt-1.5 px-2 pb-2"}`}>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+        <div className={`flex min-h-0 flex-1 flex-col overflow-hidden ${isMobile ? "gap-0" : "gap-2"}`}>
           {showDesktopLayout ? (
             <div className="flex min-h-0 flex-1 overflow-hidden">
               <div className="shrink-0" style={{ width: newsWidth }}>
@@ -1569,22 +1569,66 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
               </div>
             </>
           ) : (
-            /* Mobile: Chart top, Trade + News side by side below */
+            /* Mobile: Full-screen tab layout + bottom navigation bar */
             <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
-              {/* Chart — top, fixed height */}
-              <div className="shrink-0 overflow-hidden" style={{ height: 230 }}>
-                {renderChartPanel()}
+              {/* Tab content — each panel fills full available space */}
+              <div className="min-h-0 flex-1 overflow-hidden">
+                {mobileWorkspaceTab === "chart" && renderChartPanel()}
+                {mobileWorkspaceTab === "news"  && renderNewsPanel()}
+                {mobileWorkspaceTab === "tools" && renderRightPanel()}
               </div>
-              {/* Trade + News — side by side, fill remaining space */}
-              <div className="flex min-h-0 flex-1 overflow-hidden mt-px gap-px">
-                {/* News — left, ~55% */}
-                <div className="min-h-0 overflow-hidden" style={{ flex: "0 0 55%" }}>
-                  {renderNewsPanel()}
-                </div>
-                {/* Trade — right, ~45% */}
-                <div className="min-h-0 overflow-hidden" style={{ flex: "0 0 calc(45% - 1px)" }}>
-                  {renderRightPanel()}
-                </div>
+
+              {/* Bottom navigation bar */}
+              <div
+                className="shrink-0 flex items-stretch border-t"
+                style={{
+                  borderColor: "rgba(212,161,31,0.13)",
+                  background: "linear-gradient(180deg, rgba(12,10,8,0.98), rgba(6,5,4,0.99))",
+                  paddingBottom: "env(safe-area-inset-bottom)",
+                  minHeight: 50,
+                }}
+              >
+                {([
+                  { id: "chart" as const, label: "Chart", Icon: CandlestickChart },
+                  { id: "news"  as const, label: "News",  Icon: Newspaper        },
+                  { id: "tools" as const, label: "Trade", Icon: TrendingUp       },
+                ] as const).map(({ id, label, Icon }) => {
+                  const isActive = mobileWorkspaceTab === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setMobileWorkspaceTab(id)}
+                      className="relative flex-1 flex flex-col items-center justify-center gap-[3px] transition-colors"
+                      style={{ color: isActive ? "#f1d48f" : "#4a4a4a" }}
+                    >
+                      {/* Active indicator line at top */}
+                      {isActive && (
+                        <span
+                          className="absolute top-0 left-1/2 -translate-x-1/2 rounded-b-full"
+                          style={{ width: 28, height: 2, background: "rgba(240,185,11,0.9)" }}
+                        />
+                      )}
+                      <Icon
+                        style={{
+                          width: 16,
+                          height: 16,
+                          strokeWidth: isActive ? 2.5 : 1.5,
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          letterSpacing: "0.1em",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
