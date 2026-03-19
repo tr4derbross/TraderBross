@@ -86,37 +86,73 @@ export default function TerminalMvpApp({ initialTicker }: { initialTicker?: stri
   const watchlist = WATCHLIST_DEFAULT;
 
   const events = useMemo<UnifiedEvent[]>(() => {
-    const newsRows = (snapshot.newsSnapshot?.items || []).map((item) => ({
-      id: item.id,
-      kind: "news" as const,
-      title: item.title,
-      summary: item.summary,
-      source: item.source,
-      timestamp: item.publishedAt,
-      relatedAssets: item.relatedAssets || item.tickers || [],
-      watchlistRelevance: item.watchlistRelevance || 0,
-      priorityScore: item.priority?.score || 0,
-      priorityLabel: item.priorityLabel,
-      labels: (item.relevanceLabels || []).map(mapRelevanceLabel),
-      url: item.url,
-      eventType: item.eventType,
-    }));
-    const whaleRows = (snapshot.whaleEvents || []).map((item) => ({
-      id: item.id,
-      kind: "whale" as const,
-      title: `${item.token} ${item.eventType.replace(/_/g, " ")}`,
-      summary: `${item.fromLabel} -> ${item.toLabel} (${fmtUsd(item.usdValue)})`,
-      source: item.chain,
-      timestamp: item.timestamp,
-      relatedAssets: item.relatedAssets || [item.token],
-      watchlistRelevance: item.watchlistRelevance || 0,
-      priorityScore: item.significance || 0,
-      priorityLabel: item.priorityLabel,
-      labels: (item.relevanceLabels || []).map(mapRelevanceLabel),
-      eventType: item.eventType,
-      chain: item.chain,
-      usdValue: item.usdValue,
-    }));
+    const hasRankedNews = Array.isArray(snapshot.newsSnapshot?.items) && snapshot.newsSnapshot.items.length > 0;
+    const newsRows = hasRankedNews
+      ? (snapshot.newsSnapshot?.items || []).map((item) => ({
+          id: item.id,
+          kind: "news" as const,
+          title: item.title,
+          summary: item.summary,
+          source: item.source,
+          timestamp: item.publishedAt,
+          relatedAssets: item.relatedAssets || item.tickers || [],
+          watchlistRelevance: item.watchlistRelevance || 0,
+          priorityScore: item.priority?.score || 0,
+          priorityLabel: item.priorityLabel,
+          labels: (item.relevanceLabels || []).map(mapRelevanceLabel),
+          url: item.url,
+          eventType: item.eventType,
+        }))
+      : (snapshot.news || []).map((item) => ({
+          id: item.id,
+          kind: "news" as const,
+          title: item.headline,
+          summary: item.summary,
+          source: item.source,
+          timestamp: new Date(item.timestamp).toISOString(),
+          relatedAssets: item.relatedAssets || item.ticker || [],
+          watchlistRelevance: item.watchlistRelevance || 0,
+          priorityScore:
+            item.importance === "breaking" ? 85 : item.importance === "market-moving" ? 60 : item.importance === "watch" ? 35 : 15,
+          priorityLabel: item.priorityLabel,
+          labels: (item.relevanceLabels || []).map(mapRelevanceLabel),
+          url: item.url,
+          eventType: "watchlist",
+        }));
+    const hasStructuredWhales = Array.isArray(snapshot.whaleEvents) && snapshot.whaleEvents.length > 0;
+    const whaleRows = hasStructuredWhales
+      ? (snapshot.whaleEvents || []).map((item) => ({
+          id: item.id,
+          kind: "whale" as const,
+          title: `${item.token} ${item.eventType.replace(/_/g, " ")}`,
+          summary: `${item.fromLabel} -> ${item.toLabel} (${fmtUsd(item.usdValue)})`,
+          source: item.chain,
+          timestamp: item.timestamp,
+          relatedAssets: item.relatedAssets || [item.token],
+          watchlistRelevance: item.watchlistRelevance || 0,
+          priorityScore: item.significance || 0,
+          priorityLabel: item.priorityLabel,
+          labels: (item.relevanceLabels || []).map(mapRelevanceLabel),
+          eventType: item.eventType,
+          chain: item.chain,
+          usdValue: item.usdValue,
+        }))
+      : (snapshot.whales || []).map((item) => ({
+          id: item.id,
+          kind: "whale" as const,
+          title: item.headline,
+          summary: item.summary,
+          source: item.whaleBlockchain || item.source || "onchain",
+          timestamp: new Date(item.timestamp).toISOString(),
+          relatedAssets: item.relatedAssets || item.ticker || [],
+          watchlistRelevance: item.watchlistRelevance || 0,
+          priorityScore: item.whaleSignificance || 50,
+          priorityLabel: item.priorityLabel,
+          labels: (item.relevanceLabels || []).map(mapRelevanceLabel),
+          eventType: item.whaleEventType || "large_transfer",
+          chain: item.whaleBlockchain,
+          usdValue: item.whaleAmountUsd,
+        }));
     const merged = [...newsRows, ...whaleRows];
     return merged.filter((row) => {
       if (feedMode === "all") return true;
