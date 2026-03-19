@@ -113,7 +113,8 @@ export default function FilterBar({
         {(sourceFilter === "all" || sourceFilter === "news" || sourceFilter === "social") && (
           <>
             <select
-              className="terminal-input shrink-0 cursor-pointer rounded px-1 py-px text-[8px] text-zinc-100 outline-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
+              className="terminal-input shrink-0 cursor-pointer rounded px-1 py-px text-[7px] text-zinc-400 outline-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
+              style={{ maxWidth: 44, fontSize: 7 }}
               value={sector}
               onChange={(e) => onSector(e.target.value)}
             >
