@@ -133,7 +133,7 @@ export default function PriceChart({
   const ticker = activeSymbol;
 
   const [isMobile, setIsMobile] = useState(false);
-  const [timeframe, setTimeframe] = useState<Timeframe>("1D");
+  const [timeframe, setTimeframe] = useState<Timeframe>("5m");
   const [chartType, setChartType] = useState<ChartType>("candles");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fundingRates, setFundingRates] = useState<FundingVenue[]>([]);
