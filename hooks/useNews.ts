@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MOCK_NEWS, NewsItem } from "@/lib/mock-data";
+import { apiFetch } from "@/lib/api-client";
 import { refreshRealtimeSnapshot, useRealtimeSelector } from "@/lib/realtime-client";
 
 export type SourceFilter = "all" | "news" | "social" | "whale" | "liquidation";
@@ -119,7 +120,7 @@ export function useNews({
   const [apiLoading,    setApiLoading]    = useState(false);
   const fetchingRef = useRef(false);
 
-  const wsHasNews   = wsNewsItems.length > 0;
+  const wsHasNews = wsNewsItems.length > 0;
   const wsHasWhales = wsWhaleItems.length > 0;
 
   const fetchFromAPI = useCallback(async () => {
@@ -128,19 +129,19 @@ export function useNews({
     setApiLoading(true);
     try {
       const [newsRes, whalesRes] = await Promise.allSettled([
-        fetch("/api/news?tab=all&limit=40"),
-        fetch("/api/whales?limit=20"),
+        apiFetch<Record<string, unknown>[]>("/api/news?tab=all&limit=40"),
+        apiFetch<Record<string, unknown>[]>("/api/whales?limit=20"),
       ]);
 
-      if (newsRes.status === "fulfilled" && newsRes.value.ok) {
-        const data = (await newsRes.value.json()) as Record<string, unknown>[];
+      if (newsRes.status === "fulfilled") {
+        const data = newsRes.value;
         if (Array.isArray(data) && data.length > 0) {
           setApiNewsItems(data.map(mapApiNewsItem));
         }
       }
 
-      if (whalesRes.status === "fulfilled" && whalesRes.value.ok) {
-        const data = (await whalesRes.value.json()) as Record<string, unknown>[];
+      if (whalesRes.status === "fulfilled") {
+        const data = whalesRes.value;
         if (Array.isArray(data) && data.length > 0) {
           setApiWhaleItems(data.map(mapApiWhaleItem));
         }
@@ -153,12 +154,17 @@ export function useNews({
     }
   }, []);
 
-  // Always fetch on mount and poll every 60s
+  // Bootstrap once; when websocket is unavailable keep a slow REST fallback.
   useEffect(() => {
     void fetchFromAPI();
-    const interval = setInterval(() => void fetchFromAPI(), 60_000);
+
+    if (connectionStatus !== "disconnected") {
+      return;
+    }
+
+    const interval = setInterval(() => void fetchFromAPI(), 180_000);
     return () => clearInterval(interval);
-  }, [fetchFromAPI]);
+  }, [connectionStatus, fetchFromAPI]);
 
   // Merge: prefer WS data when available, otherwise use API data
   const newsItems   = wsHasNews   ? wsNewsItems   : apiNewsItems.filter(i => i.type !== "whale" && i.type !== "social");

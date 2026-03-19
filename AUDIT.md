@@ -1,46 +1,49 @@
-# TraderBross News System v2.0 — Audit Raporu
+# Production Risk Audit Checklist
 
-## Değişen/Oluşturulan Dosyalar
+Date: 2026-03-19
 
-| Dosya | İşlem | Ajan |
-|-------|-------|------|
-| `types/news.ts` | Yeni | Agent 2 |
-| `lib/telegram-scraper.ts` | Yeni | Agent 1 |
-| `lib/rss-parser.ts` | Güncelleme | Agent 2 |
-| `lib/news-sources.ts` | Güncelleme (legacy compat) | Agent 2 |
-| `lib/news-aggregator.ts` | Yeni | Agent 2 |
-| `lib/binance-liquidation-ws.ts` | Yeni | Agent 3 |
-| `lib/time.ts` | Yeni | Agent 3 |
-| `lib/format.ts` | Yeni | Agent 3 |
-| `app/api/whales/route.ts` | Yeni | Agent 1 |
-| `app/api/news/route.ts` | Güncelleme | Agent 2 |
-| `app/api/liquidations/route.ts` | Yeni | Agent 3 |
+## Aşama 1: Envanter ve bağımlılık audit
 
-## API Key Durumu
+- [x] `components/`, `hooks/`, `lib/`, `app/` içinde kalan `fetch("/api...")` çağrıları frontend tarafında temizlendi.
+- [x] `@/app/api/*` type bağımlılıkları kaldırıldı.
+- [x] Aktif akışta olan polling noktaları sınıflandırıldı (realtime kritik akışlar WS’ye taşındı, düşük kritik alanlar düşük frekans REST olarak bırakıldı).
 
-SIFIR API KEY GEREKMIYOR. Tüm kaynaklar acik:
-- cryptocurrency.cv/api — ucretsiz JSON API
-- RSS feed'ler — herkese acik
-- Nitter RSS — herkese acik (rsshub fallback)
-- Telegram public channels — HTML scraping, login gerekmez
-- Binance WS forceOrder — auth gerektirmez
+## Aşama 2: Frontend veri yolu tekilleştirme
 
-## Endpoint Cache Sureleri
+- [x] Frontend çağrıları `lib/api-client.ts` + `lib/runtime-env.ts` üzerinden external backend’e yönlendirildi.
+- [x] `lib/runtime-env.ts` local Next API fallback davranışı kaldırıldı.
+- [x] `useNews`, `WhaleFeed`, `LiquidationFeed`, `news/page` içinde agresif polling azaltıldı; realtime önceliği WS oldu.
+- [x] UI düzeni korunarak yalnız veri akışı güncellendi.
 
-- GET /api/news  → s-maxage=60s
-- GET /api/whales → s-maxage=30s
-- GET /api/liquidations → s-maxage=10s
+## Aşama 3: Next app/api decommission
 
-## Mock Durumu
+- [x] `app/api/*` route dosyaları tamamen kaldırıldı.
+- [x] Type bağımlılıkları `types/` altına taşındı (`calendar`, `screener`, `trending`).
+- [x] Acceptance: `npm run build` çıktısında Next dynamic API route listelenmiyor.
 
-- Whale feed: Telegram scraping calisiyorsa gercek, yoksa mock
-- Liquidations: Binance WS calisiyorsa gercek (buffer), yoksa mock
-- News: cryptocurrency.cv → RSS fallback → MOCK_NEWS
+## Aşama 4: Backend production hardening
 
-## Bilinen Sinirlamalar
+- [x] CORS allowlist `CORS_ORIGINS` ile kısıtlandı ve `DELETE` metodu eklendi.
+- [x] `/health` endpoint dependency/cached-state bilgisi döndürüyor.
+- [x] Structured logging alanları standardize edildi: `request_id`, `route`, `latency_ms`, `upstream_status`, `status_code`.
+- [x] WS heartbeat/reconnect davranışı README’de dokümante edildi.
+- [x] Eksik backend endpointleri eklendi: `/api/calendar`, `/api/screener`, `/api/trending`, `/api/liquidations`, `/api/whales`.
 
-- Binance WS serverless'ta surekli acik kalmaz, buffer yaklasimi kullanildi
-- Nitter zaman zaman rate limit verebilir, rsshub fallback var
-- Telegram HTML yapisi degisirse scraper guncellenebilir
-- cryptocurrency.cv yeni bir servis, uptime garantisi yok, RSS fallback var
-- TypeScript: npx tsc --noEmit = 0 hata
+## Aşama 5: Deploy ve runbook
+
+- [x] README tek kaynak olacak şekilde güncellendi.
+- [x] Vercel env ve Railway/VPS runbook netleştirildi.
+- [x] Process manager örneği (`pm2`) ve başlatma komutu eklendi.
+
+## Test Sonuçları
+
+- [x] Build: `npm run build` başarılı.
+- [x] Deployment acceptance: build output’ta `app/api/*` route yok.
+- [x] Security acceptance: frontend kaynak kodunda local Next `app/api/*` kullanım yolu kaldırıldı.
+- [ ] Realtime failover testi (backend stop/start sırasında canlı UI davranışı) manuel ortamda tekrar doğrulanmalı.
+- [ ] Production domain CORS doğrulaması (Vercel production URL ile) deploy ortamında doğrulanmalı.
+
+## Kalan Riskler (Düşük/Orta)
+
+- [ ] Bazı non-critical ekranlarda düşük frekans polling devam ediyor (örn. screener 120s). Bu bilinçli seçimdir.
+- [ ] Backend port conflict/availability kontrolü deployment orchestration ile garanti edilmeli.

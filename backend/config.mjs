@@ -45,5 +45,6 @@ export function loadConfig() {
       .map((entry) => entry.trim())
       .filter(Boolean),
     nitterBaseUrl: process.env.NITTER_BASE_URL || "",
+    coinMarketCalApiKey: process.env.COINMARKETCAL_API_KEY || "",
   };
 }

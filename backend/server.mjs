@@ -5,6 +5,7 @@ import WebSocket, { WebSocketServer } from "ws";
 import { loadConfig } from "./config.mjs";
 import { createLogger } from "./logger.mjs";
 import { getProviderLabel, streamChat, classifySentiment } from "./services/ai-service.mjs";
+import { getCalendarEvents } from "./services/calendar-service.mjs";
 import { getDydxAccount, getDydxMarkets } from "./services/dydx-service.mjs";
 import { getHyperliquidAccount, getHyperliquidCandles, getHyperliquidMarket } from "./services/hyperliquid-service.mjs";
 import {
@@ -17,7 +18,9 @@ import {
   getOkxQuotes,
 } from "./services/market-service.mjs";
 import { getNews, getNewsFeed, getSocial, getWhales } from "./services/news-service.mjs";
+import { getScreenerData } from "./services/screener-service.mjs";
 import { getFearGreed, getMarketStats, getMempoolStats, getEthGas, getDefiLlamaTvl, getForexRates } from "./services/stats-service.mjs";
+import { getTrendingData } from "./services/trending-service.mjs";
 import { getVenueQuotes } from "./services/venue-service.mjs";
 import { clearSecret, getSecret, storeSecret } from "./services/vault-service.mjs";
 
@@ -65,7 +68,7 @@ function withCors(request, reply) {
   const allowedOrigin = origin && config.frontendOrigins.includes(origin.replace(/\/+$/, "")) ? origin : config.frontendOrigins[0];
   reply.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   reply.setHeader("Access-Control-Allow-Headers", "content-type");
-  reply.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  reply.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
 }
 
 async function readJson(request) {
@@ -192,7 +195,20 @@ const server = http.createServer(async (request, reply) => {
   }
 
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
-  logger.info("backend.request", { method: request.method, path: url.pathname });
+  const requestId = request.headers["x-request-id"] || crypto.randomUUID();
+  const startedAt = Date.now();
+  let upstreamStatus = "ok";
+  reply.setHeader("x-request-id", requestId);
+  reply.once("finish", () => {
+    logger.info("backend.request.completed", {
+      request_id: requestId,
+      route: url.pathname,
+      method: request.method,
+      status_code: reply.statusCode,
+      latency_ms: Date.now() - startedAt,
+      upstream_status: upstreamStatus,
+    });
+  });
 
   try {
     if (request.method === "GET" && url.pathname === "/health") {
@@ -200,6 +216,18 @@ const server = http.createServer(async (request, reply) => {
         status: "ok",
         timestamp: new Date().toISOString(),
         wsClients: clients.size,
+        dependencies: {
+          websocket_server: "ok",
+          binance_quote_stream: state.quotes.length > 0 ? "ok" : "degraded",
+          news_feed: state.news.length > 0 ? "ok" : "degraded",
+          cache_state: {
+            quotes: state.quotes.length,
+            news: state.news.length,
+            whales: state.whales.length,
+            social: state.social.length,
+            liquidations: state.liquidations.length,
+          },
+        },
       });
       return;
     }
@@ -207,6 +235,22 @@ const server = http.createServer(async (request, reply) => {
     if (request.method === "GET" && url.pathname === "/api/bootstrap") {
       await refreshCoreState();
       json(reply, 200, buildSnapshot());
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/calendar") {
+      json(reply, 200, await getCalendarEvents(config));
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/screener") {
+      const sort = url.searchParams.get("sort") || "volume";
+      json(reply, 200, await getScreenerData(sort));
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/trending") {
+      json(reply, 200, await getTrendingData());
       return;
     }
 
@@ -295,7 +339,10 @@ const server = http.createServer(async (request, reply) => {
       return;
     }
 
-    if (request.method === "GET" && url.pathname === "/api/whale") {
+    if (
+      request.method === "GET" &&
+      (url.pathname === "/api/whales" || url.pathname === "/api/whale")
+    ) {
       json(reply, 200, await getWhales(config));
       return;
     }
@@ -317,6 +364,33 @@ const server = http.createServer(async (request, reply) => {
 
     if (request.method === "GET" && url.pathname === "/api/feargreed") {
       json(reply, 200, await getFearGreed());
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/liquidations") {
+      const limit = Math.min(Number(url.searchParams.get("limit") || 20), 100);
+      const liquidations = state.liquidations.slice(0, limit).map((event) => ({
+        id: event.id,
+        symbol: `${event.symbol}USDT`,
+        displaySymbol: event.symbol,
+        side: event.side === "long" ? "LONG" : "SHORT",
+        sizeUSD: event.usdValue,
+        quantity: event.qty,
+        price: event.price,
+        exchange: "Binance",
+        timestamp: event.timestamp,
+      }));
+      const stats = liquidations.reduce(
+        (acc, event) => {
+          acc.totalUSD += event.sizeUSD;
+          if (event.side === "LONG") acc.longUSD += event.sizeUSD;
+          if (event.side === "SHORT") acc.shortUSD += event.sizeUSD;
+          acc.count += 1;
+          return acc;
+        },
+        { totalUSD: 0, longUSD: 0, shortUSD: 0, count: 0 }
+      );
+      json(reply, 200, { liquidations, stats });
       return;
     }
 
@@ -685,6 +759,7 @@ const server = http.createServer(async (request, reply) => {
 
     json(reply, 404, { error: "Not found" });
   } catch (error) {
+    upstreamStatus = "error";
     logger.error("backend.request.failed", { path: url.pathname, error: String(error) });
     json(reply, 500, { error: "Internal server error" });
   }
