@@ -2,6 +2,9 @@
   "name": "trading-terminal",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev",
     "dev:frontend": "next dev",

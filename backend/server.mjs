@@ -27,6 +27,14 @@ const terminalData = createTerminalDataService({ config, logger });
 const endpointCache = new MemoryCache();
 const clients = new Set();
 
+process.on("unhandledRejection", (reason) => {
+  logger.error("backend.unhandled_rejection", { reason: String(reason) });
+});
+
+process.on("uncaughtException", (error) => {
+  logger.error("backend.uncaught_exception", { error: String(error) });
+});
+
 function binanceSignedQuery(secret, params = {}) {
   const qs = new URLSearchParams({ ...params, timestamp: Date.now().toString(), recvWindow: "5000" }).toString();
   const sig = crypto.createHmac("sha256", secret).update(qs).digest("hex");
@@ -768,7 +776,11 @@ websocketServer.on("connection", (socket) => {
   });
 });
 
-await terminalData.start();
+try {
+  await terminalData.start();
+} catch (error) {
+  logger.error("backend.bootstrap_failed", { error: String(error) });
+}
 const unsubscribeStream = terminalData.events.subscribe("stream", (envelope) => {
   broadcast(envelope.type, envelope.payload);
 });
@@ -778,6 +790,7 @@ server.listen(config.apiPort, config.apiHost, () => {
     host: config.apiHost,
     port: config.apiPort,
     origins: config.frontendOrigins,
+    node: process.version,
   });
 });
 
