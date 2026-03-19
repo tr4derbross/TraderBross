@@ -1481,14 +1481,14 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         </div>
 
         {/* Right: wallet connect */}
-        <div ref={headerControlRef} className="absolute right-3 top-1/2 z-10 -translate-y-1/2 sm:right-4">
-          <div className="panel-shell-alt flex items-center gap-1.5 rounded-2xl px-2 py-1.5">
+        <div ref={headerControlRef} className="absolute right-2 top-1/2 z-10 -translate-y-1/2 sm:right-4">
+          <div className="panel-shell-alt flex items-center gap-1 rounded-2xl px-1.5 py-1 sm:gap-1.5 sm:px-2 sm:py-1.5">
+            {/* Wallet icon-only on mobile, icon+text on desktop */}
             <button
               type="button"
               onClick={() => setHeaderConnectOpen((open) => !open)}
-              className="brand-chip-active shimmer-on-hover inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em]"
+              className="brand-chip-active shimmer-on-hover inline-flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] sm:gap-2 sm:px-3 sm:py-2"
             >
-              {/* Connection status dot */}
               <span
                 className={`h-1.5 w-1.5 rounded-full shrink-0 ${
                   isActiveHeaderConnection
@@ -1506,10 +1506,11 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
               <Wallet className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Wallet</span>
             </button>
+            {/* Platform label: shorter on mobile */}
             <button
               type="button"
               onClick={() => setHeaderConnectOpen((open) => !open)}
-              className="terminal-chip shimmer-on-hover inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)]"
+              className="terminal-chip shimmer-on-hover inline-flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)] sm:gap-2 sm:px-3 sm:py-2 sm:text-[10px]"
             >
               <span className="hidden md:inline text-zinc-500">{selectedHeaderPlatform.eyebrow}</span>
               <span className="text-[#f3ead7]">{selectedHeaderPlatform.label}</span>
