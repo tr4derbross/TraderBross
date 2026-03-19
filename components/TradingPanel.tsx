@@ -376,10 +376,10 @@ export default function TradingPanel({
       </div>
 
       {/* ── Market Summary ── */}
-      <div className="px-2 py-1 border-b border-zinc-800/60 sm:px-3 sm:py-2.5">
+      <div className="px-1.5 py-0.5 border-b border-zinc-800/60 sm:px-3 sm:py-2.5">
         <div className="flex items-center justify-between gap-1">
           <select
-            className="min-w-0 flex-1 rounded border border-zinc-700/60 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium text-zinc-100 outline-none transition hover:border-zinc-600 sm:px-2.5 sm:py-1.5 sm:text-[12px] sm:rounded-lg"
+            className="min-w-0 flex-1 rounded border border-zinc-700/50 bg-zinc-900 px-1 py-0.5 text-[9px] font-bold text-zinc-100 outline-none transition hover:border-zinc-600 sm:px-2.5 sm:py-1.5 sm:text-[12px] sm:rounded-lg"
             value={ticker}
             onChange={(e) => handleTickerChange(e.target.value)}
           >
@@ -390,8 +390,8 @@ export default function TradingPanel({
             ))}
           </select>
           <div className="shrink-0 text-right ml-1">
-            <div className="text-[8px] uppercase tracking-widest text-zinc-600">Mark</div>
-            <div className="text-[13px] font-bold tabular-nums text-zinc-100 sm:text-[18px]">${fmt(currentPrice)}</div>
+            <div className="text-[7px] uppercase tracking-widest text-zinc-600 sm:text-[9px]">Mark</div>
+            <div className="text-[11px] font-bold tabular-nums text-zinc-100 sm:text-[18px]">${fmt(currentPrice)}</div>
           </div>
         </div>
 
@@ -496,20 +496,35 @@ export default function TradingPanel({
           <div>
             <div className="mb-0.5 flex items-center justify-between">
               <label className="text-[7px] uppercase tracking-widest text-zinc-600 sm:text-[10px]">Leverage</label>
-              {maxLeverage > 0 && (
-                <span className="text-[7px] text-zinc-700">{maxLeverage}x max</span>
-              )}
+              <span className="text-[9px] font-bold text-amber-300 sm:text-[11px]">{leverage}x</span>
             </div>
-            <div className="grid grid-cols-5 gap-0.5">
+            {/* Drag slider */}
+            <input
+              type="range"
+              min={1}
+              max={maxLeverage > 0 ? Math.min(maxLeverage, 100) : 100}
+              step={1}
+              value={leverage}
+              onChange={(e) => setLeverage(Number(e.target.value))}
+              className="w-full mb-0.5"
+              style={{
+                height: 3,
+                accentColor: "#f0b90b",
+                cursor: "pointer",
+                borderRadius: 2,
+              }}
+            />
+            {/* Quick preset dots */}
+            <div className="flex justify-between">
               {dynamicLeveragePresets.map((value) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setLeverage(value)}
-                  className={`rounded py-0.5 text-[7px] font-semibold transition-all sm:rounded-md sm:py-1 sm:text-[9px] ${
+                  className={`text-[7px] font-semibold transition-colors sm:text-[9px] ${
                     leverage === value
-                      ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40"
-                      : "bg-zinc-900 text-zinc-600 hover:bg-zinc-800 hover:text-zinc-300"
+                      ? "text-amber-300"
+                      : "text-zinc-700 hover:text-zinc-400"
                   }`}
                 >
                   {value}x

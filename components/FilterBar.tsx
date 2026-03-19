@@ -65,7 +65,7 @@ export default function FilterBar({
     <div className="flex flex-col border-b border-[rgba(212,161,31,0.1)] bg-[linear-gradient(180deg,rgba(20,17,13,0.96),rgba(11,10,10,0.94))]">
 
       {/* ── Source tabs ── */}
-      <div className="flex items-center gap-0 overflow-x-auto border-b border-[rgba(212,161,31,0.08)] px-2 pb-0 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex items-center gap-0 overflow-x-auto border-b border-[rgba(212,161,31,0.08)] px-1.5 pb-0 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-2 sm:pt-1.5">
         {SOURCE_TABS.map(({ key, label, icon, color }) => {
           const count = key === "all" ? counts.all : (counts[key as keyof typeof counts] ?? 0);
           const active = sourceFilter === key;
@@ -75,14 +75,14 @@ export default function FilterBar({
             <button
               key={key}
               onClick={() => onSource(key)}
-              className={`flex shrink-0 items-center gap-1 border-b-2 px-2 py-1.5 text-[10px] font-medium transition-colors sm:gap-1.5 sm:px-3 sm:py-2 sm:text-[11px] ${
+              className={`flex shrink-0 items-center gap-0.5 border-b-2 px-1.5 py-1 text-[9px] font-medium transition-colors sm:gap-1.5 sm:px-3 sm:py-2 sm:text-[11px] ${
                 active ? `border-[rgba(212,161,31,0.72)] ${color}` : "border-transparent text-zinc-500 hover:text-zinc-300"
               }`}
             >
               <span className="hidden sm:inline">{icon}</span>
               {displayLabel}
               <span
-                className={`rounded-full px-1 py-0.5 text-[8px] sm:px-1.5 sm:text-[9px] ${
+                className={`rounded-full px-0.5 py-px text-[7px] sm:px-1.5 sm:py-0.5 sm:text-[9px] ${
                   active ? "bg-[rgba(212,161,31,0.12)] text-amber-50" : "bg-black/20 text-zinc-500"
                 }`}
               >
@@ -94,11 +94,11 @@ export default function FilterBar({
       </div>
 
       {/* ── Search + filters row (kompakt) ── */}
-      <div className="flex items-center gap-1.5 px-2 py-1.5 sm:gap-2 sm:px-3 sm:py-2">
-        <div className="terminal-input flex min-w-0 flex-1 items-center gap-1 rounded-lg px-2 py-1">
-          <Search className="h-3 w-3 shrink-0 text-zinc-500" />
+      <div className="flex items-center gap-1 px-1.5 py-1 sm:gap-2 sm:px-3 sm:py-2">
+        <div className="terminal-input flex min-w-0 flex-1 items-center gap-0.5 rounded px-1.5 py-0.5 sm:rounded-lg sm:px-2 sm:py-1">
+          <Search className="h-2.5 w-2.5 shrink-0 text-zinc-500 sm:h-3 sm:w-3" />
           <input
-            className="min-w-0 flex-1 bg-transparent text-[11px] text-amber-100 placeholder-zinc-600 outline-none sm:text-xs"
+            className="min-w-0 flex-1 bg-transparent text-[9px] text-amber-100 placeholder-zinc-600 outline-none sm:text-[11px] sm:text-xs"
             placeholder="Search..."
             value={keyword}
             onChange={(e) => onKeyword(e.target.value)}
