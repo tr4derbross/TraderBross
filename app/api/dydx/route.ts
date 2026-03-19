@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withCache } from "@/lib/server-cache";
+import { logger } from "@/lib/logger";
 
 const DYDX_INDEXER = "https://indexer.dydx.trade/v4";
 
@@ -80,14 +81,14 @@ async function getMarkets() {
 
     return NextResponse.json({ assets });
   } catch (err) {
-    console.error("dYdX markets:", err);
+    logger.error("dYdX markets:", err);
     return NextResponse.json({ assets: [] });
   }
 }
 
 async function getAccount(address: string) {
-  if (!address || !address.startsWith("dydx")) {
-    return NextResponse.json({ error: "dYdX address must start with 'dydx'" }, { status: 400 });
+  if (!address || !/^dydx[a-z0-9]{38,50}$/.test(address)) {
+    return NextResponse.json({ error: "Invalid dYdX address" }, { status: 400 });
   }
   try {
     const res = await fetch(`${DYDX_INDEXER}/addresses/${address}/subaccounts`, {
@@ -123,7 +124,7 @@ async function getAccount(address: string) {
       positions,
     });
   } catch (err) {
-    console.error("dYdX account:", err);
+    logger.error("dYdX account:", err);
     return NextResponse.json({ error: "fetch failed" }, { status: 500 });
   }
 }

@@ -418,7 +418,7 @@ export default function PriceChart({
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     loadTimeoutRef.current = setTimeout(() => {
       if (active) {
-        console.warn("[PriceChart] chart data timeout for", ticker, timeframe);
+        if (process.env.NODE_ENV !== "production") { console.warn("[PriceChart] chart data timeout for", ticker, timeframe); }
         setIsLoadingPrices(false);
         setChartError("Chart data unavailable. Check your connection or try refreshing.");
       }
@@ -433,7 +433,7 @@ export default function PriceChart({
             ? `/api/hyperliquid?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
             : `/api/prices?ticker=${ticker}&interval=${interval}&limit=${limit}`;
 
-    console.log("[PriceChart] fetching candles:", endpoint);
+    if (process.env.NODE_ENV !== "production") { console.log("[PriceChart] fetching candles:", endpoint); }
     apiFetch<PriceData[]>(endpoint)
       .then((payload: PriceData[]) => {
         if (!active) return;
@@ -441,7 +441,7 @@ export default function PriceChart({
         setPriceData(Array.isArray(payload) ? payload : []);
         setIsLoadingPrices(false);
         if (!Array.isArray(payload) || payload.length === 0) {
-          console.warn("[PriceChart] empty candle response for", ticker);
+          if (process.env.NODE_ENV !== "production") { console.warn("[PriceChart] empty candle response for", ticker); }
         }
       })
       .catch((err) => {

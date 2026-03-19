@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withCache } from "@/lib/server-cache";
+import { logger } from "@/lib/logger";
 
 const HL_INFO = "https://api.hyperliquid.xyz/info";
 
@@ -86,7 +87,7 @@ async function getOhlcv(ticker: string, interval: string, limit: number) {
     }));
     return NextResponse.json(data);
   } catch (err) {
-    console.error("HL ohlcv:", err);
+    logger.error("HL ohlcv:", err);
     return NextResponse.json([], { status: 200 });
   }
 }
@@ -135,14 +136,14 @@ async function getMarket() {
 
     return NextResponse.json({ assets, assetIndex });
   } catch (err) {
-    console.error("HL market:", err);
+    logger.error("HL market:", err);
     return NextResponse.json({ assets: [], assetIndex: {} });
   }
 }
 
 async function getAccount(address: string) {
-  if (!address || !address.startsWith("0x")) {
-    return NextResponse.json({ error: "invalid address" }, { status: 400 });
+  if (!address || !/^0x[0-9a-fA-F]{40}$/.test(address)) {
+    return NextResponse.json({ error: "Invalid wallet address" }, { status: 400 });
   }
   try {
     const res = await fetch(HL_INFO, {
@@ -178,7 +179,7 @@ async function getAccount(address: string) {
 
     return NextResponse.json({ balance, positions, withdrawable: parseFloat(data.withdrawable ?? "0") });
   } catch (err) {
-    console.error("HL account:", err);
+    logger.error("HL account:", err);
     return NextResponse.json({ error: "fetch failed" }, { status: 500 });
   }
 }

@@ -70,10 +70,6 @@ export function nitterRssUrl(baseUrl: string, handle: string): string {
   return `${clean}/${handle}/rss`;
 }
 
-/** @deprecated Kept for legacy app/api/whale/route.ts. */
-export const WHALE_ALERT_URL =
-  "https://api.whale-alert.io/v1/transactions?min_value=500000&limit=10";
-
 export interface SocialAccountConfig {
   handle: string;
   displayName: string;

@@ -168,7 +168,7 @@ async function fetchCustomSocialFeeds(): Promise<NewsItem[]> {
   const raw = process.env.SOCIAL_RSS_URLS;
   if (!raw) return [];
 
-  const urls = raw.split(",").map((u) => u.trim()).filter(Boolean);
+  const urls = raw.split(",").map((u) => u.trim()).filter((u) => u.startsWith("https://"));
   const results = await Promise.allSettled(
     urls.map(async (url, i) => {
       const items = await fetchRSS(url);

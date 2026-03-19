@@ -990,7 +990,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       try {
         const session = await connectWalletByLabel(walletLabel);
         headerWalletSessionRef.current = session;
-        console.info("[TraderBross Header Wallet]", "connected", headerPlatform, walletLabel, session.address);
+        if (process.env.NODE_ENV !== "production") { console.info("[TraderBross Header Wallet]", "connected", headerPlatform, walletLabel, session.address); }
 
         setHeaderConnection({
           status: "connected",
@@ -1004,7 +1004,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         }
       } catch (error) {
         headerWalletSessionRef.current = null;
-        console.info("[TraderBross Header Wallet]", "failed", headerPlatform, walletLabel, error);
+        if (process.env.NODE_ENV !== "production") { console.info("[TraderBross Header Wallet]", "failed", headerPlatform, walletLabel, error); }
         setHeaderConnection({
           status: "failed",
           platform: headerPlatform,

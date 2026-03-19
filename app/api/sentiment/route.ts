@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { classifyText } from "@/lib/ai-providers";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 const SYSTEM_PROMPT =
   'You are a financial news sentiment analyzer. Respond ONLY with a JSON object: {"score":"bullish"|"bearish"|"neutral","confidence":0-100,"reason":"one sentence"}';
 
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request);
+  const { allowed } = rateLimit(`sentiment:${ip}`, 30, 60_000);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests. Please wait before trying again." }, { status: 429 });
+  }
+
   const { headline, summary } = await request.json();
 
   try {
