@@ -1388,14 +1388,8 @@ button, a {
 
 /* ─── Agent 1: Mobile Responsive Overrides ─────────────────────────────────── */
 @media (max-width: 767px) {
-  /* Typography scale */
-  .symbol-name    { font-size: 14px !important; }
-  .perp-badge     { font-size: 10px !important; padding: 1px 4px !important; }
-  .price-display  { font-size: 12px !important; }
-  .timeframe-btn  { font-size: 10px !important; padding: 2px 4px !important; }
+  /* Typography scale — keep only non-conflicting rules */
   .panel-title    { font-size: 11px !important; }
-  .trade-btn      { font-size: 13px !important; min-height: 44px !important; }
-  .mark-price     { font-size: 20px !important; }
   .tab-label      { font-size: 11px !important; }
 
   /* Stats bar: horizontal scroll, hide noise */
