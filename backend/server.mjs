@@ -191,6 +191,42 @@ const server = http.createServer(async (request, reply) => {
       return;
     }
 
+    if (request.method === "GET" && url.pathname === "/api/okx/orderbook") {
+      const ticker = canonicalTickerParam(url.searchParams.get("ticker"), "BTC");
+      const size = Math.min(Math.max(Number(url.searchParams.get("sz") || 10), 1), 50);
+      try {
+        const data = await endpointCache.remember(`okx:orderbook:${ticker}:${size}`, 2_500, async () => {
+          const swapInst = `${ticker}-USDT-SWAP`;
+          const spotInst = `${ticker}-USDT`;
+
+          const fetchBook = async (instId) => {
+            const res = await fetch(
+              `https://www.okx.com/api/v5/market/books?instId=${encodeURIComponent(instId)}&sz=${size}`,
+              { signal: AbortSignal.timeout(5000) },
+            );
+            if (!res.ok) throw new Error(`okx orderbook ${res.status}`);
+            return res.json();
+          };
+
+          let payload;
+          try {
+            payload = await fetchBook(swapInst);
+          } catch {
+            payload = await fetchBook(spotInst);
+          }
+
+          const row = Array.isArray(payload?.data) ? payload.data[0] : null;
+          const bids = Array.isArray(row?.bids) ? row.bids.slice(0, size) : [];
+          const asks = Array.isArray(row?.asks) ? row.asks.slice(0, size) : [];
+          return { bids, asks };
+        });
+        json(reply, 200, data);
+      } catch {
+        json(reply, 200, { bids: [], asks: [] });
+      }
+      return;
+    }
+
     if (request.method === "GET" && url.pathname === "/api/bybit") {
       const type = url.searchParams.get("type");
       if (type === "quotes") {

@@ -47,3 +47,25 @@ Date: 2026-03-19
 
 - [ ] Bazı non-critical ekranlarda düşük frekans polling devam ediyor (örn. screener 120s). Bu bilinçli seçimdir.
 - [ ] Backend port conflict/availability kontrolü deployment orchestration ile garanti edilmeli.
+
+## 2026-03-19 Hotfix Audit (Live Empty Data)
+
+- [x] /terminal eski basarili UI (TerminalApp) geri alindi.
+- [x] Next same-origin proxy aktif: app/api/[...path]/route.ts
+- [x] Proxy path mapping duzeltildi:
+  - /api/health -> backend /health
+  - digerleri -> backend /api/*
+- [x] Eksik endpoint tamamlandi: backend GET /api/okx/orderbook
+- [x] Browser API cagirlari relative olacak sekilde sabitlendi (CORS/env drift azaltildi).
+- [x] Backend 5xx/timeout durumunda emergency live fallback eklendi:
+  - /api/bootstrap
+  - /api/news
+  - /api/prices?type=quotes
+  - /api/market
+  - /api/screener
+
+### Son durum
+
+- Build: npm run build basarili.
+- Kritik risk: canli Railway backend zaman zaman 502/timeout veriyor.
+- Mitigasyon: fallback katmani ile UI'nin tamamen bos kalmasi engellendi.
