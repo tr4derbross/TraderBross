@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import PageWrapper from "@/components/PageWrapper";
-import type { CalendarEvent, EventCategory } from "@/app/api/calendar/route";
+import { apiFetch } from "@/lib/api-client";
+import type { CalendarEvent, EventCategory } from "@/types/calendar";
 import {
   Calendar,
   CalendarDays,
@@ -247,8 +248,7 @@ export default function CalendarPage() {
   const [showPast, setShowPast]   = useState(false);
 
   useEffect(() => {
-    fetch("/api/calendar")
-      .then((r) => r.json())
+    apiFetch<CalendarEvent[]>("/api/calendar")
       .then((data: CalendarEvent[]) => setEvents(data))
       .catch(() => {})
       .finally(() => setLoading(false));

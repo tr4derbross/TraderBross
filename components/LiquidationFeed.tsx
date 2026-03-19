@@ -310,56 +310,11 @@ export default function LiquidationFeed({
 }) {
   const realtimeLiquidations = useRealtimeSelector((state) => state.liquidations ?? []);
 
-  // API data
-  const [apiLiquidations, setApiLiquidations] = useState<ApiLiquidation[]>([]);
-  const [apiStats, setApiStats] = useState<LiqStats | null>(null);
-  const [apiLoaded, setApiLoaded] = useState(false);
-
   // Mock fallback
   const [mockFeed, setMockFeed] = useState<LiquidationEvent[]>([]);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const counterRef = useRef(0);
-
-  // ── Fetch /api/liquidations ───────────────────────────────────────────────
-  async function fetchLiquidations() {
-    try {
-      const res = await fetch("/api/liquidations?limit=20");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: ApiLiquidationsResponse = await res.json();
-      if (Array.isArray(data.liquidations) && data.liquidations.length > 0) {
-        setApiLiquidations((prev) => {
-          const hasNew = prev.length > 0 && data.liquidations[0]?.id !== prev[0]?.id;
-          if (hasNew) {
-            const newId = data.liquidations[0]?.id;
-            if (newId) {
-              setNewIds((p) => new Set([...p, newId]));
-              onPulse?.();
-              setTimeout(() => {
-                setNewIds((p) => {
-                  const next = new Set(p);
-                  next.delete(newId);
-                  return next;
-                });
-              }, 3000);
-            }
-          }
-          return data.liquidations;
-        });
-        setApiStats(data.stats);
-        setApiLoaded(true);
-        onStatsUpdate?.(data.stats);
-      }
-    } catch {
-      // Fall through — mock will handle it
-    }
-  }
-
-  // Mount fetch + 5s polling
-  useEffect(() => {
-    fetchLiquidations();
-    const interval = setInterval(fetchLiquidations, 5_000);
-    return () => clearInterval(interval);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const latestRealtimeIdRef = useRef<string | null>(null);
 
   // ── Seed mock feed on mount ───────────────────────────────────────────────
   useEffect(() => {
@@ -378,13 +333,29 @@ export default function LiquidationFeed({
   // Sync with realtime when it arrives
   useEffect(() => {
     if (realtimeLiquidations.length > 0) {
+      const nextId = realtimeLiquidations[0]?.id;
+      const previousId = latestRealtimeIdRef.current;
+      if (previousId && nextId && previousId !== nextId) {
+        setNewIds((prev) => new Set([...prev, nextId]));
+        onPulse?.();
+        setTimeout(() => {
+          setNewIds((prev) => {
+            const next = new Set(prev);
+            next.delete(nextId);
+            return next;
+          });
+        }, 3000);
+      }
+      if (nextId) {
+        latestRealtimeIdRef.current = nextId;
+      }
       setMockFeed(realtimeLiquidations.slice(0, 40));
     }
-  }, [realtimeLiquidations]);
+  }, [onPulse, realtimeLiquidations]);
 
-  // Simulate new liquidation every 5s when no live/API data
+  // Simulate new liquidation every 5s when no live data
   useEffect(() => {
-    if (apiLoaded || realtimeLiquidations.length > 0) return;
+    if (realtimeLiquidations.length > 0) return;
 
     const interval = setInterval(() => {
       const id = `liqd-sim-${counterRef.current++}-${Date.now()}`;
@@ -404,49 +375,46 @@ export default function LiquidationFeed({
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [apiLoaded, realtimeLiquidations.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [onPulse, realtimeLiquidations.length]);
 
-  const useApiData = apiLoaded && apiLiquidations.length > 0;
+  const aggregateStats = mockFeed.reduce<LiqStats>(
+    (acc, event) => {
+      acc.totalUSD += event.usdValue;
+      if (event.side === "long") acc.longUSD += event.usdValue;
+      if (event.side === "short") acc.shortUSD += event.usdValue;
+      acc.count += 1;
+      return acc;
+    },
+    { totalUSD: 0, longUSD: 0, shortUSD: 0, count: 0 }
+  );
+
+  useEffect(() => {
+    onStatsUpdate?.(aggregateStats);
+  }, [aggregateStats, onStatsUpdate]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <LiquidationSummary
-        apiStats={apiStats}
+        apiStats={aggregateStats}
         mockEvents={mockFeed}
-        useApiData={useApiData}
+        useApiData={false}
       />
       <div
         className="min-h-0 flex-1 overflow-y-auto"
         style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(246,70,93,0.2) transparent" }}
       >
-        {useApiData ? (
-          apiLiquidations.length === 0 ? (
-            <div className="flex h-24 items-center justify-center text-xs text-zinc-600">
-              Waiting for liquidation data…
-            </div>
-          ) : (
-            apiLiquidations.map((liq) => (
-              <LiquidationRowApi
-                key={liq.id}
-                liq={liq}
-                isNew={newIds.has(liq.id)}
-              />
-            ))
-          )
+        {mockFeed.length === 0 ? (
+          <div className="flex h-24 items-center justify-center text-xs text-zinc-600">
+            Waiting for liquidation data…
+          </div>
         ) : (
-          mockFeed.length === 0 ? (
-            <div className="flex h-24 items-center justify-center text-xs text-zinc-600">
-              Waiting for liquidation data…
-            </div>
-          ) : (
-            mockFeed.map((event) => (
-              <LiquidationRow
-                key={event.id}
-                event={event}
-                isNew={newIds.has(event.id)}
-              />
-            ))
-          )
+          mockFeed.map((event) => (
+            <LiquidationRow
+              key={event.id}
+              event={event}
+              isNew={newIds.has(event.id)}
+            />
+          ))
         )}
       </div>
     </div>

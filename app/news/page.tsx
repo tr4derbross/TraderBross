@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
   RefreshCw,
@@ -20,9 +20,9 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { useNews, SourceFilter, SentimentFilter } from "@/hooks/useNews";
-import type { NewsItem } from "@/lib/mock-data";
-import type { LiquidationEvent } from "@/lib/binance-liquidation-ws";
+import type { NewsItem, TickerQuote } from "@/lib/mock-data";
 import { getAllTradeLinks } from "@/lib/referral-links";
+import { useRealtimeSelector } from "@/lib/realtime-client";
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 
@@ -299,27 +299,13 @@ function TrendingTopics({ news }: { news: NewsItem[] }) {
 
 /* ── Market Impact panel ──────────────────────────────────────────────────── */
 
-interface PriceQuote {
-  symbol: string;
-  price: number;
-  changePct: number;
-}
+function MarketImpact({ item, quotes }: { item: NewsItem; quotes: TickerQuote[] }) {
+  const relevantQuotes = useMemo(
+    () => quotes.filter((quote) => item.ticker?.includes(quote.symbol)),
+    [item.ticker, quotes]
+  );
 
-function MarketImpact({ item }: { item: NewsItem }) {
-  const [quotes, setQuotes] = useState<PriceQuote[]>([]);
-
-  useEffect(() => {
-    if (!item.ticker?.length) return;
-    fetch("/api/prices?type=quotes")
-      .then((r) => r.json())
-      .then((data: PriceQuote[]) => {
-        const relevant = data.filter((q) => item.ticker?.includes(q.symbol));
-        setQuotes(relevant);
-      })
-      .catch(() => {});
-  }, [item]);
-
-  if (!item.ticker?.length || quotes.length === 0) return null;
+  if (!item.ticker?.length || relevantQuotes.length === 0) return null;
 
   return (
     <div className="mx-3 mb-3 shrink-0 rounded-xl border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.04)] p-3">
@@ -331,7 +317,7 @@ function MarketImpact({ item }: { item: NewsItem }) {
         <span className="ml-auto text-[9px] text-[#3A3A3A]">24h change</span>
       </div>
       <div className="space-y-1.5">
-        {quotes.map((q) => {
+        {relevantQuotes.map((q) => {
           const pos = q.changePct >= 0;
           const fmtPrice =
             q.price >= 1000
@@ -422,39 +408,13 @@ export default function NewsPage() {
   const [selectedItem, setSelectedItem]       = useState<NewsItem | null>(null);
   const [chartSymbol, setChartSymbol]         = useState("BTCUSDT");
   const [now, setNow]                         = useState(Date.now());
+  const quotes = useRealtimeSelector((state) => state.quotes);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);
   void now;
-
-  // Liquidations state — polled every 5s independently of useNews
-  const [liqItems, setLiqItems] = useState<LiquidationEvent[]>([]);
-
-  const fetchLiquidations = useCallback(async () => {
-    try {
-      const res = await fetch("/api/liquidations?limit=15");
-      if (!res.ok) return;
-      const data = (await res.json()) as { liquidations: LiquidationEvent[] };
-      if (Array.isArray(data.liquidations) && data.liquidations.length > 0) {
-        setLiqItems(
-          data.liquidations.map((liq) => ({
-            ...liq,
-            timestamp: new Date(liq.timestamp),
-          })),
-        );
-      }
-    } catch {
-      // silent fail — keep previous state
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchLiquidations();
-    const id = setInterval(() => void fetchLiquidations(), 5_000);
-    return () => clearInterval(id);
-  }, [fetchLiquidations]);
 
   const { news, loading, liveCount, isLive, refreshNews, counts } = useNews({
     sourceFilter,
@@ -714,7 +674,7 @@ export default function NewsPage() {
               </div>
 
               {/* Market impact */}
-              <MarketImpact item={selectedItem} />
+              <MarketImpact item={selectedItem} quotes={quotes} />
             </>
           )}
         </div>

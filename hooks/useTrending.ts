@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import type { TrendingResponse } from "@/app/api/trending/route";
+import { apiFetch } from "@/lib/api-client";
+import type { TrendingResponse } from "@/types/trending";
 
-const POLL_INTERVAL = 5 * 60 * 1000;
+const POLL_INTERVAL = 10 * 60 * 1000;
 
 export function useTrending() {
   const [data, setData] = useState<TrendingResponse | null>(null);
@@ -11,9 +12,7 @@ export function useTrending() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch("/api/trending");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setData(await res.json());
+      setData(await apiFetch<TrendingResponse>("/api/trending"));
     } catch (err) {
       console.error("useTrending:", err);
     } finally {

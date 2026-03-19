@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import PageWrapper from "@/components/PageWrapper";
-import type { ScreenerCoin } from "@/app/api/screener/route";
+import { apiFetch } from "@/lib/api-client";
+import type { ScreenerCoin } from "@/types/screener";
 import {
   TrendingUp,
   TrendingDown,
@@ -336,9 +337,7 @@ export default function ScreenerPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/screener?sort=${sort}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: ScreenerCoin[] = await res.json();
+      const data = await apiFetch<ScreenerCoin[]>(`/api/screener?sort=${sort}`);
       if (!Array.isArray(data) || data.length === 0)
         throw new Error("No data returned");
       setCoins(data);
@@ -355,9 +354,9 @@ export default function ScreenerPage() {
     load();
   }, [load]);
 
-  // Auto-refresh every 45s
+  // Auto-refresh every 2 minutes for non-critical market ranking updates.
   useEffect(() => {
-    const id = setInterval(load, 45_000);
+    const id = setInterval(load, 120_000);
     return () => clearInterval(id);
   }, [load]);
 
