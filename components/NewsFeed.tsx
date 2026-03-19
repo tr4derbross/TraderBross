@@ -42,6 +42,9 @@ export default function NewsFeed({
   const [whalePulse, setWhalePulse] = useState(false);
   const [liqdPulse, setLiqdPulse] = useState(false);
 
+  // Liquidation stats for dynamic tab label
+  const [liqStats, setLiqStats] = useState<{ totalUSD: number; longUSD: number; shortUSD: number; count: number } | null>(null);
+
   const { news, loading, liveCount, counts, refreshNews, isLive } = useNews({
     sector,
     ticker,
@@ -80,6 +83,21 @@ export default function NewsFeed({
     setLiqdPulse(true);
     setTimeout(() => setLiqdPulse(false), 3000);
   };
+
+  // Handle liquidation stats update from LiquidationFeed
+  const handleLiqdStatsUpdate = (stats: { totalUSD: number; longUSD: number; shortUSD: number; count: number }) => {
+    setLiqStats(stats);
+  };
+
+  // Compute dynamic liquidation tab label
+  const liqLabel: string | undefined = (() => {
+    if (!liqStats || liqStats.totalUSD <= 0) return undefined;
+    const usd = liqStats.totalUSD;
+    if (usd >= 1_000_000_000) return `Liq $${(usd / 1_000_000_000).toFixed(1)}B`;
+    if (usd >= 1_000_000) return `Liq $${(usd / 1_000_000).toFixed(1)}M`;
+    if (usd >= 1_000) return `Liq $${(usd / 1_000).toFixed(0)}K`;
+    return `Liq $${usd.toFixed(0)}`;
+  })();
 
   const sourceLabel: Record<SourceFilter, string> = {
     all: "News Feed",
@@ -175,13 +193,14 @@ export default function NewsFeed({
         onImportance={setImportanceFilter}
         onSentiment={setSentimentFilter}
         counts={counts}
+        liqLabel={liqLabel}
       />
 
       {/* Specialized feeds */}
       {sourceFilter === "whale" ? (
         <WhaleFeed onPulse={handleWhalePulse} />
       ) : sourceFilter === "liquidation" ? (
-        <LiquidationFeed onPulse={handleLiqdPulse} />
+        <LiquidationFeed onPulse={handleLiqdPulse} onStatsUpdate={handleLiqdStatsUpdate} />
       ) : (
         /* Standard news feed */
         <div className="min-h-0 flex-1 overflow-y-auto" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(212,161,31,0.18) transparent" }}>

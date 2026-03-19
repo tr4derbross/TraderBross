@@ -89,3 +89,37 @@ export function PanelSkeleton({ rows = 4 }: { rows?: number }) {
     </div>
   );
 }
+
+export function SkeletonRow({ cols = 3 }: { cols?: number }) {
+  const widths = ["w-16", "w-24", "w-12", "w-20", "w-8"];
+  return (
+    <div className="animate-pulse flex gap-2 px-3 py-2">
+      {Array.from({ length: cols }).map((_, i) => (
+        <div
+          key={i}
+          className={`h-3 bg-[#2a2a2a] rounded ${widths[i % widths.length]}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function SkeletonCard() {
+  return (
+    <div className="animate-pulse p-3 border-b border-[#1a1a1a]">
+      <div className="h-3 bg-[#2a2a2a] rounded w-3/4 mb-2" />
+      <div className="h-2 bg-[#1e1e1e] rounded w-1/2 mb-1" />
+      <div className="h-2 bg-[#1e1e1e] rounded w-2/3" />
+    </div>
+  );
+}
+
+export function SkeletonList({ count = 5 }: { count?: number }) {
+  return (
+    <div>
+      {Array.from({ length: count }).map((_, i) => (
+        <SkeletonCard key={i} />
+      ))}
+    </div>
+  );
+}
