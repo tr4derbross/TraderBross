@@ -1479,7 +1479,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
         {/* Center brand */}
         <div className="relative z-10 flex items-center justify-center gap-1.5 px-2">
-          <BrandMark className="scale-[0.68] sm:scale-100" />
+          <BrandMark />
           {/* Live dot — inline next to logo, no text */}
           {wsConnected && (
             <span

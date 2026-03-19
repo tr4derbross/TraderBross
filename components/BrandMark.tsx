@@ -47,7 +47,7 @@ export default function BrandMark({ className = "", compact = false }: Props) {
           height={compact ? 48 : 108}
           priority
           unoptimized
-          className={compact ? "h-11 w-auto object-contain" : "h-[4.4rem] w-auto object-contain md:h-[5rem] xl:h-[5.2rem]"}
+          className={compact ? "h-11 w-auto object-contain" : "h-7 w-auto object-contain sm:h-[4.4rem] md:h-[5rem] xl:h-[5.2rem]"}
           onError={() => setImageFailed(true)}
         />
       </div>

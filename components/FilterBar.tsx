@@ -98,7 +98,7 @@ export default function FilterBar({
         <div className="terminal-input flex min-w-0 flex-1 items-center gap-0.5 rounded px-1.5 py-0.5 sm:rounded-lg sm:px-2 sm:py-1">
           <Search className="h-2.5 w-2.5 shrink-0 text-zinc-500 sm:h-3 sm:w-3" />
           <input
-            className="min-w-0 flex-1 bg-transparent text-[9px] text-amber-100 placeholder-zinc-600 outline-none sm:text-[11px] sm:text-xs"
+            className="min-w-0 flex-1 bg-transparent text-[9px] text-amber-100 placeholder-zinc-600 outline-none sm:text-[11px]"
             placeholder="Search..."
             value={keyword}
             onChange={(e) => onKeyword(e.target.value)}
