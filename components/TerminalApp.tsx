@@ -1226,6 +1226,25 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     </ErrorBoundary>
   );
 
+  /* Mobile-only trade panel — no tab bar overhead, just the form */
+  const renderMobileTradePanel = () => (
+    <div className="panel-shell soft-divider flex h-full min-h-0 flex-col overflow-hidden border">
+      <TradingPanel
+        activeVenueState={activeVenueState}
+        selectedNews={selectedItem}
+        newsTradeIntent={newsTradeIntent}
+        balance={displayBalance}
+        isDemoMode={venueBalance === null}
+        positions={displayPositions}
+        prices={activeVenuePriceMap}
+        marketDataSourceLabel={activeVenueMarketLabel}
+        onActiveSymbolChange={setActiveSymbol}
+        onPlaceOrder={routeOrderThroughVenue}
+        onConsumeNewsTradeIntent={() => setNewsTradeIntent(null)}
+      />
+    </div>
+  );
+
   const renderChartPanel = (extraClassName = "") => (
     <div
       className={`panel-shell soft-divider flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border ${extraClassName}`}
@@ -1569,66 +1588,26 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
               </div>
             </>
           ) : (
-            /* Mobile: Full-screen tab layout + bottom navigation bar */
+            /* Mobile: single page — chart top + news & trade side by side */
             <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
-              {/* Tab content — each panel fills full available space */}
-              <div className="min-h-0 flex-1 overflow-hidden">
-                {mobileWorkspaceTab === "chart" && renderChartPanel()}
-                {mobileWorkspaceTab === "news"  && renderNewsPanel()}
-                {mobileWorkspaceTab === "tools" && renderRightPanel()}
+              {/* Chart — compact fixed height */}
+              <div className="shrink-0 overflow-hidden" style={{ height: 162 }}>
+                {renderChartPanel()}
               </div>
-
-              {/* Bottom navigation bar */}
+              {/* News (left) + Trade (right) — both always visible */}
               <div
-                className="shrink-0 flex items-stretch border-t"
-                style={{
-                  borderColor: "rgba(212,161,31,0.13)",
-                  background: "linear-gradient(180deg, rgba(12,10,8,0.98), rgba(6,5,4,0.99))",
-                  paddingBottom: "env(safe-area-inset-bottom)",
-                  minHeight: 50,
-                }}
+                className="flex min-h-0 flex-1 overflow-hidden"
+                style={{ borderTop: "1px solid rgba(212,161,31,0.07)" }}
               >
-                {([
-                  { id: "chart" as const, label: "Chart", Icon: CandlestickChart },
-                  { id: "news"  as const, label: "News",  Icon: Newspaper        },
-                  { id: "tools" as const, label: "Trade", Icon: TrendingUp       },
-                ] as const).map(({ id, label, Icon }) => {
-                  const isActive = mobileWorkspaceTab === id;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setMobileWorkspaceTab(id)}
-                      className="relative flex-1 flex flex-col items-center justify-center gap-[3px] transition-colors"
-                      style={{ color: isActive ? "#f1d48f" : "#4a4a4a" }}
-                    >
-                      {/* Active indicator line at top */}
-                      {isActive && (
-                        <span
-                          className="absolute top-0 left-1/2 -translate-x-1/2 rounded-b-full"
-                          style={{ width: 28, height: 2, background: "rgba(240,185,11,0.9)" }}
-                        />
-                      )}
-                      <Icon
-                        style={{
-                          width: 16,
-                          height: 16,
-                          strokeWidth: isActive ? 2.5 : 1.5,
-                        }}
-                      />
-                      <span
-                        style={{
-                          fontSize: 9,
-                          fontWeight: 700,
-                          letterSpacing: "0.1em",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        {label}
-                      </span>
-                    </button>
-                  );
-                })}
+                <div className="min-h-0 overflow-hidden" style={{ flex: "0 0 50%" }}>
+                  {renderNewsPanel()}
+                </div>
+                <div
+                  className="min-h-0 overflow-hidden"
+                  style={{ flex: "0 0 50%", borderLeft: "1px solid rgba(212,161,31,0.07)" }}
+                >
+                  {renderMobileTradePanel()}
+                </div>
               </div>
             </div>
           )}

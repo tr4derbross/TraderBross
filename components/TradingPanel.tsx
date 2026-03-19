@@ -349,14 +349,14 @@ export default function TradingPanel({
     <div className="flex h-full min-h-0 flex-col gap-px overflow-y-auto">
 
       {/* ── Header Bar: venue + status + balance ── */}
-      <div className="flex items-center justify-between gap-1 px-2 py-1.5 border-b border-zinc-800/60 sm:gap-2 sm:px-3 sm:py-2.5">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-semibold tracking-widest text-zinc-200 uppercase sm:text-[11px]">
+      <div className="flex items-center justify-between gap-1 px-2 py-1 border-b border-zinc-800/60 sm:gap-2 sm:px-3 sm:py-2.5">
+        <div className="flex items-center gap-1">
+          <span className="text-[9px] font-semibold tracking-widest text-zinc-200 uppercase sm:text-[11px]">
             {activeVenueState.venueId}
           </span>
-          <span className="flex items-center gap-1 rounded-full border border-zinc-700/50 bg-zinc-900 px-1.5 py-0.5 sm:gap-1.5 sm:px-2">
-            <span className={`h-1.5 w-1.5 rounded-full ${statusColor}`} />
-            <span className={`text-[9px] capitalize ${statusTextColor} sm:text-[10px]`}>
+          <span className="flex items-center gap-0.5 rounded-full border border-zinc-700/50 bg-zinc-900 px-1 py-0.5 sm:gap-1.5 sm:px-2">
+            <span className={`h-1 w-1 rounded-full ${statusColor}`} />
+            <span className={`text-[8px] capitalize ${statusTextColor} sm:text-[10px]`}>
               {activeVenueState.connectionStatus.replaceAll("_", " ")}
             </span>
           </span>
@@ -364,68 +364,59 @@ export default function TradingPanel({
         <div className="text-right">
           <div className="flex items-center justify-end gap-1">
             {isDemoMode && (
-              <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1 py-0.5 text-[7px] font-bold uppercase tracking-[0.12em] text-amber-400 sm:px-1.5 sm:text-[8px]">
+              <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1 py-0.5 text-[7px] font-bold uppercase tracking-[0.1em] text-amber-400">
                 PAPER
               </span>
             )}
-            <div className="hidden text-[9px] uppercase tracking-widest text-zinc-600 sm:block">Balance</div>
           </div>
-          <div className="text-[11px] font-semibold text-amber-300 sm:text-[12px]">
-            ${balance.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+          <div className="text-[10px] font-semibold text-amber-300 sm:text-[12px]">
+            ${balance.toLocaleString("en-US", { maximumFractionDigits: 0 })}
           </div>
         </div>
       </div>
 
       {/* ── Market Summary ── */}
-      <div className="px-2 py-1.5 border-b border-zinc-800/60 sm:px-3 sm:py-2.5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1 space-y-1">
-            <select
-              className="w-full rounded-lg border border-zinc-700/60 bg-zinc-900 px-2 py-1 text-[11px] font-medium text-zinc-100 outline-none transition focus:border-zinc-500 hover:border-zinc-600 sm:px-2.5 sm:py-1.5 sm:text-[12px]"
-              value={ticker}
-              onChange={(e) => handleTickerChange(e.target.value)}
-            >
-              {FUTURES_TICKERS.map((value) => (
-                <option key={value} value={value} className="bg-zinc-950">
-                  {value}/USDT Perp
-                </option>
-              ))}
-            </select>
-            {selectedNews && (
-              <p className="line-clamp-2 text-[10px] leading-relaxed text-zinc-500">{selectedNews.headline}</p>
-            )}
-          </div>
-          <div className="shrink-0 text-right">
-            <div className="text-[8px] uppercase tracking-widest text-zinc-600 sm:text-[9px]">Mark</div>
-            <div className="text-[15px] font-bold tabular-nums text-zinc-100 sm:text-[18px]">${fmt(currentPrice)}</div>
-            <div className="text-[9px] text-zinc-600 sm:text-[10px]">{activeVenueState.venueType === "cex" ? "Perp" : "Venue"}</div>
+      <div className="px-2 py-1 border-b border-zinc-800/60 sm:px-3 sm:py-2.5">
+        <div className="flex items-center justify-between gap-1">
+          <select
+            className="min-w-0 flex-1 rounded border border-zinc-700/60 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium text-zinc-100 outline-none transition hover:border-zinc-600 sm:px-2.5 sm:py-1.5 sm:text-[12px] sm:rounded-lg"
+            value={ticker}
+            onChange={(e) => handleTickerChange(e.target.value)}
+          >
+            {FUTURES_TICKERS.map((value) => (
+              <option key={value} value={value} className="bg-zinc-950">
+                {value}
+              </option>
+            ))}
+          </select>
+          <div className="shrink-0 text-right ml-1">
+            <div className="text-[8px] uppercase tracking-widest text-zinc-600">Mark</div>
+            <div className="text-[13px] font-bold tabular-nums text-zinc-100 sm:text-[18px]">${fmt(currentPrice)}</div>
           </div>
         </div>
 
         {existingPos && (
-          <div className="mt-2 flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1.5 text-[10px]">
+          <div className="mt-1 flex items-center gap-1 rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-1 text-[9px]">
             <span className={`font-semibold ${existingPos.side === "long" ? "text-emerald-400" : "text-red-400"}`}>
               {existingPos.side.toUpperCase()}
             </span>
-            <span className="text-zinc-500">·</span>
+            <span className="text-zinc-600">·</span>
             <span className="text-zinc-400">{existingPos.leverage}x</span>
-            <span className="text-zinc-500">·</span>
-            <span className="text-zinc-400">{fmt(existingPos.amount)} {ticker}</span>
           </div>
         )}
       </div>
 
       {/* ── Order Ticket ── */}
-      <div className="flex flex-1 flex-col gap-2 px-2 py-2 sm:gap-3 sm:px-3 sm:py-3">
+      <div className="flex flex-1 flex-col gap-1.5 px-2 py-1.5 sm:gap-3 sm:px-3 sm:py-3">
 
         {/* Order type tabs */}
-        <div className="grid grid-cols-3 gap-0.5 rounded-lg bg-zinc-900 p-0.5">
+        <div className="grid grid-cols-3 gap-0.5 rounded bg-zinc-900 p-0.5">
           {(["market", "limit", "stop"] as TicketType[]).map((value) => (
             <button
               key={value}
               type="button"
               onClick={() => setTicketType(value)}
-              className={`rounded-md py-1 text-[10px] font-medium capitalize transition-all sm:py-1.5 sm:text-[11px] ${
+              className={`rounded py-0.5 text-[9px] font-medium capitalize transition-all sm:rounded-md sm:py-1.5 sm:text-[11px] ${
                 ticketType === value
                   ? "bg-zinc-700 text-zinc-100 shadow-sm"
                   : "text-zinc-500 hover:text-zinc-300"
@@ -441,7 +432,7 @@ export default function TradingPanel({
           <button
             type="button"
             onClick={() => setSide("long")}
-            className={`min-h-[44px] rounded-lg py-2 text-[12px] font-bold transition-all sm:py-2.5 sm:text-[13px] ${
+            className={`min-h-[38px] rounded-lg py-1.5 text-[11px] font-bold transition-all sm:min-h-[44px] sm:py-2.5 sm:text-[13px] ${
               side === "long"
                 ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/50"
                 : "bg-zinc-900 text-zinc-600 hover:bg-zinc-800 hover:text-emerald-400"
@@ -452,7 +443,7 @@ export default function TradingPanel({
           <button
             type="button"
             onClick={() => setSide("short")}
-            className={`min-h-[44px] rounded-lg py-2 text-[12px] font-bold transition-all sm:py-2.5 sm:text-[13px] ${
+            className={`min-h-[38px] rounded-lg py-1.5 text-[11px] font-bold transition-all sm:min-h-[44px] sm:py-2.5 sm:text-[13px] ${
               side === "short"
                 ? "bg-red-500/20 text-red-300 ring-1 ring-red-500/50"
                 : "bg-zinc-900 text-zinc-600 hover:bg-zinc-800 hover:text-red-400"
@@ -479,12 +470,12 @@ export default function TradingPanel({
         )}
 
         {/* Margin + Leverage */}
-        <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+        <div className="grid grid-cols-2 gap-1">
           <div>
-            <label className="mb-0.5 block text-[8px] uppercase tracking-widest text-zinc-600 sm:mb-1 sm:text-[10px]">Margin (USDT)</label>
+            <label className="mb-0.5 block text-[7px] uppercase tracking-widest text-zinc-600 sm:text-[10px]">Margin</label>
             <input
               type="number"
-              className="w-full rounded-lg border border-zinc-700/60 bg-zinc-900 px-2 py-1 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 sm:px-3 sm:py-1.5 sm:text-[12px]"
+              className="w-full rounded border border-zinc-700/60 bg-zinc-900 px-1.5 py-0.5 text-[10px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-[12px]"
               placeholder="0.00"
               value={marginUSD}
               onChange={(e) => setMarginUSD(e.target.value)}
@@ -495,7 +486,7 @@ export default function TradingPanel({
                   key={pct}
                   type="button"
                   onClick={() => setMarginUSD(((balance * pct) / 100).toFixed(2))}
-                  className="flex-1 rounded py-0.5 text-[8px] text-zinc-600 transition hover:bg-zinc-800 hover:text-zinc-300"
+                  className="flex-1 rounded py-0.5 text-[7px] text-zinc-600 transition hover:bg-zinc-800 hover:text-zinc-300"
                 >
                   {pct}%
                 </button>
@@ -503,10 +494,10 @@ export default function TradingPanel({
             </div>
           </div>
           <div>
-            <div className="mb-0.5 flex items-center justify-between sm:mb-1">
-              <label className="text-[8px] uppercase tracking-widest text-zinc-600 sm:text-[10px]">Leverage</label>
+            <div className="mb-0.5 flex items-center justify-between">
+              <label className="text-[7px] uppercase tracking-widest text-zinc-600 sm:text-[10px]">Leverage</label>
               {maxLeverage > 0 && (
-                <span className="text-[8px] text-zinc-700">max {maxLeverage}x</span>
+                <span className="text-[7px] text-zinc-700">{maxLeverage}x max</span>
               )}
             </div>
             <div className="grid grid-cols-5 gap-0.5">
@@ -515,7 +506,7 @@ export default function TradingPanel({
                   key={value}
                   type="button"
                   onClick={() => setLeverage(value)}
-                  className={`rounded-md py-0.5 text-[8px] font-semibold transition-all sm:py-1 sm:text-[9px] ${
+                  className={`rounded py-0.5 text-[7px] font-semibold transition-all sm:rounded-md sm:py-1 sm:text-[9px] ${
                     leverage === value
                       ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40"
                       : "bg-zinc-900 text-zinc-600 hover:bg-zinc-800 hover:text-zinc-300"
@@ -529,16 +520,16 @@ export default function TradingPanel({
         </div>
 
         {/* Mode + Notional */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-1">
           <div>
-            <label className="mb-1 block text-[10px] uppercase tracking-widest text-zinc-600">Mode</label>
-            <div className="grid grid-cols-2 gap-0.5 rounded-lg bg-zinc-900 p-0.5">
+            <label className="mb-0.5 block text-[7px] uppercase tracking-widest text-zinc-600 sm:text-[10px]">Mode</label>
+            <div className="grid grid-cols-2 gap-0.5 rounded bg-zinc-900 p-0.5">
               {(["isolated", "cross"] as MarginMode[]).map((mode) => (
                 <button
                   key={mode}
                   type="button"
                   onClick={() => setMarginMode(mode)}
-                  className={`rounded-md py-1 text-[10px] font-medium capitalize transition-all ${
+                  className={`rounded py-0.5 text-[8px] font-medium capitalize transition-all sm:rounded-md sm:py-1 sm:text-[10px] ${
                     marginMode === mode
                       ? "bg-zinc-700 text-zinc-100"
                       : "text-zinc-500 hover:text-zinc-300"
@@ -550,26 +541,26 @@ export default function TradingPanel({
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-[10px] uppercase tracking-widest text-zinc-600">Notional</label>
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1.5">
-              <div className="text-[12px] font-medium text-zinc-200">${fmt(notional)}</div>
-              <div className="text-[10px] text-zinc-600">{fmt(quantity)} {ticker}</div>
+            <label className="mb-0.5 block text-[7px] uppercase tracking-widest text-zinc-600 sm:text-[10px]">Notional</label>
+            <div className="rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-1 sm:rounded-lg sm:px-2.5 sm:py-1.5">
+              <div className="text-[10px] font-medium text-zinc-200 sm:text-[12px]">${fmt(notional)}</div>
+              <div className="text-[8px] text-zinc-600 sm:text-[10px]">{fmt(quantity)} {ticker}</div>
             </div>
           </div>
         </div>
 
         {/* TP / SL accordion */}
-        <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/40">
+        <div className="rounded border border-zinc-800/80 bg-zinc-900/40 sm:rounded-lg">
           <button
             type="button"
             onClick={() => setAdvancedOpen((open) => !open)}
-            className="flex w-full items-center justify-between px-3 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500 hover:text-zinc-400 transition-colors"
+            className="flex w-full items-center justify-between px-2 py-1.5 text-[9px] font-semibold uppercase tracking-widest text-zinc-500 hover:text-zinc-400 transition-colors sm:px-3 sm:py-2.5 sm:text-[10px]"
           >
-            <span className="flex items-center gap-1.5">
-              <SlidersHorizontal className="h-3 w-3 text-amber-400/80" />
+            <span className="flex items-center gap-1">
+              <SlidersHorizontal className="h-2.5 w-2.5 text-amber-400/80 sm:h-3 sm:w-3" />
               TP / SL
             </span>
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${advancedOpen ? "rotate-180" : ""}`} />
+            <ChevronDown className={`h-3 w-3 transition-transform duration-200 sm:h-3.5 sm:w-3.5 ${advancedOpen ? "rotate-180" : ""}`} />
           </button>
 
           {advancedOpen && (
@@ -696,17 +687,17 @@ export default function TradingPanel({
         </div>
 
         {/* Order summary */}
-        <div className="rounded-lg border border-zinc-800/60 bg-zinc-900/30 px-3 py-2.5 space-y-1">
-          <div className="flex items-center justify-between text-[10px]">
+        <div className="rounded border border-zinc-800/60 bg-zinc-900/30 px-2 py-1.5 space-y-0.5 sm:rounded-lg sm:px-3 sm:py-2.5 sm:space-y-1">
+          <div className="flex items-center justify-between text-[9px] sm:text-[10px]">
             <span className="text-zinc-600">Required</span>
             <span className="font-medium text-zinc-300">${fmt(requiredBalance)}</span>
           </div>
-          <div className="flex items-center justify-between text-[10px]">
+          <div className="flex items-center justify-between text-[9px] sm:text-[10px]">
             <span className="text-zinc-600">Fee ({(feeRate * 100).toFixed(3)}%)</span>
             <span className="font-medium text-zinc-300">${fmt(estimatedFee)}</span>
           </div>
-          <div className="flex items-center justify-between text-[10px]">
-            <span className="text-zinc-600">Liquidation</span>
+          <div className="flex items-center justify-between text-[9px] sm:text-[10px]">
+            <span className="text-zinc-600">Liq. Price</span>
             <span className="font-medium text-zinc-300">{liqPrice ? `$${fmt(liqPrice)}` : "—"}</span>
           </div>
           {(() => {
@@ -766,7 +757,7 @@ export default function TradingPanel({
           type="button"
           onClick={handleSubmit}
           disabled={submitDisabled}
-          className={`w-full rounded-lg py-3 text-[13px] font-bold tracking-wide transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600 ${
+          className={`w-full rounded-lg py-2 text-[12px] font-bold tracking-wide transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600 sm:py-3 sm:text-[13px] ${
             side === "long"
               ? "bg-emerald-500 text-zinc-950 hover:bg-emerald-400 active:bg-emerald-600"
               : "bg-red-500 text-white hover:bg-red-400 active:bg-red-600"
