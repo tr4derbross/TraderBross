@@ -376,10 +376,10 @@ export default function TradingPanel({
       </div>
 
       {/* ── Market Summary ── */}
-      <div className="px-1.5 py-0.5 border-b border-zinc-800/60 sm:px-3 sm:py-2.5">
+      <div className="px-1.5 py-px border-b border-zinc-800/60 sm:px-3 sm:py-2.5">
         <div className="flex items-center justify-between gap-1">
           <select
-            className="min-w-0 flex-1 rounded border border-zinc-700/50 bg-zinc-900 px-1 py-0.5 text-[9px] font-bold text-zinc-100 outline-none transition hover:border-zinc-600 sm:px-2.5 sm:py-1.5 sm:text-[12px] sm:rounded-lg"
+            className="min-w-0 flex-1 rounded border border-zinc-700/50 bg-zinc-900 px-1 py-px text-[8px] font-bold text-zinc-100 outline-none transition hover:border-zinc-600 sm:px-2.5 sm:py-1.5 sm:text-[12px] sm:rounded-lg"
             value={ticker}
             onChange={(e) => handleTickerChange(e.target.value)}
           >
@@ -390,8 +390,8 @@ export default function TradingPanel({
             ))}
           </select>
           <div className="shrink-0 text-right ml-1">
-            <div className="text-[7px] uppercase tracking-widest text-zinc-600 sm:text-[9px]">Mark</div>
-            <div className="text-[11px] font-bold tabular-nums text-zinc-100 sm:text-[18px]">${fmt(currentPrice)}</div>
+            <div className="text-[6px] uppercase tracking-widest text-zinc-600 sm:text-[9px]">Mark</div>
+            <div className="text-[10px] font-bold tabular-nums text-zinc-100 sm:text-[18px]">${fmt(currentPrice)}</div>
           </div>
         </div>
 
