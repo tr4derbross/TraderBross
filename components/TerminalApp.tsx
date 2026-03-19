@@ -1436,7 +1436,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
   return (
     <div className="flex flex-col overflow-hidden bg-black" style={{ height: "100dvh" }}>
-      <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-3 py-1.5 sm:py-2 sm:px-4 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
+      <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-2 py-1 sm:px-4 sm:py-1.5 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
         {/* Left: Fear & Greed + page nav */}
         <div className="absolute left-3 top-1/2 z-10 -translate-y-1/2 sm:left-4 flex items-center gap-2">
           <FearGreedPill />
@@ -1461,7 +1461,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         {/* Center brand */}
         <div className="relative z-10 flex items-center justify-center px-2">
           <div className="relative">
-            <BrandMark className="mx-auto" />
+            <BrandMark className="mx-auto scale-75 sm:scale-100" />
             {/* Live data indicator */}
             {wsConnected && (
               <span

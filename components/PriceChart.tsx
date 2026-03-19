@@ -705,17 +705,17 @@ export default function PriceChart({
       {/* ── Mobile: single compact header row ─────────────────────────────────── */}
       {isMobile ? (
         <div
-          className="flex items-center gap-2 border-b shrink-0 px-2"
+          className="flex items-center gap-1.5 border-b shrink-0 px-1.5"
           style={{
             borderColor: "rgba(39,39,42,0.72)",
             background: "linear-gradient(180deg, rgba(27,22,16,0.98), rgba(12,11,10,0.96))",
-            minHeight: 46,
+            minHeight: 36,
           }}
         >
           {/* Ticker select + PERP */}
-          <div className="flex items-center gap-1.5 shrink-0 border-r pr-2" style={{ borderColor: "rgba(39,39,42,0.72)" }}>
+          <div className="flex items-center gap-1 shrink-0 border-r pr-1.5" style={{ borderColor: "rgba(39,39,42,0.72)" }}>
             <select
-              className="cursor-pointer bg-transparent text-[13px] font-bold text-white outline-none"
+              className="cursor-pointer bg-transparent text-[11px] font-bold text-white outline-none"
               value={ticker}
               onChange={(event) => onTickerChange?.(event.target.value)}
             >
@@ -724,7 +724,7 @@ export default function PriceChart({
               ))}
             </select>
             <span
-              className="rounded-full px-1.5 py-0.5 text-[8px] font-bold shrink-0"
+              className="rounded-full px-1 py-0.5 text-[7px] font-bold shrink-0"
               style={{ color: "#f0b90b", background: "rgba(240,185,11,0.1)", border: "1px solid rgba(240,185,11,0.24)" }}
             >
               PERP
@@ -737,7 +737,7 @@ export default function PriceChart({
               <button
                 key={item}
                 onClick={() => setTimeframe(item)}
-                className="rounded px-2 py-1 text-[11px] font-semibold transition-all"
+                className="rounded px-1.5 py-0.5 text-[10px] font-semibold transition-all"
                 style={
                   timeframe === item
                     ? { color: "#f1d48f", background: "rgba(212,161,31,0.18)", border: "1px solid rgba(212,161,31,0.28)" }
@@ -750,10 +750,10 @@ export default function PriceChart({
           </div>
 
           {/* Chart type toggle + fullscreen */}
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 shrink-0">
             <button
               onClick={() => setChartType(chartType === "candles" ? "line" : "candles")}
-              className="rounded px-2 py-1 text-[10px] font-semibold transition-all"
+              className="rounded px-1.5 py-0.5 text-[9px] font-semibold transition-all"
               style={{ color: "#71717a", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
               title={`Switch to ${chartType === "candles" ? "line" : "candles"}`}
             >
@@ -761,11 +761,11 @@ export default function PriceChart({
             </button>
             <button
               onClick={toggleFullscreen}
-              className="rounded p-1.5 transition-all"
+              className="rounded p-1 transition-all"
               style={{ color: "#71717a", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
               title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
             >
-              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              {isFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
             </button>
           </div>
         </div>
