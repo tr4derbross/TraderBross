@@ -705,17 +705,17 @@ export default function PriceChart({
       {/* ── Mobile: single compact header row ─────────────────────────────────── */}
       {isMobile ? (
         <div
-          className="flex items-center gap-1 border-b shrink-0 px-1.5"
+          className="flex items-center gap-1 border-b shrink-0 px-1"
           style={{
             borderColor: "rgba(39,39,42,0.72)",
             background: "linear-gradient(180deg, rgba(27,22,16,0.98), rgba(12,11,10,0.96))",
-            minHeight: 28,
+            minHeight: 24,
           }}
         >
           {/* Ticker select + PERP */}
           <div className="flex items-center gap-0.5 shrink-0 border-r pr-1" style={{ borderColor: "rgba(39,39,42,0.72)" }}>
             <select
-              className="cursor-pointer bg-transparent text-[10px] font-bold text-white outline-none"
+              className="cursor-pointer bg-transparent text-[9px] font-bold text-white outline-none"
               value={ticker}
               onChange={(event) => onTickerChange?.(event.target.value)}
             >

@@ -94,12 +94,12 @@ export default function FilterBar({
       </div>
 
       {/* ── Search + filters row (kompakt) ── */}
-      <div className="flex items-center gap-1 px-1.5 py-1 sm:gap-2 sm:px-3 sm:py-2">
-        <div className="terminal-input flex min-w-0 flex-1 items-center gap-0.5 rounded px-1.5 py-0.5 sm:rounded-lg sm:px-2 sm:py-1">
-          <Search className="h-2.5 w-2.5 shrink-0 text-zinc-500 sm:h-3 sm:w-3" />
+      <div className="flex items-center gap-1 px-1.5 py-0.5 sm:gap-2 sm:px-3 sm:py-2">
+        <div className="terminal-input flex min-w-0 flex-1 items-center gap-0.5 rounded px-1 py-px sm:rounded-lg sm:px-2 sm:py-1">
+          <Search className="h-2 w-2 shrink-0 text-zinc-500 sm:h-3 sm:w-3" />
           <input
-            className="min-w-0 flex-1 bg-transparent text-[9px] text-amber-100 placeholder-zinc-600 outline-none sm:text-[11px]"
-            placeholder="Search..."
+            className="min-w-0 flex-1 bg-transparent text-[8px] text-amber-100 placeholder-zinc-600 outline-none sm:text-[11px]"
+            placeholder="Ara..."
             value={keyword}
             onChange={(e) => onKeyword(e.target.value)}
           />
@@ -113,7 +113,7 @@ export default function FilterBar({
         {(sourceFilter === "all" || sourceFilter === "news" || sourceFilter === "social") && (
           <>
             <select
-              className="terminal-input shrink-0 cursor-pointer rounded-lg px-1.5 py-1 text-[10px] text-zinc-100 outline-none sm:px-2 sm:text-xs"
+              className="terminal-input shrink-0 cursor-pointer rounded px-1 py-px text-[8px] text-zinc-100 outline-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
               value={sector}
               onChange={(e) => onSector(e.target.value)}
             >
