@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateMockPriceData, generateTickerQuotes } from "@/lib/mock-data";
+import { logger } from "@/lib/logger";
 
 const BINANCE_REST_BASE = "https://data-api.binance.vision";
 
@@ -70,7 +71,7 @@ async function getOHLCV(ticker: string, interval: string, limit: number) {
 
     return NextResponse.json(data);
   } catch (err) {
-    console.error("Binance OHLCV fallback:", err);
+    logger.error("Binance OHLCV fallback:", err);
     return NextResponse.json(generateMockPriceData(ticker, safeLimit));
   }
 }
@@ -118,7 +119,7 @@ async function getQuotes() {
 
     return NextResponse.json(quotes);
   } catch (err) {
-    console.error("Binance quotes fallback:", err);
+    logger.error("Binance quotes fallback:", err);
     return NextResponse.json(generateTickerQuotes());
   }
 }

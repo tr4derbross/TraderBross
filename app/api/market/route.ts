@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 
 export async function GET() {
   try {
@@ -30,7 +31,7 @@ export async function GET() {
       updatedAt: new Date().toISOString(),
     });
   } catch (err) {
-    console.error("Market API error:", err);
+    logger.error("Market API error:", err);
     return NextResponse.json({
       marketCapUsd: null,
       volume24hUsd: null,

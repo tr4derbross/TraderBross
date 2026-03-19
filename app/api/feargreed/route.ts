@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withCache } from "@/lib/server-cache";
+import { logger } from "@/lib/logger";
 
 export interface FearGreedData {
   value: number;          // 0-100
@@ -62,7 +63,7 @@ export async function GET() {
         })),
       } satisfies FearGreedData;
     } catch (err) {
-      console.error("Fear & Greed API error:", err);
+      logger.error("Fear & Greed API error:", err);
       return mockFearGreed();
     }
   });

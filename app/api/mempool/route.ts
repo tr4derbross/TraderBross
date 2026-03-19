@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 
 const BASE = "https://mempool.space/api";
 
@@ -40,7 +41,7 @@ export async function GET() {
       updatedAt: new Date().toISOString(),
     });
   } catch (err) {
-    console.error("Mempool API error:", err);
+    logger.error("Mempool API error:", err);
     return NextResponse.json({
       fees: null,
       blockHeight: null,

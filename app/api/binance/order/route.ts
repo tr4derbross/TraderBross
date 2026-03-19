@@ -127,6 +127,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Invalid request body" }, { status: 400 });
   }
 
+  const VALID_SYMBOLS = new Set(["BTC","ETH","SOL","BNB","XRP","DOGE","ADA","AVAX","DOT","LINK","LTC","BCH","UNI","ATOM","FIL","APT","ARB","OP","INJ","TIA","SUI","SEI","WLD","PEPE","SHIB","FTM","MATIC","NEAR","AAVE","CRV","MKR","SNX","COMP","YFI","SUSHI","1INCH","ENS","GRT","IMX","SAND","MANA","AXS","GALA","CHZ"]);
+  if (!body.symbol || !VALID_SYMBOLS.has(String(body.symbol).toUpperCase())) {
+    return NextResponse.json({ ok: false, error: "Invalid symbol" }, { status: 400 });
+  }
+
   if (!body.sessionToken) {
     return NextResponse.json({ ok: false, error: "Session token required" }, { status: 401 });
   }

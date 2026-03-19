@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { withCache } from "@/lib/server-cache";
+import { logger } from "@/lib/logger";
 
 const OKX_BASE = "https://www.okx.com";
 
@@ -93,7 +94,7 @@ async function getQuotes() {
       })
     );
   } catch (err) {
-    console.error("OKX quotes:", err);
+    logger.error("OKX quotes:", err);
     return NextResponse.json([]);
   }
 }
@@ -133,7 +134,7 @@ async function getOHLCV(ticker: string, interval: string, limit: number) {
       }))
     );
   } catch (err) {
-    console.error("OKX OHLCV:", err);
+    logger.error("OKX OHLCV:", err);
     return NextResponse.json([]);
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { withCache } from "@/lib/server-cache";
+import { logger } from "@/lib/logger";
 
 const BYBIT_BASE = "https://api.bybit.com";
 
@@ -97,7 +98,7 @@ async function getQuotes() {
         })
     );
   } catch (err) {
-    console.error("Bybit quotes:", err);
+    logger.error("Bybit quotes:", err);
     return NextResponse.json([]);
   }
 }
@@ -134,7 +135,7 @@ async function getOHLCV(ticker: string, interval: string, limit: number) {
       }))
     );
   } catch (err) {
-    console.error("Bybit OHLCV:", err);
+    logger.error("Bybit OHLCV:", err);
     return NextResponse.json([]);
   }
 }

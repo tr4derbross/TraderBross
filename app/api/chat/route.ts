@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { streamChat, getProviderLabel } from "@/lib/ai-providers";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,12 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request);
+  const { allowed } = rateLimit(`chat:${ip}`, 20, 60_000);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests. Please wait before trying again." }, { status: 429 });
+  }
+
   try {
     const body = await request.json();
     const {
