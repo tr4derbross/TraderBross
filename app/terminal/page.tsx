@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import TerminalMvpApp from "@/components/TerminalMvpApp";
+import TerminalApp from "@/components/TerminalApp";
 
 // Read ticker from ?ticker=ETH and pass to TerminalApp
 export default async function TerminalPage({
@@ -11,7 +11,7 @@ export default async function TerminalPage({
   const ticker = params.ticker?.toUpperCase();
   return (
     <Suspense fallback={null}>
-      <TerminalMvpApp initialTicker={ticker} />
+      <TerminalApp initialTicker={ticker} />
     </Suspense>
   );
 }
