@@ -18,6 +18,8 @@ type Props = {
   onImportance: (i: ImportanceFilter) => void;
   onSentiment: (s: SentimentFilter) => void;
   counts: { news: number; whale: number; social: number; liquidation: number; all: number };
+  /** Override label for the liquidation tab (e.g. "Liq $4.2M") */
+  liqLabel?: string;
 };
 
 const IMPORTANCE_OPTIONS: { key: ImportanceFilter; label: string; style: string }[] = [
@@ -57,6 +59,7 @@ export default function FilterBar({
   onImportance,
   onSentiment,
   counts,
+  liqLabel,
 }: Props) {
   return (
     <div className="flex flex-col border-b border-[rgba(212,161,31,0.1)] bg-[linear-gradient(180deg,rgba(20,17,13,0.96),rgba(11,10,10,0.94))]">
@@ -64,6 +67,7 @@ export default function FilterBar({
         {SOURCE_TABS.map(({ key, label, icon, color }) => {
           const count = key === "all" ? counts.all : (counts[key as keyof typeof counts] ?? 0);
           const active = sourceFilter === key;
+          const displayLabel = key === "liquidation" && liqLabel ? liqLabel : label;
 
           return (
             <button
@@ -74,7 +78,7 @@ export default function FilterBar({
               }`}
             >
               {icon}
-              {label}
+              {displayLabel}
               <span
                 className={`rounded-full px-1.5 py-0.5 text-[9px] ${
                   active ? "bg-[rgba(212,161,31,0.12)] text-amber-50" : "bg-black/20 text-zinc-500"

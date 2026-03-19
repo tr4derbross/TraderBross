@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import {
   RefreshCw,
@@ -21,6 +21,7 @@ import {
 import Navbar from "@/components/Navbar";
 import { useNews, SourceFilter, SentimentFilter } from "@/hooks/useNews";
 import type { NewsItem } from "@/lib/mock-data";
+import type { LiquidationEvent } from "@/lib/binance-liquidation-ws";
 import { getAllTradeLinks } from "@/lib/referral-links";
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
@@ -108,6 +109,11 @@ function NewsCard({
             {item.authorHandle && (
               <span className="text-[11px] text-[#6B6B6B]">
                 @{item.authorHandle}
+              </span>
+            )}
+            {item.importance === "breaking" && (
+              <span className="rounded-sm bg-[#FF4D4D] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] text-white">
+                BREAKING
               </span>
             )}
             <span className="ml-auto text-[10px] text-[#3A3A3A]">
@@ -423,6 +429,33 @@ export default function NewsPage() {
   }, []);
   void now;
 
+  // Liquidations state — polled every 5s independently of useNews
+  const [liqItems, setLiqItems] = useState<LiquidationEvent[]>([]);
+
+  const fetchLiquidations = useCallback(async () => {
+    try {
+      const res = await fetch("/api/liquidations?limit=15");
+      if (!res.ok) return;
+      const data = (await res.json()) as { liquidations: LiquidationEvent[] };
+      if (Array.isArray(data.liquidations) && data.liquidations.length > 0) {
+        setLiqItems(
+          data.liquidations.map((liq) => ({
+            ...liq,
+            timestamp: new Date(liq.timestamp),
+          })),
+        );
+      }
+    } catch {
+      // silent fail — keep previous state
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchLiquidations();
+    const id = setInterval(() => void fetchLiquidations(), 5_000);
+    return () => clearInterval(id);
+  }, [fetchLiquidations]);
+
   const { news, loading, liveCount, isLive, refreshNews, counts } = useNews({
     sourceFilter,
     sentimentFilter,
@@ -460,7 +493,7 @@ export default function NewsPage() {
       <Navbar />
 
       {/* Main layout */}
-      <div className="relative z-10 flex min-h-0 flex-1 overflow-hidden">
+      <div className="news-grid relative z-10 flex min-h-0 flex-1 overflow-hidden">
         {/* Left: news feed */}
         <div className="flex w-full flex-col border-r border-[rgba(242,183,5,0.08)] lg:w-[520px] xl:w-[560px]">
           {/* Feed header */}
@@ -500,7 +533,7 @@ export default function NewsPage() {
           </div>
 
           {/* Sticky filter bar */}
-          <div className="shrink-0 space-y-2 border-b border-[rgba(242,183,5,0.08)] bg-[#0B0B0B]/95 px-4 py-2.5 backdrop-blur-sm">
+          <div className="news-filter-row shrink-0 space-y-2 border-b border-[rgba(242,183,5,0.08)] bg-[#0B0B0B]/95 px-4 py-2.5 backdrop-blur-sm">
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[#6B6B6B]" />
@@ -514,7 +547,7 @@ export default function NewsPage() {
             </div>
 
             {/* Source + sentiment tabs */}
-            <div className="flex gap-1">
+            <div className="ticker-filter-bar flex gap-1">
               {SOURCE_TABS.map(({ label, value, icon }) => (
                 <button
                   key={value}
@@ -586,7 +619,7 @@ export default function NewsPage() {
         </div>
 
         {/* Right: sidebar */}
-        <div className="hidden min-h-0 flex-1 flex-col overflow-y-auto lg:flex">
+        <div className="news-right-panel hidden min-h-0 flex-1 flex-col overflow-y-auto lg:flex">
           {/* Chart header */}
           <div className="flex shrink-0 items-center justify-between border-b border-[rgba(242,183,5,0.08)] px-4 py-2.5">
             <div className="flex items-center gap-2">

@@ -694,32 +694,6 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     });
   }, [venuePositions, positions, wsPrices]);
 
-  const handleSelectItem = (item: NewsItem) => {
-    setSelectedItem(item);
-    if (item.ticker.length > 0) {
-      const match = item.ticker.find((t) => AVAILABLE_TICKERS.includes(t));
-      if (match) {
-        setActiveSymbol(match);
-        setRightTab("trade");
-        if (showDesktopLayout) {
-          setMobileWorkspaceTab("chart");
-        } else {
-          setMobileWorkspaceTab("tools");
-        }
-      }
-    }
-  };
-
-  const handleTickerRoute = (ticker: string, item: NewsItem) => {
-    setSelectedItem(item);
-    setActiveSymbol(ticker);
-    setRightTab("trade");
-
-    if (!showDesktopLayout) {
-      setMobileWorkspaceTab("tools");
-    }
-  };
-
   const handleNewsQuickTrade = (preset: NewsTradePreset, item: NewsItem) => {
     setSelectedItem(item);
     setActiveSymbol(preset.symbol);
@@ -770,6 +744,35 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       activeSymbol: symbol,
     }));
   }, []);
+
+  const handleSelectItem = useCallback((item: NewsItem) => {
+    setSelectedItem(item);
+    if (item.ticker.length > 0) {
+      // Derive symbol directly from parameter — avoids stale closure on activeSymbol
+      const match = item.ticker.find((t) => AVAILABLE_TICKERS.includes(t));
+      if (match) {
+        setActiveSymbol(match);
+        setRightTab("trade");
+        setMobileWorkspaceTab(() => {
+          // Read viewport inline to avoid stale closure on showDesktopLayout
+          const desktop = window.innerWidth >= 1280;
+          return desktop ? "chart" : "tools";
+        });
+      }
+    }
+  }, [setActiveSymbol]);
+
+  const handleTickerRoute = useCallback((ticker: string, item: NewsItem) => {
+    setSelectedItem(item);
+    // Derive symbol directly from the ticker parameter — no stale state read
+    const symbol = ticker.split("-")[0].replace(/USDT$/i, "").replace(/PERP$/i, "") || ticker;
+    setActiveSymbol(AVAILABLE_TICKERS.includes(symbol) ? symbol : ticker);
+    setRightTab("trade");
+    setMobileWorkspaceTab((prev) => {
+      const desktop = window.innerWidth >= 1280;
+      return desktop ? prev : "tools";
+    });
+  }, [setActiveSymbol]);
 
   const buildActiveVenueConnection = useCallback((): VenueConnectionInput | undefined => {
     if (activeVenueState.venueType === "cex" && selectedHeaderCexPlatform) {

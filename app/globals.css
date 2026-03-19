@@ -1385,3 +1385,129 @@ button, a {
   .panel-section-title { font-size: 7px !important; letter-spacing: 0.18em !important; }
   .watch-row, .signal-row { padding: 4px 8px !important; font-size: 8px !important; }
 }
+
+/* ─── Agent 1: Mobile Responsive Overrides ─────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Typography scale */
+  .symbol-name    { font-size: 14px !important; }
+  .perp-badge     { font-size: 10px !important; padding: 1px 4px !important; }
+  .price-display  { font-size: 12px !important; }
+  .timeframe-btn  { font-size: 10px !important; padding: 2px 4px !important; }
+  .panel-title    { font-size: 11px !important; }
+  .trade-btn      { font-size: 13px !important; min-height: 44px !important; }
+  .mark-price     { font-size: 20px !important; }
+  .tab-label      { font-size: 11px !important; }
+
+  /* Stats bar: horizontal scroll, hide noise */
+  .stats-bar {
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .stats-bar::-webkit-scrollbar { display: none !important; }
+  .stats-bar .hide-mobile { display: none !important; }
+
+  /* Chart container */
+  .chart-container {
+    height: 48dvh !important;
+    min-height: 220px !important;
+  }
+
+  /* Wallet/DEX block */
+  .wallet-dex-block {
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+  .wallet-dex-block > * {
+    width: 100% !important;
+  }
+
+  /* iOS safe area */
+  .terminal-wrapper {
+    padding-bottom: env(safe-area-inset-bottom) !important;
+  }
+
+  /* News page: single column */
+  .news-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .news-right-panel {
+    display: none !important;
+  }
+  .news-filter-row {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+  .news-filter-row select,
+  .news-filter-row .filter-dropdown {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .ticker-filter-bar {
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+    flex-wrap: nowrap !important;
+  }
+  .ticker-filter-bar::-webkit-scrollbar { display: none !important; }
+
+  /* Tab reflow prevention */
+  .tab-content {
+    min-height: 200px !important;
+  }
+
+  /* Focus states for keyboard nav */
+  button:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 1px solid #f0b90b !important;
+    outline-offset: 2px !important;
+  }
+}
+
+/* ─── Global: Custom Scrollbar ──────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #1a1a1a; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #444; }
+
+/* ─── Global: Panel border consistency ──────────────────────────────────────── */
+.panel-border { border: 1px solid #2a2a2a !important; }
+
+/* ─── Global: Hover transitions ─────────────────────────────────────────────── */
+button, [role="button"], a, .clickable {
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, opacity 150ms ease;
+}
+
+/* ─── Global: IBM Plex Mono for numbers ─────────────────────────────────────── */
+.tabular-nums, .price, .amount, .ticker-price, .order-size, .pnl-value {
+  font-family: "IBM Plex Mono", ui-monospace, monospace !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ─── Global: Skeleton animation ────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 3px;
+}
+
+/* ─── Agent 4: Focus states + Tab reflow ────────────────────────────────────── */
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 1px solid #f0b90b;
+  outline-offset: 2px;
+}
+
+.tab-content {
+  min-height: 200px;
+}
