@@ -63,7 +63,9 @@ export default function FilterBar({
 }: Props) {
   return (
     <div className="flex flex-col border-b border-[rgba(212,161,31,0.1)] bg-[linear-gradient(180deg,rgba(20,17,13,0.96),rgba(11,10,10,0.94))]">
-      <div className="flex items-center gap-0 border-b border-[rgba(212,161,31,0.08)] px-3 pb-0 pt-2">
+
+      {/* ── Source tabs ── */}
+      <div className="flex items-center gap-0 overflow-x-auto border-b border-[rgba(212,161,31,0.08)] px-2 pb-0 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {SOURCE_TABS.map(({ key, label, icon, color }) => {
           const count = key === "all" ? counts.all : (counts[key as keyof typeof counts] ?? 0);
           const active = sourceFilter === key;
@@ -73,14 +75,14 @@ export default function FilterBar({
             <button
               key={key}
               onClick={() => onSource(key)}
-              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[11px] font-medium transition-colors ${
+              className={`flex shrink-0 items-center gap-1 border-b-2 px-2 py-1.5 text-[10px] font-medium transition-colors sm:gap-1.5 sm:px-3 sm:py-2 sm:text-[11px] ${
                 active ? `border-[rgba(212,161,31,0.72)] ${color}` : "border-transparent text-zinc-500 hover:text-zinc-300"
               }`}
             >
-              {icon}
+              <span className="hidden sm:inline">{icon}</span>
               {displayLabel}
               <span
-                className={`rounded-full px-1.5 py-0.5 text-[9px] ${
+                className={`rounded-full px-1 py-0.5 text-[8px] sm:px-1.5 sm:text-[9px] ${
                   active ? "bg-[rgba(212,161,31,0.12)] text-amber-50" : "bg-black/20 text-zinc-500"
                 }`}
               >
@@ -91,11 +93,12 @@ export default function FilterBar({
         })}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2">
-        <div className="terminal-input flex items-center gap-1 rounded-lg px-2 py-1">
+      {/* ── Search + filters row (kompakt) ── */}
+      <div className="flex items-center gap-1.5 px-2 py-1.5 sm:gap-2 sm:px-3 sm:py-2">
+        <div className="terminal-input flex min-w-0 flex-1 items-center gap-1 rounded-lg px-2 py-1">
           <Search className="h-3 w-3 shrink-0 text-zinc-500" />
           <input
-            className="w-28 bg-transparent text-xs text-amber-100 placeholder-zinc-600 outline-none"
+            className="min-w-0 flex-1 bg-transparent text-[11px] text-amber-100 placeholder-zinc-600 outline-none sm:text-xs"
             placeholder="Search..."
             value={keyword}
             onChange={(e) => onKeyword(e.target.value)}
@@ -110,7 +113,7 @@ export default function FilterBar({
         {(sourceFilter === "all" || sourceFilter === "news" || sourceFilter === "social") && (
           <>
             <select
-              className="terminal-input cursor-pointer rounded-lg px-2 py-1 text-xs text-zinc-100 outline-none"
+              className="terminal-input shrink-0 cursor-pointer rounded-lg px-1.5 py-1 text-[10px] text-zinc-100 outline-none sm:px-2 sm:text-xs"
               value={sector}
               onChange={(e) => onSector(e.target.value)}
             >
@@ -122,82 +125,65 @@ export default function FilterBar({
             </select>
 
             <select
-              className="terminal-input cursor-pointer rounded-lg px-2 py-1 text-xs text-zinc-100 outline-none"
+              className="terminal-input hidden shrink-0 cursor-pointer rounded-lg px-1.5 py-1 text-[10px] text-zinc-100 outline-none sm:block sm:px-2 sm:text-xs"
               value={ticker}
               onChange={(e) => onTicker(e.target.value)}
             >
-              <option value="" className="bg-zinc-900">
-                All Tickers
-              </option>
+              <option value="" className="bg-zinc-900">All Tickers</option>
               {AVAILABLE_TICKERS.map((item) => (
-                <option key={item} value={item} className="bg-zinc-900">
-                  {item}
-                </option>
+                <option key={item} value={item} className="bg-zinc-900">{item}</option>
               ))}
             </select>
           </>
         )}
 
-        <div className="ml-auto flex flex-wrap gap-1.5">
-          {sector !== "All" && (sourceFilter === "all" || sourceFilter === "news") && (
-            <span
-              className="brand-badge cursor-pointer rounded-full px-2 py-0.5 text-[10px] text-amber-100"
-              onClick={() => onSector("All")}
-            >
-              {sector} ×
-            </span>
-          )}
-          {ticker && (
-            <span
-              className="brand-badge brand-badge-gold cursor-pointer rounded-full px-2 py-0.5 text-[10px]"
-              onClick={() => onTicker("")}
-            >
-              {ticker} ×
-            </span>
-          )}
-        </div>
+        {/* Active filter badges */}
+        {sector !== "All" && (
+          <span className="brand-badge cursor-pointer rounded-full px-1.5 py-0.5 text-[9px] text-amber-100" onClick={() => onSector("All")}>
+            {sector} ×
+          </span>
+        )}
+        {ticker && (
+          <span className="brand-badge brand-badge-gold cursor-pointer rounded-full px-1.5 py-0.5 text-[9px]" onClick={() => onTicker("")}>
+            {ticker} ×
+          </span>
+        )}
       </div>
 
-      {/* Importance + Sentiment quick filters — hidden for special feeds */}
+      {/* ── Impact + Sentiment — masaüstünde göster, mobilde gizle ── */}
       {sourceFilter !== "whale" && sourceFilter !== "liquidation" && (
-      <div className="flex items-center gap-2 overflow-x-auto border-t border-[rgba(212,161,31,0.07)] px-3 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <span className="shrink-0 text-[9px] uppercase tracking-[0.18em] text-zinc-600">Impact</span>
-        <div className="flex shrink-0 gap-1">
-          {IMPORTANCE_OPTIONS.map(({ key, label, style }) => (
-            <button
-              key={key}
-              onClick={() => onImportance(key)}
-              className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-medium transition-all ${
-                importanceFilter === key
-                  ? `${style} opacity-100`
-                  : "border-transparent text-zinc-600 hover:text-zinc-400"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="hidden items-center gap-2 overflow-x-auto border-t border-[rgba(212,161,31,0.07)] px-3 py-1.5 sm:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <span className="shrink-0 text-[9px] uppercase tracking-[0.18em] text-zinc-600">Impact</span>
+          <div className="flex shrink-0 gap-1">
+            {IMPORTANCE_OPTIONS.map(({ key, label, style }) => (
+              <button
+                key={key}
+                onClick={() => onImportance(key)}
+                className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-medium transition-all ${
+                  importanceFilter === key ? `${style} opacity-100` : "border-transparent text-zinc-600 hover:text-zinc-400"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="mx-1 h-3 w-px shrink-0 bg-zinc-800" />
+          <span className="shrink-0 text-[9px] uppercase tracking-[0.18em] text-zinc-600">Sent.</span>
+          <div className="flex shrink-0 gap-1">
+            {SENTIMENT_OPTIONS.map(({ key, label, icon, style }) => (
+              <button
+                key={key}
+                onClick={() => onSentiment(key)}
+                className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-medium transition-all ${
+                  sentimentFilter === key ? `${style} opacity-100` : "border-transparent text-zinc-600 hover:text-zinc-400"
+                }`}
+              >
+                {icon}
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-
-        <div className="mx-1 h-3 w-px shrink-0 bg-zinc-800" />
-
-        <span className="shrink-0 text-[9px] uppercase tracking-[0.18em] text-zinc-600">Sent.</span>
-        <div className="flex shrink-0 gap-1">
-          {SENTIMENT_OPTIONS.map(({ key, label, icon, style }) => (
-            <button
-              key={key}
-              onClick={() => onSentiment(key)}
-              className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-medium transition-all ${
-                sentimentFilter === key
-                  ? `${style} opacity-100`
-                  : "border-transparent text-zinc-600 hover:text-zinc-400"
-              }`}
-            >
-              {icon}
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
       )}
     </div>
   );
