@@ -93,11 +93,11 @@ export default function FilterBar({
       </div>
 
       {/* Search + filters row */}
-      <div className="flex flex-wrap items-center gap-1 px-1.5 py-1 sm:flex-nowrap sm:gap-2 sm:px-3 sm:py-2">
-        <div className="terminal-input order-1 flex min-w-0 w-full items-center gap-1 rounded-md px-2 py-1 sm:w-auto sm:flex-1 sm:rounded-lg sm:px-2 sm:py-1">
+      <div className="flex items-center gap-1 px-1.5 py-0.5 sm:flex-nowrap sm:gap-2 sm:px-3 sm:py-2">
+        <div className="terminal-input order-1 flex min-w-0 flex-1 items-center gap-1 rounded-md px-2 py-0.5 sm:w-auto sm:flex-1 sm:rounded-lg sm:px-2 sm:py-1">
           <Search className="h-3 w-3 shrink-0 text-zinc-500" />
           <input
-            className="min-w-0 flex-1 bg-transparent text-[11px] text-amber-100 placeholder-zinc-600 outline-none"
+            className="min-w-0 flex-1 bg-transparent text-[10px] text-amber-100 placeholder-zinc-600 outline-none sm:text-[11px]"
             placeholder="Ara..."
             value={keyword}
             onChange={(e) => onKeyword(e.target.value)}
@@ -110,9 +110,9 @@ export default function FilterBar({
         </div>
 
         {(sourceFilter === "all" || sourceFilter === "news" || sourceFilter === "social") && (
-          <div className="order-2 flex w-full items-center gap-1 sm:w-auto">
+          <div className="order-2 flex items-center gap-1 sm:w-auto">
             <select
-              className="terminal-input h-8 min-w-0 flex-1 cursor-pointer rounded-md px-2 text-[11px] text-zinc-300 outline-none sm:h-auto sm:w-auto sm:flex-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
+              className="terminal-input h-7 w-[72px] cursor-pointer rounded-md px-1.5 text-[10px] text-zinc-300 outline-none sm:h-auto sm:w-auto sm:flex-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
               value={sector}
               onChange={(e) => onSector(e.target.value)}
             >
@@ -124,7 +124,7 @@ export default function FilterBar({
             </select>
 
             <select
-              className="terminal-input h-8 min-w-0 flex-1 cursor-pointer rounded-md px-2 text-[11px] text-zinc-100 outline-none sm:h-auto sm:w-auto sm:flex-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
+              className="terminal-input hidden h-7 w-[106px] cursor-pointer rounded-md px-1.5 text-[10px] text-zinc-100 outline-none sm:block sm:h-auto sm:w-auto sm:flex-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
               value={ticker}
               onChange={(e) => onTicker(e.target.value)}
             >
@@ -140,7 +140,7 @@ export default function FilterBar({
           </div>
         )}
 
-        <div className="order-3 flex w-full flex-wrap items-center gap-1 sm:w-auto">
+        <div className="order-3 hidden w-full flex-wrap items-center gap-1 sm:flex sm:w-auto">
           {sector !== "All" && (
             <span className="brand-badge cursor-pointer rounded-full px-1.5 py-0.5 text-[9px] text-amber-100" onClick={() => onSector("All")}>
               {sector} x
