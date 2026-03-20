@@ -346,6 +346,7 @@ export function createNewsIngestionEngine({ watchlistTickers = WATCHLIST_DEFAULT
         const relevanceMeta = relevance.score(item.tickers, { priorityScore: item.priority.score });
         return {
           kind: "news",
+          sourceType: item.sourceType || "news",
           id: item.id,
           source: item.source,
           title: item.title,
