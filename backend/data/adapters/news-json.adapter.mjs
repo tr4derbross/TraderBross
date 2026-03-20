@@ -7,26 +7,73 @@ function inferSentimentFromVotes(positive = 0, negative = 0) {
   return "neutral";
 }
 
-export async function fetchJsonNews({ cryptopanicKey = "" } = {}) {
+function parseBlockchairTime(value) {
+  if (!value) return new Date().toISOString();
+  const normalized = String(value).trim().replace(" ", "T");
+  const withZone = /z$/i.test(normalized) ? normalized : `${normalized}Z`;
+  const date = new Date(withZone);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : new Date().toISOString();
+}
+
+export async function fetchJsonNews({ cryptopanicKey = "", cryptocompareApiKey = "" } = {}) {
   const requests = [
-    fetchJson("https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest", { timeoutMs: 6000 }),
+    fetchJson("https://api.blockchair.com/news", { timeoutMs: 7000 }),
   ];
-
-  const params = new URLSearchParams({
-    public: "true",
-    kind: "news",
-    metadata: "true",
-    regions: "en",
-  });
-  if (cryptopanicKey) {
-    params.set("auth_token", cryptopanicKey);
+  if (cryptocompareApiKey) {
+    requests.push(
+      fetchJson(
+        `https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest&api_key=${encodeURIComponent(
+          cryptocompareApiKey,
+        )}`,
+        { timeoutMs: 7000 },
+      ),
+    );
   }
-  requests.push(fetchJson(`https://cryptopanic.com/api/v1/posts/?${params.toString()}`, { timeoutMs: 6000 }));
 
-  const [cc, cp] = await Promise.allSettled(requests);
+  // CryptoPanic v1 endpoint often returns 404 without the correct account tier.
+  // Keep it optional to avoid wasting free-tier request budget.
+  if (cryptopanicKey) {
+    const params = new URLSearchParams({
+      auth_token: cryptopanicKey,
+      kind: "news",
+      metadata: "true",
+      regions: "en",
+    });
+    requests.push(fetchJson(`https://cryptopanic.com/api/v1/posts/?${params.toString()}`, { timeoutMs: 7000 }));
+  }
+
+  const settled = await Promise.allSettled(requests);
+  const [blockchair, cc, cp] = settled;
   const output = [];
 
-  if (cc.status === "fulfilled") {
+  if (blockchair?.status === "fulfilled") {
+    const rows = Array.isArray(blockchair.value?.data) ? blockchair.value.data : [];
+    rows
+      .filter((row) => {
+        const language = String(row?.language || "").toLowerCase();
+        return !language || language === "en";
+      })
+      .slice(0, 40)
+      .forEach((row, index) => {
+        output.push(
+          normalizeNewsEvent({
+            id: `bc-${row.hash || index}`,
+            title: row.title,
+            summary: String(row.description || row.title || "").slice(0, 300),
+            source: row.source || "Blockchair",
+            sourceType: "news",
+            sentiment: "neutral",
+            importance: "watch",
+            tickers: [],
+            url: row.link || row.permalink || "#",
+            timestamp: parseBlockchairTime(row.time),
+            provider: "json",
+          }),
+        );
+      });
+  }
+
+  if (cc?.status === "fulfilled") {
     const rows = Array.isArray(cc.value?.Data) ? cc.value.Data : [];
     rows.slice(0, 30).forEach((row, index) => {
       output.push(
@@ -47,7 +94,7 @@ export async function fetchJsonNews({ cryptopanicKey = "" } = {}) {
     });
   }
 
-  if (cp.status === "fulfilled") {
+  if (cp?.status === "fulfilled") {
     const rows = Array.isArray(cp.value?.results) ? cp.value.results : [];
     rows.slice(0, 30).forEach((row) => {
       output.push(
@@ -70,4 +117,3 @@ export async function fetchJsonNews({ cryptopanicKey = "" } = {}) {
 
   return output;
 }
-
