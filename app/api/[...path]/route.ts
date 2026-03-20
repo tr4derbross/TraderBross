@@ -280,7 +280,7 @@ async function emergencyResponse(path: string[], request: NextRequest) {
       limit: request.nextUrl.searchParams.get("limit") || "120",
     }));
   }
-  if (key === "okx" || key === "bybit" || key === "hyperliquid") {
+  if (key === "okx" || key === "bybit" || key === "hyperliquid" || key === "dydx") {
     const type = request.nextUrl.searchParams.get("type") || "";
     if (type === "ohlcv" || !type) {
       return json(await fetchEmergencyCandles({
@@ -362,7 +362,7 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
   }
   if (method === "GET" && upstream.ok) {
     const primary = (normalizedPath?.[0] || "").toLowerCase();
-    if (["bootstrap", "news", "market", "screener", "prices", "okx", "bybit", "hyperliquid", "symbols", "venues"].includes(primary)) {
+    if (["bootstrap", "news", "market", "screener", "prices", "okx", "bybit", "hyperliquid", "dydx", "symbols", "venues"].includes(primary)) {
       try {
         const clone = upstream.clone();
         const payload = await clone.json();
@@ -374,7 +374,7 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
         const looksEmptyMarket = primary === "market" && (!payload || (!payload.marketCapUsd && !payload.total24hVolume));
         const type = request.nextUrl.searchParams.get("type") || "";
         const looksEmptyCandles =
-          ["prices", "okx", "bybit", "hyperliquid"].includes(primary) &&
+          ["prices", "okx", "bybit", "hyperliquid", "dydx"].includes(primary) &&
           (type === "ohlcv" || type === "" || primary === "prices") &&
           Array.isArray(payload) &&
           payload.length === 0;

@@ -1,8 +1,58 @@
 import { MemoryCache } from "./cache.mjs";
 import { fetchJson } from "./http.mjs";
+import { generateMockCandles } from "./mock-data.mjs";
 
 const cache = new MemoryCache();
 const INDEXER = "https://indexer.dydx.trade/v4";
+
+const DYDX_INTERVAL_RESOLUTIONS = {
+  "1m": ["1MIN", "1MINUTE", "1M"],
+  "5m": ["5MINS", "5MIN", "5M"],
+  "15m": ["15MINS", "15MIN", "15M"],
+  "30m": ["30MINS", "30MIN", "30M"],
+  "1h": ["1HOUR", "1H", "60M"],
+  "4h": ["4HOURS", "4H", "240M"],
+  "1d": ["1DAY", "1D"],
+  "1w": ["1WEEK", "1W"],
+};
+
+function toDydxMarket(symbol) {
+  const base = String(symbol || "BTC").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/USDT$/, "");
+  return `${base || "BTC"}-USD`;
+}
+
+function parseDydxCandleRows(raw) {
+  const rows = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.candles)
+      ? raw.candles
+      : Array.isArray(raw?.data?.candles)
+        ? raw.data.candles
+        : [];
+
+  return rows
+    .map((row) => {
+      const startedAt = row.startedAt || row.startTime || row.started_at || row.time || row.t || null;
+      const timeMs = startedAt ? Date.parse(startedAt) : Number(row.time || row.t || 0);
+      if (!Number.isFinite(timeMs) || timeMs <= 0) return null;
+      const open = Number(row.open || row.o || 0);
+      const high = Number(row.high || row.h || 0);
+      const low = Number(row.low || row.l || 0);
+      const close = Number(row.close || row.c || 0);
+      const volume = Number(row.baseTokenVolume || row.volume || row.v || 0);
+      if (![open, high, low, close].every(Number.isFinite)) return null;
+      return {
+        time: Math.floor(timeMs / 1000),
+        open,
+        high,
+        low,
+        close,
+        volume: Number.isFinite(volume) ? volume : 0,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.time - b.time);
+}
 
 export async function getDydxMarkets() {
   return cache.remember("dydx:markets", 30000, async () => {
@@ -63,5 +113,31 @@ export async function getDydxAccount(address) {
     } catch {
       return { error: "Failed to load dYdX account." };
     }
+  });
+}
+
+export async function getDydxCandles(symbol, interval, limit) {
+  const market = toDydxMarket(symbol);
+  const safeInterval = String(interval || "1h").toLowerCase();
+  const safeLimit = Math.min(Math.max(Number(limit || 120) || 120, 20), 500);
+  const resolutionCandidates = DYDX_INTERVAL_RESOLUTIONS[safeInterval] || DYDX_INTERVAL_RESOLUTIONS["1h"];
+
+  return cache.remember(`dydx:candles:${market}:${safeInterval}:${safeLimit}`, 12_000, async () => {
+    for (const resolution of resolutionCandidates) {
+      try {
+        const payload = await fetchJson(
+          `${INDEXER}/candles/perpetualMarkets/${encodeURIComponent(market)}?resolution=${encodeURIComponent(
+            resolution,
+          )}&limit=${safeLimit}`,
+          { timeoutMs: 6000 },
+        );
+        const rows = parseDydxCandleRows(payload);
+        if (rows.length > 0) return rows;
+      } catch {
+        // try next resolution variant
+      }
+    }
+
+    return generateMockCandles(String(symbol || "BTC").toUpperCase(), safeInterval, safeLimit);
   });
 }

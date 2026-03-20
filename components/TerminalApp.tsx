@@ -1367,8 +1367,15 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       <PriceChart
         activeVenue={activeVenueState.venueId}
         activeSymbol={activeVenueState.activeSymbol}
+        availableTickers={tradableSymbols}
         marketDataSourceLabel={activeVenueMarketLabel}
-        liveTickerPrice={getTickerDisplayPrice(activeVenueTicker) ?? undefined}
+        liveTickerPrice={
+          activeVenueState.venueId === "binance" ||
+          activeVenueState.venueId === "okx" ||
+          activeVenueState.venueId === "bybit"
+            ? getTickerDisplayPrice(activeVenueTicker) ?? undefined
+            : undefined
+        }
         liveFeedConnected={activeVenueFeedState === "connected"}
         positions={displayPositions}
         orders={orders}
