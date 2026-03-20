@@ -432,9 +432,9 @@ export default function TradingPanel({
       </div>
 
       {/* ── Market Summary ── */}
-      <div className="px-1.5 py-px border-b border-zinc-800/60 sm:px-3 sm:py-2.5">
-        <div className="flex items-center justify-between gap-1">
-          <div className="min-w-0 flex flex-1 gap-1">
+      <div className="px-1.5 py-1 border-b border-zinc-800/60 sm:px-3 sm:py-2.5">
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-1">
+          <div className="min-w-0 flex gap-1">
             <select
               className="min-w-0 flex-1 rounded border border-zinc-700/50 bg-zinc-900 px-1 py-px text-[8px] font-bold text-zinc-100 outline-none transition hover:border-zinc-600 sm:px-2.5 sm:py-1.5 sm:text-[12px] sm:rounded-lg"
               value={ticker}
@@ -455,9 +455,9 @@ export default function TradingPanel({
               <option value="USDC">USDC</option>
             </select>
           </div>
-          <div className="shrink-0 text-right ml-1">
-            <div className="text-[6px] uppercase tracking-widest text-zinc-600 sm:text-[9px]">Mark</div>
-            <div className="text-[10px] font-bold tabular-nums text-zinc-100 sm:text-[18px]">${fmt(currentPrice)}</div>
+          <div className="shrink-0 text-right sm:ml-1">
+            <div className="text-[7px] uppercase tracking-widest text-zinc-600 sm:text-[9px]">Mark</div>
+            <div className="text-[11px] font-bold tabular-nums text-zinc-100 sm:text-[18px]">${fmt(currentPrice)}</div>
           </div>
         </div>
 
@@ -494,7 +494,7 @@ export default function TradingPanel({
         </div>
 
         {/* Long / Short */}
-        <div className="grid grid-cols-2 gap-1">
+        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
           <button
             type="button"
             onClick={() => setSide("long")}
@@ -536,7 +536,7 @@ export default function TradingPanel({
         )}
 
         {/* Margin + Leverage */}
-        <div className="grid grid-cols-2 gap-1">
+        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
           <div>
             <label className="mb-0.5 block text-[7px] uppercase tracking-widest text-zinc-600 sm:text-[10px]">Margin</label>
             <input
