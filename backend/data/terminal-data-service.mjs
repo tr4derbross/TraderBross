@@ -392,11 +392,13 @@ export function createTerminalDataService({ config, logger }) {
         url: item.url,
       }),
     );
+    const nextPrimaryNews = nextNews.filter((item) => item.type !== "social");
+    const nextSocial = nextNews.filter((item) => item.type === "social").slice(0, 80);
     const prevIds = new Set(state.news.map((item) => item.id));
-    state.news = nextNews;
-    state.social = nextNews.filter((item) => item.type === "social").slice(0, 80);
+    state.news = nextPrimaryNews;
+    state.social = nextSocial;
 
-    nextNews.forEach((item) => {
+    nextPrimaryNews.forEach((item) => {
       if (!prevIds.has(item.id) && item.type !== "social") {
         publish("news", item);
         const ranked = (snapshot.items || []).find((entry) => entry.id === item.id);
