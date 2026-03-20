@@ -18,6 +18,7 @@ import { fetchRssNews } from "./adapters/news-rss.adapter.mjs";
 import { getDefaultSocialRssFeeds } from "./adapters/news-rss.adapter.mjs";
 import { getDefaultNitterSocialFeeds } from "./adapters/news-rss.adapter.mjs";
 import { fetchJsonNews } from "./adapters/news-json.adapter.mjs";
+import { fetchTreeOfAlphaNews } from "./adapters/news-treeofalpha.adapter.mjs";
 import { createLiquidationEventStream, fetchOnchainWhaleEvents } from "./adapters/onchain-whale-events.adapter.mjs";
 import { fetchCoingeckoCoinMetadata } from "./adapters/coingecko-metadata.adapter.mjs";
 import { fetchCoinpaprikaCoinMetadata } from "./adapters/coinpaprika-metadata.adapter.mjs";
@@ -301,7 +302,8 @@ export function createTerminalDataService({ config, logger }) {
   async function refreshNewsLayer() {
     const rssEnabled = featureFlags.enableNewsRss !== false;
     const jsonEnabled = featureFlags.enableNewsJson !== false;
-    if (!rssEnabled && !jsonEnabled) {
+    const treeEnabled = featureFlags.enableNewsTree !== false;
+    if (!rssEnabled && !jsonEnabled && !treeEnabled) {
       markProvider("news", "disabled");
       return;
     }
@@ -333,17 +335,23 @@ export function createTerminalDataService({ config, logger }) {
           dedupedFeedMap.set(key, feed);
         });
         const mergedSocialFeeds = Array.from(dedupedFeedMap.values()).slice(0, 24);
-        const [rss, json, social] = await Promise.all([
+        const [rss, json, tree, social] = await Promise.all([
           rssEnabled ? fetchRssNews() : Promise.resolve([]),
           jsonEnabled ? fetchJsonNews({ cryptopanicKey: config.cryptopanicKey }) : Promise.resolve([]),
+          treeEnabled ? fetchTreeOfAlphaNews({ limit: ttl.treeNewsLimit || 300 }) : Promise.resolve([]),
           mergedSocialFeeds.length > 0 ? fetchRssNews({ feeds: mergedSocialFeeds }) : Promise.resolve([]),
         ]);
         const socialRows = social.map((item) => ({ ...item, sourceType: "social" }));
-        const engineSnapshot = newsEngine.ingest([...rss, ...json, ...socialRows]);
+        const treeRows = (Array.isArray(tree) ? tree : []).map((item) => ({
+          ...item,
+          sourceType: item.sourceType || "news",
+        }));
+        const engineSnapshot = newsEngine.ingest([...rss, ...json, ...treeRows, ...socialRows]);
         if (engineSnapshot.count === 0) {
           const errors = [];
           if (rssEnabled && rss.length === 0) errors.push("rss_empty_or_unavailable");
           if (jsonEnabled && json.length === 0) errors.push("json_empty_or_unavailable");
+          if (treeEnabled && treeRows.length === 0) errors.push("tree_news_empty_or_unavailable");
           if (mergedSocialFeeds.length > 0 && socialRows.length === 0) errors.push("social_rss_empty_or_unavailable");
           engineSnapshot.errors = errors;
         }
