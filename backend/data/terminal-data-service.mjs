@@ -9,12 +9,15 @@ import {
   toFrontendWhaleItem,
 } from "./core/normalize.mjs";
 import { fetchCoingeckoMarketData } from "./adapters/coingecko-market.adapter.mjs";
+import { fetchCoincapMarketData } from "./adapters/coincap-market.adapter.mjs";
+import { fetchCoinpaprikaMarketData } from "./adapters/coinpaprika-market.adapter.mjs";
 import { createHyperliquidMarketStream } from "./adapters/hyperliquid-ws-market.adapter.mjs";
 import { fetchDexScreenerDiscovery } from "./adapters/dexscreener.adapter.mjs";
 import { fetchRssNews } from "./adapters/news-rss.adapter.mjs";
 import { fetchJsonNews } from "./adapters/news-json.adapter.mjs";
 import { createLiquidationEventStream, fetchOnchainWhaleEvents } from "./adapters/onchain-whale-events.adapter.mjs";
 import { fetchCoingeckoCoinMetadata } from "./adapters/coingecko-metadata.adapter.mjs";
+import { fetchCoinpaprikaCoinMetadata } from "./adapters/coinpaprika-metadata.adapter.mjs";
 import { fetchBinanceLargeTradeEvents } from "./adapters/whale-binance-trades.adapter.mjs";
 import { createNewsIngestionEngine } from "./news/news-engine.mjs";
 import { createWhaleEventEngine } from "./onchain/whale-engine.mjs";
@@ -202,7 +205,23 @@ export function createTerminalDataService({ config, logger }) {
       limiterKey: "coingecko_market",
       providerName: "coingecko_market",
       primary: () => fetchCoingeckoMarketData({ symbols: coreSymbols }),
-      fallback: async () => ({ ticks: [], marketStats: state.marketStats }),
+      fallback: async () => {
+        if (featureFlags.enableCoincap !== false) {
+          try {
+            return await fetchCoincapMarketData({ symbols: coreSymbols });
+          } catch {
+            // continue to coinpaprika
+          }
+        }
+        if (featureFlags.enableCoinpaprika !== false) {
+          try {
+            return await fetchCoinpaprikaMarketData({ symbols: coreSymbols });
+          } catch {
+            // continue to state fallback
+          }
+        }
+        return { ticks: [], marketStats: state.marketStats };
+      },
     });
 
     if (Array.isArray(result.value.ticks) && result.value.ticks.length > 0) {
@@ -238,7 +257,16 @@ export function createTerminalDataService({ config, logger }) {
       limiterKey: "coingecko_metadata",
       providerName: "coingecko_metadata",
       primary: () => fetchCoingeckoCoinMetadata({ symbols: coreSymbols }),
-      fallback: async () => state.coinMetadata,
+      fallback: async () => {
+        if (featureFlags.enableCoinpaprika !== false) {
+          try {
+            return await fetchCoinpaprikaCoinMetadata({ symbols: coreSymbols });
+          } catch {
+            return state.coinMetadata;
+          }
+        }
+        return state.coinMetadata;
+      },
     });
     state.coinMetadata = result.value || {};
   }

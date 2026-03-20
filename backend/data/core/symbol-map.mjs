@@ -77,6 +77,62 @@ const HYPERLIQUID_SYMBOLS = {
   AAVE: "AAVE",
 };
 
+const COINCAP_IDS = {
+  BTC: "bitcoin",
+  ETH: "ethereum",
+  SOL: "solana",
+  BNB: "binance-coin",
+  XRP: "xrp",
+  DOGE: "dogecoin",
+  AVAX: "avalanche",
+  LINK: "chainlink",
+  ARB: "arbitrum",
+  OP: "optimism",
+  NEAR: "near-protocol",
+  INJ: "injective-protocol",
+  DOT: "polkadot",
+  APT: "aptos",
+  SUI: "sui",
+  TIA: "celestia",
+  ATOM: "cosmos",
+  AAVE: "aave",
+  LTC: "litecoin",
+  UNI: "uniswap",
+  ADA: "cardano",
+  TRX: "tron",
+  FIL: "filecoin",
+  WIF: "dogwifhat",
+  PEPE: "pepe",
+};
+
+const COINPAPRIKA_IDS = {
+  BTC: "btc-bitcoin",
+  ETH: "eth-ethereum",
+  SOL: "sol-solana",
+  BNB: "bnb-binance-coin",
+  XRP: "xrp-xrp",
+  DOGE: "doge-dogecoin",
+  AVAX: "avax-avalanche",
+  LINK: "link-chainlink",
+  ARB: "arb-arbitrum",
+  OP: "op-optimism",
+  NEAR: "near-near-protocol",
+  INJ: "inj-injective",
+  DOT: "dot-polkadot",
+  APT: "apt-aptos",
+  SUI: "sui-sui",
+  TIA: "tia-celestia",
+  ATOM: "atom-cosmos",
+  AAVE: "aave-aave",
+  LTC: "ltc-litecoin",
+  UNI: "uni-uniswap",
+  ADA: "ada-cardano",
+  TRX: "trx-tron",
+  FIL: "fil-filecoin",
+  WIF: "wif-dogwifcoin",
+  PEPE: "pepe-pepe",
+};
+
 const LOOKUP = new Map();
 for (const [canonical, aliases] of Object.entries(SYMBOL_ALIASES)) {
   aliases.forEach((alias) => LOOKUP.set(alias.toUpperCase(), canonical));
@@ -106,6 +162,12 @@ export function providerSymbol(provider, value) {
   if (provider === "hyperliquid") {
     return HYPERLIQUID_SYMBOLS[canonical] || canonical;
   }
+  if (provider === "coincap") {
+    return COINCAP_IDS[canonical] || null;
+  }
+  if (provider === "coinpaprika") {
+    return COINPAPRIKA_IDS[canonical] || null;
+  }
   return canonical;
 }
 
@@ -120,4 +182,3 @@ export function toCanonicalSymbols(values) {
   });
   return out;
 }
-
