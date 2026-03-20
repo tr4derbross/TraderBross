@@ -11,6 +11,7 @@ import {
 import { fetchCoingeckoMarketData } from "./adapters/coingecko-market.adapter.mjs";
 import { fetchCoincapMarketData } from "./adapters/coincap-market.adapter.mjs";
 import { fetchCoinpaprikaMarketData } from "./adapters/coinpaprika-market.adapter.mjs";
+import { fetchCoinloreMarketData } from "./adapters/coinlore-market.adapter.mjs";
 import { createHyperliquidMarketStream } from "./adapters/hyperliquid-ws-market.adapter.mjs";
 import { fetchDexScreenerDiscovery } from "./adapters/dexscreener.adapter.mjs";
 import { fetchRssNews } from "./adapters/news-rss.adapter.mjs";
@@ -216,6 +217,13 @@ export function createTerminalDataService({ config, logger }) {
         if (featureFlags.enableCoinpaprika !== false) {
           try {
             return await fetchCoinpaprikaMarketData({ symbols: coreSymbols });
+          } catch {
+            // continue
+          }
+        }
+        if (featureFlags.enableCoinlore !== false) {
+          try {
+            return await fetchCoinloreMarketData({ symbols: coreSymbols });
           } catch {
             // continue to state fallback
           }
