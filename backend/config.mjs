@@ -52,6 +52,7 @@ export function loadConfig() {
       .split(",")
       .map((entry) => entry.trim())
       .filter(Boolean),
+    enableDefaultSocialFeeds: toBoolean(process.env.FEATURE_SOCIAL_DEFAULT_FEEDS, true),
     nitterBaseUrl: process.env.NITTER_BASE_URL || "",
     coinMarketCalApiKey: process.env.COINMARKETCAL_API_KEY || "",
     watchlistTickers: (process.env.WATCHLIST_TICKERS || "BTC,ETH,SOL,BNB,XRP")
