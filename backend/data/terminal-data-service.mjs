@@ -112,6 +112,22 @@ export function createTerminalDataService({ config, logger }) {
     whales: { status: "idle", providerCalls: 0, cacheHits: 0, staleServed: 0, lastSuccessAt: null, lastErrorAt: null, lastError: null },
   };
 
+  const NEWS_SOURCES = ["rss", "json", "tree", "ninja", "social_rss"];
+  const newsSourceHealth = NEWS_SOURCES.reduce((acc, source) => {
+    acc[source] = {
+      status: "idle",
+      enabled: true,
+      lastFetchedAt: null,
+      lastSuccessAt: null,
+      lastErrorAt: null,
+      lastError: null,
+      lastCount: 0,
+      errorStreak: 0,
+      nextRetryAt: null,
+    };
+    return acc;
+  }, {});
+
   let started = false;
   let stopHyperliquid = null;
   let stopLiquidations = null;
@@ -166,6 +182,74 @@ export function createTerminalDataService({ config, logger }) {
       return;
     }
     state.connectionState = "connecting";
+  }
+
+  function markNewsSource(source, patch = {}) {
+    if (!newsSourceHealth[source]) return;
+    newsSourceHealth[source] = {
+      ...newsSourceHealth[source],
+      ...patch,
+    };
+  }
+
+  function sourceBackoffMs(errorStreak = 0) {
+    const streak = Math.max(0, Number(errorStreak) || 0);
+    if (streak === 0) return 0;
+    return Math.min(60_000, 2_000 * (2 ** (streak - 1)));
+  }
+
+  async function fetchNewsSource(source, enabled, fetcher) {
+    const now = Date.now();
+    if (!enabled) {
+      markNewsSource(source, {
+        status: "disabled",
+        enabled: false,
+        lastCount: 0,
+      });
+      return [];
+    }
+
+    const health = newsSourceHealth[source];
+    const nextRetryMs = health?.nextRetryAt ? toMs(health.nextRetryAt) : 0;
+    if (nextRetryMs > now) {
+      markNewsSource(source, {
+        status: "backoff",
+        enabled: true,
+      });
+      return [];
+    }
+
+    try {
+      const rows = await fetcher();
+      const count = Array.isArray(rows) ? rows.length : 0;
+      const fetchedAt = new Date().toISOString();
+      markNewsSource(source, {
+        status: count > 0 ? "ok" : "empty",
+        enabled: true,
+        lastFetchedAt: fetchedAt,
+        lastSuccessAt: fetchedAt,
+        lastCount: count,
+        errorStreak: 0,
+        nextRetryAt: null,
+        lastError: null,
+      });
+      return Array.isArray(rows) ? rows : [];
+    } catch (error) {
+      const streak = (newsSourceHealth[source]?.errorStreak || 0) + 1;
+      const retryAt = new Date(now + sourceBackoffMs(streak)).toISOString();
+      markNewsSource(source, {
+        status: "error",
+        enabled: true,
+        lastFetchedAt: new Date().toISOString(),
+        lastErrorAt: new Date().toISOString(),
+        lastError: String(error),
+        errorStreak: streak,
+        nextRetryAt: retryAt,
+        lastCount: 0,
+      });
+      logger?.warn?.("data.news.source_failed", { source, error: String(error), streak });
+      return [];
+    }
   }
 
   async function callWithFallback({ cacheKey, ttlMs, staleMs, limiterKey, primary, fallback, providerName }) {
@@ -345,21 +429,24 @@ export function createTerminalDataService({ config, logger }) {
         });
         const mergedSocialFeeds = Array.from(dedupedFeedMap.values()).slice(0, 24);
         const [rss, json, tree, social, ninjaBundle] = await Promise.all([
-          rssEnabled ? fetchRssNews() : Promise.resolve([]),
-          jsonEnabled
-            ? fetchJsonNews({
-                cryptopanicKey: config.cryptopanicKey,
-                cryptocompareApiKey: config.cryptocompareApiKey,
-              })
-            : Promise.resolve([]),
-          treeEnabled ? fetchTreeOfAlphaNews({ limit: ttl.treeNewsLimit || 300 }) : Promise.resolve([]),
-          mergedSocialFeeds.length > 0 ? fetchRssNews({ feeds: mergedSocialFeeds }) : Promise.resolve([]),
-          ninjaEnabled
-            ? fetchNinjaNewsBundle({
+          fetchNewsSource("rss", rssEnabled, () => fetchRssNews()),
+          fetchNewsSource("json", jsonEnabled, () =>
+            fetchJsonNews({
+              cryptopanicKey: config.cryptopanicKey,
+              cryptocompareApiKey: config.cryptocompareApiKey,
+            }),
+          ),
+          fetchNewsSource("tree", treeEnabled, () => fetchTreeOfAlphaNews({ limit: ttl.treeNewsLimit || 300 })),
+          fetchNewsSource("social_rss", mergedSocialFeeds.length > 0, () => fetchRssNews({ feeds: mergedSocialFeeds })),
+          (async () => {
+            const bundle = await fetchNewsSource("ninja", ninjaEnabled, () =>
+              fetchNinjaNewsBundle({
                 graphqlUrl: config.ninjaNewsGraphqlUrl,
                 limit: ttl.ninjaNewsLimit || 30,
-              })
-            : Promise.resolve({ news: [], social: [] }),
+              }).then((data) => [data]),
+            );
+            return bundle[0] || { news: [], social: [] };
+          })(),
         ]);
         const socialRows = social.map((item) => ({ ...item, sourceType: "social" }));
         const ninjaNewsRows = Array.isArray(ninjaBundle?.news) ? ninjaBundle.news : [];
@@ -451,10 +538,17 @@ export function createTerminalDataService({ config, logger }) {
         url: item.url,
       }),
     );
-    const nextPrimaryNews = nextNews.filter((item) => item.type !== "social");
+    const nextPrimaryNews = nextNews
+      .filter((item) => item.type !== "social")
+      .sort((a, b) => toMs(b.timestamp) - toMs(a.timestamp) || b.id.localeCompare(a.id));
     const nextSocial = Array.isArray(snapshotEnvelope.socialFeedRows)
-      ? snapshotEnvelope.socialFeedRows.slice(0, 120)
-      : nextNews.filter((item) => item.type === "social").slice(0, 80);
+      ? snapshotEnvelope.socialFeedRows
+          .slice(0, 120)
+          .sort((a, b) => toMs(b.timestamp) - toMs(a.timestamp) || b.id.localeCompare(a.id))
+      : nextNews
+          .filter((item) => item.type === "social")
+          .sort((a, b) => toMs(b.timestamp) - toMs(a.timestamp) || b.id.localeCompare(a.id))
+          .slice(0, 80);
     const prevIds = new Set(state.news.map((item) => item.id));
     state.news = nextPrimaryNews;
     state.social = nextSocial;
@@ -633,6 +727,8 @@ export function createTerminalDataService({ config, logger }) {
       ...state,
       providerState: { ...providerState },
       providerHealth: { ...providerHealth },
+      newsSourceHealth: { ...newsSourceHealth },
+      freshness: buildFreshnessSummary(),
     };
   }
 
@@ -641,12 +737,30 @@ export function createTerminalDataService({ config, logger }) {
     const keyword = filters.keyword ? String(filters.keyword).toLowerCase() : "";
     const sector = filters.sector ? String(filters.sector) : "";
 
-    return state.news.filter((item) => {
+    const filtered = state.news.filter((item) => {
       if (ticker && !item.ticker.includes(ticker)) return false;
       if (sector && sector !== "All" && !String(item.sector || "").includes(sector)) return false;
       if (keyword && !`${item.headline} ${item.summary} ${item.source}`.toLowerCase().includes(keyword)) return false;
       return true;
     });
+    return filtered.sort((a, b) => toMs(b.timestamp) - toMs(a.timestamp) || b.id.localeCompare(a.id));
+  }
+
+  function buildFreshnessSummary() {
+    const now = Date.now();
+    const newestNewsTs = state.news.length > 0 ? toMs(state.news[0]?.timestamp) : 0;
+    const newestSocialTs = state.social.length > 0 ? toMs(state.social[0]?.timestamp) : 0;
+    const newsAgeSec = newestNewsTs > 0 ? Math.max(0, Math.round((now - newestNewsTs) / 1000)) : null;
+    const socialAgeSec = newestSocialTs > 0 ? Math.max(0, Math.round((now - newestSocialTs) / 1000)) : null;
+    const newsFresh = newsAgeSec != null && newsAgeSec <= 180;
+    const socialFresh = socialAgeSec != null && socialAgeSec <= 180;
+    return {
+      newsAgeSec,
+      socialAgeSec,
+      newsFresh,
+      socialFresh,
+      stale: !(newsFresh || socialFresh),
+    };
   }
 
   function getLiquidations(limit = 20) {
@@ -741,6 +855,8 @@ export function createTerminalDataService({ config, logger }) {
       started,
       providerState: { ...providerState },
       providerHealth: { ...providerHealth },
+      newsSourceHealth: { ...newsSourceHealth },
+      freshness: buildFreshnessSummary(),
       quotes: state.quotes.length,
       news: state.news.length,
       whales: state.whales.length,
