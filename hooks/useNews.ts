@@ -27,6 +27,14 @@ function matchesKeyword(item: NewsItem, keyword: string) {
   );
 }
 
+function sortByLatest(items: NewsItem[]) {
+  return [...items].sort((a, b) => {
+    const tsDiff = new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    if (tsDiff !== 0) return tsDiff;
+    return b.id.localeCompare(a.id);
+  });
+}
+
 export function useNews({
   sector,
   ticker,
@@ -62,11 +70,7 @@ export function useNews({
         items = socialItems;
         break;
       default:
-        items = [...allItems].sort(
-          (a, b) =>
-            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime() ||
-            a.id.localeCompare(b.id),
-        );
+        items = allItems;
     }
 
     if (keyword) items = items.filter((item) => matchesKeyword(item, keyword));
@@ -75,7 +79,7 @@ export function useNews({
     if (importanceFilter !== "all") items = items.filter((item) => item.importance === importanceFilter);
     if (sentimentFilter !== "all") items = items.filter((item) => item.sentiment === sentimentFilter);
 
-    return items;
+    return sortByLatest(items);
   }, [allItems, importanceFilter, keyword, newsItems, sector, sentimentFilter, socialItems, sourceFilter, ticker, whaleItems]);
 
   const liveCount = useMemo(() => {
