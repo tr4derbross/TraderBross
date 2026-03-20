@@ -20,6 +20,7 @@ import { getDefaultNitterSocialFeeds } from "./adapters/news-rss.adapter.mjs";
 import { fetchJsonNews } from "./adapters/news-json.adapter.mjs";
 import { fetchTreeOfAlphaNews } from "./adapters/news-treeofalpha.adapter.mjs";
 import { createTreeOfAlphaNewsStream } from "./adapters/news-treeofalpha.adapter.mjs";
+import { fetchNinjaNewsBundle } from "./adapters/news-ninjanews.adapter.mjs";
 import { createLiquidationEventStream, fetchOnchainWhaleEvents } from "./adapters/onchain-whale-events.adapter.mjs";
 import { fetchCoingeckoCoinMetadata } from "./adapters/coingecko-metadata.adapter.mjs";
 import { fetchCoinpaprikaCoinMetadata } from "./adapters/coinpaprika-metadata.adapter.mjs";
@@ -310,7 +311,8 @@ export function createTerminalDataService({ config, logger }) {
     const rssEnabled = featureFlags.enableNewsRss !== false;
     const jsonEnabled = featureFlags.enableNewsJson !== false;
     const treeEnabled = featureFlags.enableNewsTree !== false;
-    if (!rssEnabled && !jsonEnabled && !treeEnabled) {
+    const ninjaEnabled = featureFlags.enableNewsNinja !== false;
+    if (!rssEnabled && !jsonEnabled && !treeEnabled && !ninjaEnabled) {
       markProvider("news", "disabled");
       return;
     }
@@ -342,21 +344,41 @@ export function createTerminalDataService({ config, logger }) {
           dedupedFeedMap.set(key, feed);
         });
         const mergedSocialFeeds = Array.from(dedupedFeedMap.values()).slice(0, 24);
-        const [rss, json, tree, social] = await Promise.all([
+        const [rss, json, tree, social, ninjaBundle] = await Promise.all([
           rssEnabled ? fetchRssNews() : Promise.resolve([]),
-          jsonEnabled ? fetchJsonNews({ cryptopanicKey: config.cryptopanicKey }) : Promise.resolve([]),
+          jsonEnabled
+            ? fetchJsonNews({
+                cryptopanicKey: config.cryptopanicKey,
+                cryptocompareApiKey: config.cryptocompareApiKey,
+              })
+            : Promise.resolve([]),
           treeEnabled ? fetchTreeOfAlphaNews({ limit: ttl.treeNewsLimit || 300 }) : Promise.resolve([]),
           mergedSocialFeeds.length > 0 ? fetchRssNews({ feeds: mergedSocialFeeds }) : Promise.resolve([]),
+          ninjaEnabled
+            ? fetchNinjaNewsBundle({
+                graphqlUrl: config.ninjaNewsGraphqlUrl,
+                limit: ttl.ninjaNewsLimit || 30,
+              })
+            : Promise.resolve({ news: [], social: [] }),
         ]);
         const socialRows = social.map((item) => ({ ...item, sourceType: "social" }));
+        const ninjaNewsRows = Array.isArray(ninjaBundle?.news) ? ninjaBundle.news : [];
+        const ninjaSocialRows = Array.isArray(ninjaBundle?.social) ? ninjaBundle.social : [];
         const treeRows = (Array.isArray(tree) ? tree : []).map((item) => ({
           ...item,
           sourceType: item.sourceType || "news",
         }));
         const treeSocialRows = treeRows.filter((item) => item.sourceType === "social");
-        const engineSnapshot = newsEngine.ingest([...rss, ...json, ...treeRows, ...socialRows]);
+        const engineSnapshot = newsEngine.ingest([
+          ...rss,
+          ...json,
+          ...treeRows,
+          ...ninjaNewsRows,
+          ...socialRows,
+          ...ninjaSocialRows,
+        ]);
         const socialFeedRows = dedupeBy(
-          [...treeSocialRows, ...socialRows]
+          [...treeSocialRows, ...ninjaSocialRows, ...socialRows]
             .sort((a, b) => toMs(b.timestamp) - toMs(a.timestamp))
             .slice(0, 400),
           (item) => item.id,
@@ -385,6 +407,9 @@ export function createTerminalDataService({ config, logger }) {
           if (rssEnabled && rss.length === 0) errors.push("rss_empty_or_unavailable");
           if (jsonEnabled && json.length === 0) errors.push("json_empty_or_unavailable");
           if (treeEnabled && treeRows.length === 0) errors.push("tree_news_empty_or_unavailable");
+          if (ninjaEnabled && ninjaNewsRows.length === 0 && ninjaSocialRows.length === 0) {
+            errors.push("ninja_news_empty_or_unavailable");
+          }
           if (mergedSocialFeeds.length > 0 && socialRows.length === 0) errors.push("social_rss_empty_or_unavailable");
           engineSnapshot.errors = errors;
         }
