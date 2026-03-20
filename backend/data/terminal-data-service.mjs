@@ -427,7 +427,8 @@ export function createTerminalDataService({ config, logger }) {
           if (!key || dedupedFeedMap.has(key)) return;
           dedupedFeedMap.set(key, feed);
         });
-        const mergedSocialFeeds = Array.from(dedupedFeedMap.values()).slice(0, 24);
+        // Keep social fetch budget tight to avoid periodic latency spikes.
+        const mergedSocialFeeds = Array.from(dedupedFeedMap.values()).slice(0, 12);
         const [rss, json, tree, social, ninjaBundle] = await Promise.all([
           fetchNewsSource("rss", rssEnabled, () => fetchRssNews()),
           fetchNewsSource("json", jsonEnabled, () =>
@@ -550,8 +551,9 @@ export function createTerminalDataService({ config, logger }) {
           .sort((a, b) => toMs(b.timestamp) - toMs(a.timestamp) || b.id.localeCompare(a.id))
           .slice(0, 80);
     const prevIds = new Set(state.news.map((item) => item.id));
-    state.news = nextPrimaryNews;
-    state.social = nextSocial;
+    // Preserve previously valid feeds if a refresh cycle returns empty due temporary provider outage.
+    state.news = nextPrimaryNews.length > 0 ? nextPrimaryNews : state.news;
+    state.social = nextSocial.length > 0 ? nextSocial : state.social;
 
     nextPrimaryNews.forEach((item) => {
       if (!prevIds.has(item.id) && item.type !== "social") {
