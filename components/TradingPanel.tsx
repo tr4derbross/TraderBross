@@ -26,6 +26,8 @@ type Props = {
   selectedNews: NewsItem | null;
   newsTradeIntent?: (NewsTradePreset & { sourceItemId?: string }) | null;
   availableTickers?: string[];
+  quoteAsset?: "USDT" | "USDC";
+  onQuoteAssetChange?: (quote: "USDT" | "USDC") => void;
   balance: number;
   isDemoMode?: boolean;
   positions: Position[];
@@ -94,6 +96,8 @@ export default function TradingPanel({
   selectedNews,
   newsTradeIntent,
   availableTickers = [],
+  quoteAsset = "USDT",
+  onQuoteAssetChange,
   balance,
   isDemoMode = false,
   positions,
@@ -135,14 +139,14 @@ export default function TradingPanel({
 
     const endpoint =
       activeVenueState.venueId === "okx"
-        ? `/api/okx?type=ohlcv&ticker=${ticker}&interval=1m&limit=2`
+        ? `/api/okx?type=ohlcv&ticker=${ticker}&quote=${quoteAsset}&interval=1m&limit=2`
         : activeVenueState.venueId === "bybit"
-          ? `/api/bybit?type=ohlcv&ticker=${ticker}&interval=1m&limit=2`
+          ? `/api/bybit?type=ohlcv&ticker=${ticker}&quote=${quoteAsset}&interval=1m&limit=2`
           : activeVenueState.venueId === "hyperliquid"
             ? `/api/hyperliquid?type=ohlcv&ticker=${ticker}&interval=1m&limit=2`
             : activeVenueState.venueId === "dydx"
               ? `/api/dydx?type=ohlcv&ticker=${ticker}&interval=1m&limit=2`
-              : `/api/prices?ticker=${ticker}&interval=1m&limit=2`;
+              : `/api/prices?ticker=${ticker}&quote=${quoteAsset}&interval=1m&limit=2`;
 
     const loadMark = async () => {
       try {
@@ -164,7 +168,7 @@ export default function TradingPanel({
       active = false;
       clearInterval(id);
     };
-  }, [activeVenueState.venueId, ticker]);
+  }, [activeVenueState.venueId, quoteAsset, ticker]);
 
   useEffect(() => {
     setTicker(activeVenueState.activeSymbol);
@@ -430,17 +434,27 @@ export default function TradingPanel({
       {/* ── Market Summary ── */}
       <div className="px-1.5 py-px border-b border-zinc-800/60 sm:px-3 sm:py-2.5">
         <div className="flex items-center justify-between gap-1">
-          <select
-            className="min-w-0 flex-1 rounded border border-zinc-700/50 bg-zinc-900 px-1 py-px text-[8px] font-bold text-zinc-100 outline-none transition hover:border-zinc-600 sm:px-2.5 sm:py-1.5 sm:text-[12px] sm:rounded-lg"
-            value={ticker}
-            onChange={(e) => handleTickerChange(e.target.value)}
-          >
-            {futuresTickers.map((value) => (
-              <option key={value} value={value} className="bg-zinc-950">
-                {value}
-              </option>
-            ))}
-          </select>
+          <div className="min-w-0 flex flex-1 gap-1">
+            <select
+              className="min-w-0 flex-1 rounded border border-zinc-700/50 bg-zinc-900 px-1 py-px text-[8px] font-bold text-zinc-100 outline-none transition hover:border-zinc-600 sm:px-2.5 sm:py-1.5 sm:text-[12px] sm:rounded-lg"
+              value={ticker}
+              onChange={(e) => handleTickerChange(e.target.value)}
+            >
+              {futuresTickers.map((value) => (
+                <option key={value} value={value} className="bg-zinc-950">
+                  {value}
+                </option>
+              ))}
+            </select>
+            <select
+              className="w-[64px] rounded border border-zinc-700/50 bg-zinc-900 px-1 py-px text-[8px] font-bold text-zinc-100 outline-none transition hover:border-zinc-600 sm:w-[74px] sm:px-2 sm:py-1.5 sm:text-[11px] sm:rounded-lg"
+              value={quoteAsset}
+              onChange={(e) => onQuoteAssetChange?.(e.target.value as "USDT" | "USDC")}
+            >
+              <option value="USDT">USDT</option>
+              <option value="USDC">USDC</option>
+            </select>
+          </div>
           <div className="shrink-0 text-right ml-1">
             <div className="text-[6px] uppercase tracking-widest text-zinc-600 sm:text-[9px]">Mark</div>
             <div className="text-[10px] font-bold tabular-nums text-zinc-100 sm:text-[18px]">${fmt(currentPrice)}</div>

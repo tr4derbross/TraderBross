@@ -59,15 +59,16 @@ function uniqueSortedSymbols(input) {
   );
 }
 
-async function getVenueSymbols(venueId) {
+async function getVenueSymbols(venueId, quoteAsset = "USDT") {
   const venue = String(venueId || "binance").toLowerCase();
-  return endpointCache.remember(`venue:symbols:${venue}`, 60_000, async () => {
+  const quote = String(quoteAsset || "USDT").toUpperCase() === "USDC" ? "USDC" : "USDT";
+  return endpointCache.remember(`venue:symbols:${venue}:${quote}`, 60_000, async () => {
     if (venue === "okx") {
       const payload = await fetch("https://www.okx.com/api/v5/public/instruments?instType=SWAP", {
         signal: AbortSignal.timeout(6000),
       }).then((res) => res.json());
       const symbols = (payload?.data || [])
-        .filter((row) => row.state === "live" && String(row.instId || "").includes("-USDT-SWAP"))
+        .filter((row) => row.state === "live" && String(row.instId || "").includes(`-${quote}-SWAP`))
         .map((row) => String(row.instId || "").split("-")[0]);
       return uniqueSortedSymbols(symbols);
     }
@@ -77,8 +78,8 @@ async function getVenueSymbols(venueId) {
         signal: AbortSignal.timeout(7000),
       }).then((res) => res.json());
       const symbols = (payload?.result?.list || [])
-        .filter((row) => row.status === "Trading" && String(row.symbol || "").endsWith("USDT"))
-        .map((row) => String(row.baseCoin || row.symbol).replace(/USDT$/i, ""));
+        .filter((row) => row.status === "Trading" && String(row.symbol || "").endsWith(quote))
+        .map((row) => String(row.baseCoin || row.symbol).replace(new RegExp(`${quote}$`, "i"), ""));
       return uniqueSortedSymbols(symbols);
     }
 
@@ -110,9 +111,9 @@ async function getVenueSymbols(venueId) {
         (row) =>
           row.status === "TRADING" &&
           row.contractType === "PERPETUAL" &&
-          String(row.symbol || "").endsWith("USDT"),
+          String(row.symbol || "").endsWith(quote),
       )
-      .map((row) => String(row.baseAsset || row.symbol).replace(/USDT$/i, ""));
+      .map((row) => String(row.baseAsset || row.symbol).replace(new RegExp(`${quote}$`, "i"), ""));
     return uniqueSortedSymbols(symbols);
   });
 }
@@ -248,6 +249,7 @@ const server = http.createServer(async (request, reply) => {
 
     if (request.method === "GET" && url.pathname === "/api/prices") {
       const type = url.searchParams.get("type");
+      const quote = (url.searchParams.get("quote") || "USDT").toUpperCase();
       if (type === "quotes") {
         json(reply, 200, buildSnapshot().quotes || []);
         return;
@@ -256,12 +258,13 @@ const server = http.createServer(async (request, reply) => {
       const ticker = canonicalTickerParam(url.searchParams.get("ticker"), "BTC");
       const interval = url.searchParams.get("interval") || "1d";
       const limit = Math.min(Number(url.searchParams.get("limit") || 120), 500);
-      json(reply, 200, await getBinanceCandles(ticker, interval, limit));
+      json(reply, 200, await getBinanceCandles(ticker, interval, limit, quote));
       return;
     }
 
     if (request.method === "GET" && url.pathname === "/api/okx") {
       const type = url.searchParams.get("type");
+      const quote = (url.searchParams.get("quote") || "USDT").toUpperCase();
       if (type === "quotes") {
         json(reply, 200, buildSnapshot().venueQuotes?.OKX || []);
         return;
@@ -269,7 +272,7 @@ const server = http.createServer(async (request, reply) => {
       const ticker = canonicalTickerParam(url.searchParams.get("ticker"), "BTC");
       const interval = url.searchParams.get("interval") || "1d";
       const limit = Math.min(Number(url.searchParams.get("limit") || 120), 500);
-      json(reply, 200, await getOkxCandles(ticker, interval, limit));
+      json(reply, 200, await getOkxCandles(ticker, interval, limit, quote));
       return;
     }
 
@@ -311,6 +314,7 @@ const server = http.createServer(async (request, reply) => {
 
     if (request.method === "GET" && url.pathname === "/api/bybit") {
       const type = url.searchParams.get("type");
+      const quote = (url.searchParams.get("quote") || "USDT").toUpperCase();
       if (type === "quotes") {
         json(reply, 200, buildSnapshot().venueQuotes?.Bybit || []);
         return;
@@ -318,7 +322,7 @@ const server = http.createServer(async (request, reply) => {
       const ticker = canonicalTickerParam(url.searchParams.get("ticker"), "BTC");
       const interval = url.searchParams.get("interval") || "1d";
       const limit = Math.min(Number(url.searchParams.get("limit") || 120), 500);
-      json(reply, 200, await getBybitCandles(ticker, interval, limit));
+      json(reply, 200, await getBybitCandles(ticker, interval, limit, quote));
       return;
     }
 
@@ -418,8 +422,9 @@ const server = http.createServer(async (request, reply) => {
 
     if (request.method === "GET" && url.pathname === "/api/venues/symbols") {
       const venue = (url.searchParams.get("venue") || "binance").toLowerCase();
+      const quote = (url.searchParams.get("quote") || "USDT").toUpperCase();
       try {
-        json(reply, 200, await getVenueSymbols(venue));
+        json(reply, 200, await getVenueSymbols(venue, quote));
       } catch {
         const fallback = [...CORE_SYMBOLS, ...(buildSnapshot().quotes || []).map((q) => q.symbol)];
         json(reply, 200, uniqueSortedSymbols(fallback));
