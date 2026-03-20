@@ -31,6 +31,13 @@ const SOURCE_IMPORTANCE = {
   "Bloomberg": 22,
   "Reuters": 22,
   "SEC": 24,
+  "Reddit r/CryptoCurrency": 11,
+  "Reddit r/Bitcoin": 13,
+  "Reddit r/ethereum": 12,
+  "Reddit r/CryptoMarkets": 11,
+  "Reddit r/ethfinance": 11,
+  "Reddit r/solana": 10,
+  "Reddit r/defi": 10,
 };
 
 const TICKER_ALIAS = {
@@ -154,6 +161,7 @@ function inferEventType(text, tickers, matchedKeywords) {
 
 function sourceImportance(source) {
   const normalized = String(source || "").trim();
+  if (normalized.startsWith("Nitter @")) return 12;
   if (SOURCE_IMPORTANCE[normalized] != null) return SOURCE_IMPORTANCE[normalized];
   return 8;
 }

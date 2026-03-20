@@ -154,15 +154,31 @@ export function getDefaultSocialRssFeeds(subreddits = DEFAULT_SOCIAL_REDDITS) {
 }
 
 export function getDefaultNitterSocialFeeds(nitterBaseUrl = "", handles = []) {
-  const base = String(nitterBaseUrl || "").trim().replace(/\/+$/, "");
-  if (!base) return [];
-  return (Array.isArray(handles) ? handles : [])
+  const bases = (Array.isArray(nitterBaseUrl) ? nitterBaseUrl : [nitterBaseUrl])
+    .map((value) => String(value || "").trim().replace(/\/+$/, ""))
+    .filter(Boolean)
+    .slice(0, 4);
+  if (bases.length === 0) return [];
+  const normalizedHandles = (Array.isArray(handles) ? handles : [])
     .map((value) => String(value || "").trim().replace(/^@/, ""))
     .filter(Boolean)
-    .slice(0, 40)
-    .map((handle) => ({
-      id: `nitter-${handle.toLowerCase()}`,
-      source: `Nitter @${handle}`,
-      url: `${base}/${handle}/rss`,
-    }));
+    .slice(0, 30);
+  const feedRows = [];
+  for (const handle of normalizedHandles) {
+    for (const base of bases) {
+      const instanceHost = (() => {
+        try {
+          return new URL(base).hostname;
+        } catch {
+          return base.replace(/^https?:\/\//, "");
+        }
+      })();
+      feedRows.push({
+        id: `nitter-${handle.toLowerCase()}-${instanceHost.replace(/\./g, "-")}`,
+        source: `Nitter @${handle}`,
+        url: `${base}/${handle}/rss`,
+      });
+    }
+  }
+  return feedRows;
 }

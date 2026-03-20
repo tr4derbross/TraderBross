@@ -315,7 +315,10 @@ export function createTerminalDataService({ config, logger }) {
         const defaultSocialFeeds = config.enableDefaultSocialFeeds !== false
           ? getDefaultSocialRssFeeds(config.socialRedditSubreddits)
           : [];
-        const nitterFeeds = getDefaultNitterSocialFeeds(config.nitterBaseUrl, config.socialTwitterHandles);
+        const nitterBases = Array.isArray(config.socialNitterInstances) && config.socialNitterInstances.length > 0
+          ? config.socialNitterInstances
+          : [config.nitterBaseUrl].filter(Boolean);
+        const nitterFeeds = getDefaultNitterSocialFeeds(nitterBases, config.socialTwitterHandles);
         const socialFeeds = Array.isArray(config.socialRssUrls)
           ? config.socialRssUrls.map((url, index) => ({
               id: `social-${index}`,
@@ -323,7 +326,13 @@ export function createTerminalDataService({ config, logger }) {
               url,
             }))
           : [];
-        const mergedSocialFeeds = [...defaultSocialFeeds, ...nitterFeeds, ...socialFeeds];
+        const dedupedFeedMap = new Map();
+        [...defaultSocialFeeds, ...nitterFeeds, ...socialFeeds].forEach((feed) => {
+          const key = String(feed.url || "").trim().toLowerCase();
+          if (!key || dedupedFeedMap.has(key)) return;
+          dedupedFeedMap.set(key, feed);
+        });
+        const mergedSocialFeeds = Array.from(dedupedFeedMap.values()).slice(0, 24);
         const [rss, json, social] = await Promise.all([
           rssEnabled ? fetchRssNews() : Promise.resolve([]),
           jsonEnabled ? fetchJsonNews({ cryptopanicKey: config.cryptopanicKey }) : Promise.resolve([]),

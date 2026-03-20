@@ -62,11 +62,15 @@ export function loadConfig() {
       .filter(Boolean),
     socialTwitterHandles: parseCsvList(
       process.env.SOCIAL_TWITTER_HANDLES,
-      ["wublockchain", "watcherguru", "tier10k", "lookonchain", "whale_alert", "coindesk"],
+      ["wublockchain", "tier10k", "lookonchain", "glassnode", "santimentfeed", "coindesk"],
     ),
     socialRedditSubreddits: parseCsvList(
       process.env.SOCIAL_REDDIT_SUBREDDITS,
-      ["CryptoCurrency", "Bitcoin", "ethfinance", "solana"],
+      ["CryptoCurrency", "Bitcoin", "ethereum", "CryptoMarkets", "ethfinance", "solana", "defi"],
+    ),
+    socialNitterInstances: parseCsvList(
+      process.env.SOCIAL_NITTER_INSTANCES,
+      ["https://nitter.net", "https://nitter.privacydev.net"],
     ),
     enableDefaultSocialFeeds: toBoolean(process.env.FEATURE_SOCIAL_DEFAULT_FEEDS, true),
     nitterBaseUrl: process.env.NITTER_BASE_URL || "",
