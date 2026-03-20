@@ -386,6 +386,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const [binanceTestnet, setBinanceTestnet] = useState(false);
   const [newsTradeIntent, setNewsTradeIntent] = useState<NewsTradeIntent | null>(null);
   const [venueSymbols, setVenueSymbols] = useState<string[]>([]);
+  const [quoteAsset, setQuoteAsset] = useState<"USDT" | "USDC">("USDT");
   const [activeVenueState, setActiveVenueState] = useState<ActiveVenueState>({
     venueId: "hyperliquid",
     venueType: "wallet",
@@ -771,7 +772,9 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
   useEffect(() => {
     let cancelled = false;
-    void apiFetch<string[]>(`/api/venues/symbols?venue=${encodeURIComponent(activeVenueState.venueId)}`)
+    void apiFetch<string[]>(
+      `/api/venues/symbols?venue=${encodeURIComponent(activeVenueState.venueId)}&quote=${encodeURIComponent(quoteAsset)}`,
+    )
       .then((rows) => {
         if (cancelled || !Array.isArray(rows)) return;
         const normalized = Array.from(
@@ -795,7 +798,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     return () => {
       cancelled = true;
     };
-  }, [activeVenueState.venueId]);
+  }, [activeVenueState.venueId, quoteAsset]);
 
   useEffect(() => {
     if (tradableSymbols.length === 0) return;
@@ -1348,6 +1351,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         selectedNews={selectedItem}
         newsTradeIntent={newsTradeIntent}
         availableTickers={tradableSymbols}
+        quoteAsset={quoteAsset}
+        onQuoteAssetChange={setQuoteAsset}
         balance={displayBalance}
         isDemoMode={venueBalance === null}
         positions={displayPositions}
@@ -1368,6 +1373,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         activeVenue={activeVenueState.venueId}
         activeSymbol={activeVenueState.activeSymbol}
         availableTickers={tradableSymbols}
+        quoteAsset={quoteAsset}
         marketDataSourceLabel={activeVenueMarketLabel}
         liveTickerPrice={
           activeVenueState.venueId === "binance" ||
@@ -1429,6 +1435,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           selectedNews={selectedItem}
           newsTradeIntent={newsTradeIntent}
           availableTickers={tradableSymbols}
+          quoteAsset={quoteAsset}
+          onQuoteAssetChange={setQuoteAsset}
           balance={displayBalance}
           isDemoMode={venueBalance === null}
           positions={displayPositions}
@@ -1537,6 +1545,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                   prices={prices}
                   venueId={activeVenueState.venueId}
                   availableTickers={tradableSymbols}
+                  quoteAsset={quoteAsset}
                   activeTicker={activeVenueState.activeSymbol}
                   onSelectTicker={(ticker) => {
                     setActiveSymbol(ticker);

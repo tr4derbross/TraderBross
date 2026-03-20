@@ -32,6 +32,7 @@ type Props = {
   activeVenue: TradingVenueId;
   activeSymbol: string;
   availableTickers?: string[];
+  quoteAsset?: "USDT" | "USDC";
   marketDataSourceLabel: string;
   liveTickerPrice?: number;
   liveFeedConnected?: boolean;
@@ -112,6 +113,7 @@ export default function PriceChart({
   activeVenue,
   activeSymbol,
   availableTickers = AVAILABLE_TICKERS,
+  quoteAsset = "USDT",
   marketDataSourceLabel,
   liveTickerPrice,
   liveFeedConnected = false,
@@ -429,14 +431,14 @@ export default function PriceChart({
 
     const endpoint =
       activeVenue === "okx"
-        ? `/api/okx?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
+        ? `/api/okx?type=ohlcv&ticker=${ticker}&quote=${quoteAsset}&interval=${interval}&limit=${limit}`
         : activeVenue === "bybit"
-          ? `/api/bybit?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
+          ? `/api/bybit?type=ohlcv&ticker=${ticker}&quote=${quoteAsset}&interval=${interval}&limit=${limit}`
           : activeVenue === "hyperliquid"
             ? `/api/hyperliquid?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
             : activeVenue === "dydx"
               ? `/api/dydx?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
-            : `/api/prices?ticker=${ticker}&interval=${interval}&limit=${limit}`;
+            : `/api/prices?ticker=${ticker}&quote=${quoteAsset}&interval=${interval}&limit=${limit}`;
 
     if (process.env.NODE_ENV !== "production") { console.log("[PriceChart] fetching candles:", endpoint); }
     apiFetch<PriceData[]>(endpoint)
@@ -462,7 +464,7 @@ export default function PriceChart({
       active = false;
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     };
-  }, [activeVenue, ticker, timeframe]);
+  }, [activeVenue, quoteAsset, ticker, timeframe]);
 
   useEffect(() => {
     if (!liveTickerPrice || !Number.isFinite(liveTickerPrice)) return;
@@ -793,7 +795,7 @@ export default function PriceChart({
             >
               {chartTickers.map((item) => (
                 <option key={item} value={item} className="bg-[#0d0d14]">
-                  {item}USDT
+                  {item}{quoteAsset}
                 </option>
               ))}
             </select>

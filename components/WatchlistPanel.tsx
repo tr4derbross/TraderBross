@@ -14,6 +14,7 @@ type Props = {
   activeTicker: string;
   venueId?: string;
   availableTickers?: string[];
+  quoteAsset?: "USDT" | "USDC";
 };
 
 const DEFAULT_WATCHLIST = ["BTC", "ETH", "SOL", "BNB", "XRP"];
@@ -34,6 +35,7 @@ export default function WatchlistPanel({
   activeTicker,
   venueId = "binance",
   availableTickers = [],
+  quoteAsset = "USDT",
 }: Props) {
   const [watchlist, setWatchlist] = useState<string[]>(DEFAULT_WATCHLIST);
   const [adding, setAdding] = useState(false);
@@ -56,7 +58,9 @@ export default function WatchlistPanel({
 
   useEffect(() => {
     let cancelled = false;
-    void apiFetch<Array<string | { symbol?: string }>>(`/api/venues/symbols?venue=${encodeURIComponent(venueId)}`)
+    void apiFetch<Array<string | { symbol?: string }>>(
+      `/api/venues/symbols?venue=${encodeURIComponent(venueId)}&quote=${encodeURIComponent(quoteAsset)}`,
+    )
       .then((rows) => {
         if (cancelled || !Array.isArray(rows)) return;
         setBackendSymbols(
@@ -69,7 +73,7 @@ export default function WatchlistPanel({
     return () => {
       cancelled = true;
     };
-  }, [venueId]);
+  }, [quoteAsset, venueId]);
 
   const quoteMap = Object.fromEntries(quotes.map((q) => [q.symbol, q]));
   const supportedUniverse = useMemo(
@@ -237,7 +241,7 @@ export default function WatchlistPanel({
                     <span className={`text-xs font-bold tracking-[0.06em] ${isActive ? "text-amber-300" : "text-white"}`}>
                       {ticker}
                     </span>
-                    <span className="text-[9px] text-zinc-600">USDT</span>
+                    <span className="text-[9px] text-zinc-600">{quoteAsset}</span>
                   </div>
                 </div>
 

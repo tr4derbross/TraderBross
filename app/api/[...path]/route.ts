@@ -42,17 +42,18 @@ function extractTickers(text: string) {
   return Array.from(new Set(matches)).slice(0, 3);
 }
 
-function toBinanceSymbol(ticker: string) {
+function toBinanceSymbol(ticker: string, quoteAsset = "USDT") {
   const symbol = String(ticker || "BTC").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  return `${symbol || "BTC"}USDT`;
+  const quote = String(quoteAsset || "USDT").toUpperCase() === "USDC" ? "USDC" : "USDT";
+  return `${symbol || "BTC"}${quote}`;
 }
 
-async function fetchEmergencyCandles(params: { ticker?: string; interval?: string; limit?: string }) {
+async function fetchEmergencyCandles(params: { ticker?: string; interval?: string; limit?: string; quote?: string }) {
   const ticker = String(params.ticker || "BTC").toUpperCase();
   const interval = String(params.interval || "1h");
   const limit = Math.min(Math.max(Number(params.limit || 120) || 120, 10), 500);
-  const symbol = toBinanceSymbol(ticker);
-  const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${encodeURIComponent(interval)}&limit=${limit}`;
+  const symbol = toBinanceSymbol(ticker, params.quote);
+  const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${encodeURIComponent(interval)}&limit=${limit}`;
   const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(9000) });
   if (!res.ok) return [];
   const rows = await res.json();
@@ -278,6 +279,7 @@ async function emergencyResponse(path: string[], request: NextRequest) {
       ticker: request.nextUrl.searchParams.get("ticker") || "BTC",
       interval: request.nextUrl.searchParams.get("interval") || "1h",
       limit: request.nextUrl.searchParams.get("limit") || "120",
+      quote: request.nextUrl.searchParams.get("quote") || "USDT",
     }));
   }
   if (key === "okx" || key === "bybit" || key === "hyperliquid" || key === "dydx") {
@@ -287,6 +289,7 @@ async function emergencyResponse(path: string[], request: NextRequest) {
         ticker: request.nextUrl.searchParams.get("ticker") || "BTC",
         interval: request.nextUrl.searchParams.get("interval") || "1h",
         limit: request.nextUrl.searchParams.get("limit") || "120",
+        quote: request.nextUrl.searchParams.get("quote") || "USDT",
       }));
     }
     if (type === "quotes") {
