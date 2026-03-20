@@ -343,20 +343,24 @@ function SocialCard({ item, isNew, onSelect, onTickerSelect, onQuickTrade, selec
 
       <QuickTradeChips item={item} onQuickTrade={onQuickTrade} />
 
+      {item.url && item.url !== "#" && (
+        <div className="mt-2 border-t border-zinc-800/70 pt-2">
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[10px] text-sky-400 hover:text-sky-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ExternalLink className="h-3 w-3" />
+            Source: {item.source}
+          </a>
+        </div>
+      )}
+
       {expanded && item.summary && item.summary !== item.headline && (
         <div className="mt-2.5 border-t border-zinc-800/80 pt-2.5">
           <p className="text-[11px] leading-relaxed text-zinc-400">{item.summary}</p>
-          {item.url && item.url !== "#" && (
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-1 flex items-center gap-1 text-[10px] text-sky-400 hover:text-sky-300"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <ExternalLink className="h-3 w-3" /> View Post
-            </a>
-          )}
         </div>
       )}
     </CardShell>
@@ -456,6 +460,21 @@ function NewsCardInner({ item, isNew, onSelect, onTickerSelect, onQuickTrade, on
 
       <QuickTradeChips item={item} onQuickTrade={onQuickTrade} />
 
+      {item.url && item.url !== "#" && (
+        <div className="mt-2 border-t border-zinc-800/70 pt-2">
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[10px] text-green-500 hover:text-green-400"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ExternalLink className="h-3 w-3" />
+            Source: {item.source}
+          </a>
+        </div>
+      )}
+
       {expanded && (
         <div className="mt-2.5 space-y-2">
           <p className="text-[11px] leading-relaxed text-zinc-400">{item.summary}</p>
@@ -465,17 +484,6 @@ function NewsCardInner({ item, isNew, onSelect, onTickerSelect, onQuickTrade, on
             </p>
           )}
           <div className="flex items-center gap-2 pt-0.5">
-            {item.url && item.url !== "#" && (
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-[10px] text-green-500 hover:text-green-400"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ExternalLink className="h-3 w-3" /> Read Article
-              </a>
-            )}
             {onAskAI && (
               <button
                 type="button"
