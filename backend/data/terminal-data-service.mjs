@@ -15,6 +15,7 @@ import { fetchRssNews } from "./adapters/news-rss.adapter.mjs";
 import { fetchJsonNews } from "./adapters/news-json.adapter.mjs";
 import { createLiquidationEventStream, fetchOnchainWhaleEvents } from "./adapters/onchain-whale-events.adapter.mjs";
 import { fetchCoingeckoCoinMetadata } from "./adapters/coingecko-metadata.adapter.mjs";
+import { fetchBinanceLargeTradeEvents } from "./adapters/whale-binance-trades.adapter.mjs";
 import { createNewsIngestionEngine } from "./news/news-engine.mjs";
 import { createWhaleEventEngine } from "./onchain/whale-engine.mjs";
 import { createWatchlistRelevance } from "./core/watchlist-relevance.mjs";
@@ -348,17 +349,25 @@ export function createTerminalDataService({ config, logger }) {
   }
 
   async function refreshWhaleLayer() {
-    if (!featureFlags.enableWhaleApi || featureFlags.enableWhaleEngine === false || !config.whaleAlertKey) {
+    if (featureFlags.enableWhaleEngine === false) {
       markProvider("whales", "disabled");
       return;
     }
+    const canUseWhaleAlert = featureFlags.enableWhaleApi !== false && Boolean(config.whaleAlertKey);
+    const whalePrimary = canUseWhaleAlert
+      ? () => fetchOnchainWhaleEvents({ whaleAlertKey: config.whaleAlertKey })
+      : () =>
+          fetchBinanceLargeTradeEvents({
+            minUsd: config.whaleFallback?.minUsd || 500_000,
+            symbols: config.whaleFallback?.symbols,
+          });
     const result = await callWithFallback({
       cacheKey: "core:whales",
       ttlMs: ttl.whaleScanMs || 75_000,
       staleMs: 240_000,
       limiterKey: "whale_alert",
       providerName: "whales",
-      primary: () => fetchOnchainWhaleEvents({ whaleAlertKey: config.whaleAlertKey }),
+      primary: whalePrimary,
       fallback: async () => [],
     });
 

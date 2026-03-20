@@ -81,5 +81,12 @@ export function loadConfig() {
       lsrMs: toNumber(process.env.TTL_LSR_MS, 30_000),
       coincapMs: toNumber(process.env.TTL_COINCAP_MS, 60_000),
     },
+    whaleFallback: {
+      minUsd: toNumber(process.env.WHALE_FALLBACK_MIN_USD, 500_000),
+      symbols: (process.env.WHALE_FALLBACK_SYMBOLS || "BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT")
+        .split(",")
+        .map((entry) => entry.trim().toUpperCase())
+        .filter(Boolean),
+    },
   };
 }
