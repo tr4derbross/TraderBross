@@ -631,7 +631,7 @@ export default function TradingPanel({
         </div>
 
         {/* TP / SL accordion */}
-        <div className="rounded border border-zinc-800/80 bg-zinc-900/40 sm:rounded-lg">
+        <div className="overflow-hidden rounded border border-zinc-800/80 bg-zinc-900/40 sm:rounded-lg">
           <button
             type="button"
             onClick={() => setAdvancedOpen((open) => !open)}
@@ -645,14 +645,14 @@ export default function TradingPanel({
           </button>
 
           {advancedOpen && (
-            <div className="border-t border-zinc-800/60 px-3 pb-3 pt-2.5 space-y-2">
+            <div className="border-t border-zinc-800/60 px-2 pb-2.5 pt-2 sm:px-3 sm:pb-3 sm:pt-2.5 space-y-2">
               {/* TP row */}
               <div className="space-y-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <button
                     type="button"
                     onClick={() => setTpEnabled((v) => !v)}
-                    className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold transition-all ${
+                    className={`shrink-0 rounded-md px-1.5 py-1 text-[9px] font-bold transition-all sm:px-2 sm:text-[10px] ${
                       tpEnabled
                         ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40"
                         : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"
@@ -662,7 +662,7 @@ export default function TradingPanel({
                   </button>
                   <input
                     type="number"
-                    className="flex-1 rounded-lg border border-zinc-700/60 bg-zinc-900 px-2.5 py-1.5 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40"
+                    className="min-w-0 flex-1 rounded-lg border border-zinc-700/60 bg-zinc-900 px-2 py-1.5 text-[10px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40 sm:px-2.5 sm:text-[11px]"
                     disabled={!tpEnabled}
                     placeholder="Price"
                     value={tpPrice}
@@ -670,7 +670,7 @@ export default function TradingPanel({
                   />
                   <input
                     type="number"
-                    className="w-12 min-w-0 rounded-lg border border-zinc-700/60 bg-zinc-900 px-1.5 py-1.5 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40"
+                    className="w-10 min-w-0 rounded-lg border border-zinc-700/60 bg-zinc-900 px-1 py-1.5 text-[10px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40 sm:w-12 sm:px-1.5 sm:text-[11px]"
                     disabled={!tpEnabled}
                     placeholder="%"
                     value={tpPercent}
@@ -683,20 +683,20 @@ export default function TradingPanel({
                       setTpPrice("");
                       setTpPercent("");
                     }}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-700/60 bg-zinc-900 text-zinc-500 transition hover:text-zinc-300 disabled:opacity-40"
+                    className="flex h-6 w-6 items-center justify-center rounded-lg border border-zinc-700/60 bg-zinc-900 text-zinc-500 transition hover:text-zinc-300 disabled:opacity-40 sm:h-7 sm:w-7"
                     title="Clear TP"
                   >
                     <X className="h-3 w-3" />
                   </button>
                 </div>
                 {tpEnabled && (
-                  <div className="flex gap-0.5 pl-8">
+                  <div className="grid grid-cols-4 gap-0.5 pl-0 sm:flex sm:pl-8">
                     {TPSL_PRESETS.map((pct) => (
                       <button
                         key={pct}
                         type="button"
                         onClick={() => setTpPercent(String(pct))}
-                        className={`flex-1 rounded py-0.5 text-[9px] transition ${
+                        className={`rounded py-0.5 text-[8px] transition sm:flex-1 sm:text-[9px] ${
                           tpPercent === String(pct)
                             ? "bg-emerald-500/20 text-emerald-300"
                             : "text-zinc-600 hover:bg-zinc-800 hover:text-zinc-300"
@@ -708,7 +708,7 @@ export default function TradingPanel({
                   </div>
                 )}
                 {tpEnabled && (
-                  <div className="pl-8 text-[9px] text-zinc-600">
+                  <div className="pl-0 text-[8px] text-zinc-600 sm:pl-8 sm:text-[9px]">
                     {side === "long" ? "TP must be above entry." : "TP must be below entry."}
                   </div>
                 )}
@@ -716,11 +716,11 @@ export default function TradingPanel({
 
               {/* SL row */}
               <div className="space-y-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <button
                     type="button"
                     onClick={() => setSlEnabled((v) => !v)}
-                    className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold transition-all ${
+                    className={`shrink-0 rounded-md px-1.5 py-1 text-[9px] font-bold transition-all sm:px-2 sm:text-[10px] ${
                       slEnabled
                         ? "bg-red-500/20 text-red-300 ring-1 ring-red-500/40"
                         : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"
@@ -730,7 +730,7 @@ export default function TradingPanel({
                   </button>
                   <input
                     type="number"
-                    className="flex-1 rounded-lg border border-zinc-700/60 bg-zinc-900 px-2.5 py-1.5 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40"
+                    className="min-w-0 flex-1 rounded-lg border border-zinc-700/60 bg-zinc-900 px-2 py-1.5 text-[10px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40 sm:px-2.5 sm:text-[11px]"
                     disabled={!slEnabled}
                     placeholder="Price"
                     value={slPrice}
@@ -738,7 +738,7 @@ export default function TradingPanel({
                   />
                   <input
                     type="number"
-                    className="w-12 min-w-0 rounded-lg border border-zinc-700/60 bg-zinc-900 px-1.5 py-1.5 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40"
+                    className="w-10 min-w-0 rounded-lg border border-zinc-700/60 bg-zinc-900 px-1 py-1.5 text-[10px] text-zinc-100 outline-none placeholder:text-zinc-700 transition focus:border-zinc-500 disabled:opacity-40 sm:w-12 sm:px-1.5 sm:text-[11px]"
                     disabled={!slEnabled}
                     placeholder="%"
                     value={slPercent}
@@ -751,20 +751,20 @@ export default function TradingPanel({
                       setSlPrice("");
                       setSlPercent("");
                     }}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-700/60 bg-zinc-900 text-zinc-500 transition hover:text-zinc-300 disabled:opacity-40"
+                    className="flex h-6 w-6 items-center justify-center rounded-lg border border-zinc-700/60 bg-zinc-900 text-zinc-500 transition hover:text-zinc-300 disabled:opacity-40 sm:h-7 sm:w-7"
                     title="Clear SL"
                   >
                     <X className="h-3 w-3" />
                   </button>
                 </div>
                 {slEnabled && (
-                  <div className="flex gap-0.5 pl-8">
+                  <div className="grid grid-cols-4 gap-0.5 pl-0 sm:flex sm:pl-8">
                     {TPSL_PRESETS.map((pct) => (
                       <button
                         key={pct}
                         type="button"
                         onClick={() => setSlPercent(String(pct))}
-                        className={`flex-1 rounded py-0.5 text-[9px] transition ${
+                        className={`rounded py-0.5 text-[8px] transition sm:flex-1 sm:text-[9px] ${
                           slPercent === String(pct)
                             ? "bg-red-500/20 text-red-300"
                             : "text-zinc-600 hover:bg-zinc-800 hover:text-zinc-300"
@@ -776,7 +776,7 @@ export default function TradingPanel({
                   </div>
                 )}
                 {slEnabled && (
-                  <div className="pl-8 text-[9px] text-zinc-600">
+                  <div className="pl-0 text-[8px] text-zinc-600 sm:pl-8 sm:text-[9px]">
                     {side === "long" ? "SL must be below entry." : "SL must be above entry."}
                   </div>
                 )}
