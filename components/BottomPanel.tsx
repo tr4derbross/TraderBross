@@ -315,9 +315,27 @@ export default function BottomPanel({
 }: Props) {
   const [tab, setTab] = useState<"positions" | "openorders" | "history" | "pnl">("positions");
   const [editingPosId, setEditingPosId] = useState<string | null>(null);
+  const [quickMenuPosId, setQuickMenuPosId] = useState<string | null>(null);
+  const [positionSort, setPositionSort] = useState<{
+    field: "none" | "pnl" | "roe";
+    direction: "desc" | "asc";
+  }>({ field: "none", direction: "desc" });
 
   const openOrders = orders.filter((o) => o.status === "open");
   const history    = orders.filter((o) => o.status === "filled" || o.status === "cancelled");
+  const sortedPositions = useMemo(() => {
+    if (positionSort.field === "none") return positions;
+    const list = [...positions];
+    list.sort((a, b) => {
+      const aPnl = calcPnl(a);
+      const bPnl = calcPnl(b);
+      const aRoe = calcRoe(a);
+      const bRoe = calcRoe(b);
+      const diff = positionSort.field === "pnl" ? bPnl - aPnl : bRoe - aRoe;
+      return positionSort.direction === "desc" ? diff : -diff;
+    });
+    return list;
+  }, [positionSort, positions]);
   const totalUnrealizedPnL = positions.reduce((sum, p) => sum + calcPnl(p), 0);
   const pnlPositive = totalUnrealizedPnL >= 0;
 
@@ -413,7 +431,43 @@ export default function BottomPanel({
                 <TH>Mark Price</TH>
                 <TH>Liq. Price</TH>
                 <TH>Margin</TH>
-                <TH right>PNL (ROE%)</TH>
+                <TH right>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[9px] hover:bg-white/5"
+                    onClick={() =>
+                      setPositionSort((prev) =>
+                        prev.field !== "pnl"
+                          ? { field: "pnl", direction: "desc" }
+                          : { field: "pnl", direction: prev.direction === "desc" ? "asc" : "desc" },
+                      )
+                    }
+                    title="Sort by PnL"
+                  >
+                    PNL
+                    <span className={positionSort.field === "pnl" ? "text-amber-300" : "text-zinc-700"}>
+                      {positionSort.field === "pnl" ? (positionSort.direction === "desc" ? "↓" : "↑") : "↕"}
+                    </span>
+                  </button>
+                  <span className="mx-0.5 text-zinc-700">/</span>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[9px] hover:bg-white/5"
+                    onClick={() =>
+                      setPositionSort((prev) =>
+                        prev.field !== "roe"
+                          ? { field: "roe", direction: "desc" }
+                          : { field: "roe", direction: prev.direction === "desc" ? "asc" : "desc" },
+                      )
+                    }
+                    title="Sort by ROE"
+                  >
+                    ROE
+                    <span className={positionSort.field === "roe" ? "text-amber-300" : "text-zinc-700"}>
+                      {positionSort.field === "roe" ? (positionSort.direction === "desc" ? "↓" : "↑") : "↕"}
+                    </span>
+                  </button>
+                </TH>
                 <TH>TP / SL</TH>
                 <TH></TH>
               </tr>
@@ -422,24 +476,42 @@ export default function BottomPanel({
               {positions.length === 0 ? (
                 <EmptyRow cols={9} label="No open positions" />
               ) : (
-                positions.map((pos, idx) => {
+                sortedPositions.map((pos, idx) => {
                   const pnl     = calcPnl(pos);
                   const roe     = calcRoe(pos);
                   const notional = pos.amount * pos.currentPrice;
                   const isLong  = pos.side === "long";
                   const pUp     = pnl >= 0;
                   const isEditing = editingPosId === pos.id;
+                  const liqDistancePct = Math.abs((pos.currentPrice - pos.liquidationPrice) / Math.max(pos.currentPrice, 0.000001)) * 100;
+                  const liqRiskLevel = liqDistancePct <= 2 ? "critical" : liqDistancePct <= 5 ? "warning" : "normal";
 
                   return (
                     <tr
                       key={pos.id}
                       className="group transition-colors"
                       style={{
-                        background: idx % 2 === 0 ? "rgba(255,255,255,0.011)" : "transparent",
+                        background:
+                          liqRiskLevel === "critical"
+                            ? "rgba(248,113,113,0.06)"
+                            : liqRiskLevel === "warning"
+                              ? "rgba(245,158,11,0.045)"
+                              : idx % 2 === 0
+                                ? "rgba(255,255,255,0.011)"
+                                : "transparent",
                         borderBottom: "1px solid rgba(255,255,255,0.032)",
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(212,161,31,0.035)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = idx % 2 === 0 ? "rgba(255,255,255,0.011)" : "transparent")}
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background =
+                          liqRiskLevel === "critical"
+                            ? "rgba(248,113,113,0.06)"
+                            : liqRiskLevel === "warning"
+                              ? "rgba(245,158,11,0.045)"
+                              : idx % 2 === 0
+                                ? "rgba(255,255,255,0.011)"
+                                : "transparent")
+                      }
                     >
                       {/* Symbol */}
                       <td className="px-3 py-2.5">
@@ -491,11 +563,31 @@ export default function BottomPanel({
                       <td className="px-3 py-2.5">
                         <span
                           className="inline-flex items-center gap-1 rounded px-1.5 py-[3px] text-[10px] tabular-nums"
-                          style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.16)", color: "#f59e0b" }}
+                          style={{
+                            background:
+                              liqRiskLevel === "critical"
+                                ? "rgba(248,113,113,0.12)"
+                                : liqRiskLevel === "warning"
+                                  ? "rgba(245,158,11,0.09)"
+                                  : "rgba(245,158,11,0.07)",
+                            border:
+                              liqRiskLevel === "critical"
+                                ? "1px solid rgba(248,113,113,0.35)"
+                                : liqRiskLevel === "warning"
+                                  ? "1px solid rgba(245,158,11,0.24)"
+                                  : "1px solid rgba(245,158,11,0.16)",
+                            color:
+                              liqRiskLevel === "critical"
+                                ? "#f87171"
+                                : "#f59e0b",
+                          }}
                         >
                           <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
                           ${fmt(pos.liquidationPrice)}
                         </span>
+                        <div className="mt-0.5 text-[9px] tabular-nums text-zinc-600">
+                          {liqDistancePct.toFixed(2)}% away
+                        </div>
                       </td>
 
                       {/* Margin */}
@@ -526,18 +618,88 @@ export default function BottomPanel({
                             </span>
                           </div>
                           <button
-                            onClick={() => setEditingPosId(isEditing ? null : pos.id)}
+                            onClick={() =>
+                              setQuickMenuPosId((current) => {
+                                if (current === pos.id) return null;
+                                setEditingPosId(null);
+                                return pos.id;
+                              })
+                            }
                             className="ml-auto flex h-6 w-6 items-center justify-center rounded-md transition"
                             style={{
-                              background: isEditing ? "rgba(212,161,31,0.15)" : "rgba(255,255,255,0.04)",
-                              border: `1px solid ${isEditing ? "rgba(212,161,31,0.35)" : "rgba(255,255,255,0.08)"}`,
-                              color: isEditing ? "#d4a11f" : "#52525b",
+                              background: quickMenuPosId === pos.id ? "rgba(212,161,31,0.15)" : "rgba(255,255,255,0.04)",
+                              border: `1px solid ${quickMenuPosId === pos.id ? "rgba(212,161,31,0.35)" : "rgba(255,255,255,0.08)"}`,
+                              color: quickMenuPosId === pos.id ? "#d4a11f" : "#52525b",
                             }}
                             title="Set TP / SL"
                           >
                             <Plus className="h-3 w-3" />
                           </button>
                         </div>
+
+                        {quickMenuPosId === pos.id && (
+                          <div
+                            className="mt-2 rounded-lg p-2"
+                            style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.07)" }}
+                          >
+                            <div className="grid grid-cols-2 gap-1">
+                              <button
+                                className="rounded-md py-1 text-[9px] font-bold text-emerald-300"
+                                style={{ background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.22)" }}
+                                onClick={() => {
+                                  const nextTp = Number(calcPriceFromPercent(pos, "1", "tp"));
+                                  onUpdatePositionTpSl(pos.id, Number.isFinite(nextTp) ? nextTp : pos.tpPrice, pos.slPrice);
+                                  setQuickMenuPosId(null);
+                                }}
+                              >
+                                TP +1%
+                              </button>
+                              <button
+                                className="rounded-md py-1 text-[9px] font-bold text-emerald-300"
+                                style={{ background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.22)" }}
+                                onClick={() => {
+                                  const nextTp = Number(calcPriceFromPercent(pos, "2", "tp"));
+                                  onUpdatePositionTpSl(pos.id, Number.isFinite(nextTp) ? nextTp : pos.tpPrice, pos.slPrice);
+                                  setQuickMenuPosId(null);
+                                }}
+                              >
+                                TP +2%
+                              </button>
+                              <button
+                                className="rounded-md py-1 text-[9px] font-bold text-red-300"
+                                style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.22)" }}
+                                onClick={() => {
+                                  const nextSl = Number(calcPriceFromPercent(pos, "1", "sl"));
+                                  onUpdatePositionTpSl(pos.id, pos.tpPrice, Number.isFinite(nextSl) ? nextSl : pos.slPrice);
+                                  setQuickMenuPosId(null);
+                                }}
+                              >
+                                SL -1%
+                              </button>
+                              <button
+                                className="rounded-md py-1 text-[9px] font-bold text-red-300"
+                                style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.22)" }}
+                                onClick={() => {
+                                  const nextSl = Number(calcPriceFromPercent(pos, "2", "sl"));
+                                  onUpdatePositionTpSl(pos.id, pos.tpPrice, Number.isFinite(nextSl) ? nextSl : pos.slPrice);
+                                  setQuickMenuPosId(null);
+                                }}
+                              >
+                                SL -2%
+                              </button>
+                            </div>
+                            <button
+                              className="mt-1 w-full rounded-md py-1 text-[9px] text-zinc-300"
+                              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}
+                              onClick={() => {
+                                setEditingPosId(pos.id);
+                                setQuickMenuPosId(null);
+                              }}
+                            >
+                              Advanced Editor
+                            </button>
+                          </div>
+                        )}
 
                         {isEditing && (
                           <TpSlEditor
@@ -546,8 +708,12 @@ export default function BottomPanel({
                             onSave={(tp, sl) => {
                               onUpdatePositionTpSl(pos.id, tp, sl);
                               setEditingPosId(null);
+                              setQuickMenuPosId(null);
                             }}
-                            onCancel={() => setEditingPosId(null)}
+                            onCancel={() => {
+                              setEditingPosId(null);
+                              setQuickMenuPosId(null);
+                            }}
                           />
                         )}
                       </td>
