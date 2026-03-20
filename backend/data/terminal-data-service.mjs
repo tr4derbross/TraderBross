@@ -19,6 +19,7 @@ import { getDefaultSocialRssFeeds } from "./adapters/news-rss.adapter.mjs";
 import { getDefaultNitterSocialFeeds } from "./adapters/news-rss.adapter.mjs";
 import { fetchJsonNews } from "./adapters/news-json.adapter.mjs";
 import { fetchTreeOfAlphaNews } from "./adapters/news-treeofalpha.adapter.mjs";
+import { createTreeOfAlphaNewsStream } from "./adapters/news-treeofalpha.adapter.mjs";
 import { createLiquidationEventStream, fetchOnchainWhaleEvents } from "./adapters/onchain-whale-events.adapter.mjs";
 import { fetchCoingeckoCoinMetadata } from "./adapters/coingecko-metadata.adapter.mjs";
 import { fetchCoinpaprikaCoinMetadata } from "./adapters/coinpaprika-metadata.adapter.mjs";
@@ -108,6 +109,7 @@ export function createTerminalDataService({ config, logger }) {
   let started = false;
   let stopHyperliquid = null;
   let stopLiquidations = null;
+  let stopTreeNews = null;
   let intervals = [];
 
   function publish(type, payload) {
@@ -492,6 +494,40 @@ export function createTerminalDataService({ config, logger }) {
         publish("whaleEvents", state.whaleEvents);
       },
     });
+
+    if (featureFlags.enableNewsTreeWs !== false && config.treeNewsApiKey) {
+      stopTreeNews = createTreeOfAlphaNewsStream({
+        apiKey: config.treeNewsApiKey,
+        logger,
+        onEvent(newsEvent) {
+          const item = toFrontendNewsItem({
+            id: newsEvent.id,
+            title: newsEvent.title,
+            summary: newsEvent.summary,
+            source: newsEvent.source,
+            sourceType: newsEvent.sourceType || "news",
+            sentiment: newsEvent.sentiment || "neutral",
+            importance: newsEvent.importance || "watch",
+            tickers: newsEvent.tickers || [],
+            relatedAssets: newsEvent.tickers || [],
+            watchlistRelevance: 0,
+            relevanceLabels: [],
+            priorityLabel: "watchlist hit",
+            timestamp: newsEvent.timestamp,
+            url: newsEvent.url || "#",
+          });
+          if (item.type === "social") {
+            state.social = [item, ...state.social.filter((row) => row.id !== item.id)].slice(0, 80);
+            publish("social", state.social);
+            return;
+          }
+          state.news = [item, ...state.news.filter((row) => row.id !== item.id)].slice(0, 160);
+          publish("news", item);
+        },
+      });
+    } else {
+      stopTreeNews = null;
+    }
   }
 
   async function refreshSecondaryStats() {
@@ -621,8 +657,10 @@ export function createTerminalDataService({ config, logger }) {
     started = false;
     if (stopHyperliquid) stopHyperliquid();
     if (stopLiquidations) stopLiquidations();
+    if (stopTreeNews) stopTreeNews();
     stopHyperliquid = null;
     stopLiquidations = null;
+    stopTreeNews = null;
     intervals.forEach(clearInterval);
     intervals = [];
   }
