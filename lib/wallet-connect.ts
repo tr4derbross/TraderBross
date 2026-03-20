@@ -40,6 +40,8 @@ export type ConnectedWalletSession = {
   disconnectTargets: Array<EthereumProvider | SolanaProvider>;
 };
 
+export type WalletSessionListenerCleanup = () => void;
+
 declare global {
   interface Window {
     ethereum?: EthereumProvider;
@@ -155,6 +157,101 @@ export async function connectWalletByLabel(wallet: SupportedWalletLabel): Promis
   }
 
   throw new Error(`${wallet} integration is not available yet.`);
+}
+
+export function isWalletInstalled(wallet: SupportedWalletLabel) {
+  if (typeof window === "undefined") return false;
+  if (wallet === "MetaMask" || wallet === "Rabby" || wallet === "Coinbase Wallet") {
+    return Boolean(getInjectedEthereumProvider(wallet));
+  }
+  if (wallet === "Phantom") {
+    return Boolean(window.phantom?.solana || window.solana?.isPhantom || window.solflare?.isPhantom);
+  }
+  if (wallet === "Solflare") {
+    return Boolean(window.solflare || window.solana?.isSolflare || window.phantom?.solana?.isSolflare);
+  }
+  return false;
+}
+
+export function walletInstallUrl(wallet: SupportedWalletLabel) {
+  switch (wallet) {
+    case "MetaMask":
+      return "https://metamask.io/download/";
+    case "Rabby":
+      return "https://rabby.io/";
+    case "Coinbase Wallet":
+      return "https://www.coinbase.com/wallet/downloads";
+    case "Phantom":
+      return "https://phantom.app/download";
+    case "Solflare":
+      return "https://solflare.com/download";
+    default:
+      return "";
+  }
+}
+
+export function subscribeWalletSession(
+  session: ConnectedWalletSession,
+  handlers: {
+    onDisconnect: () => void;
+    onAddressChange?: (nextAddress: string) => void;
+  },
+): WalletSessionListenerCleanup {
+  const cleanup: Array<() => void> = [];
+
+  for (const target of session.disconnectTargets) {
+    if (!target.on) continue;
+
+    if (session.kind === "evm") {
+      const provider = target as EthereumProvider;
+      const accountHandler = (accounts: unknown) => {
+        const nextAddress = Array.isArray(accounts) ? String(accounts[0] || "") : "";
+        if (!nextAddress) {
+          handlers.onDisconnect();
+          return;
+        }
+        handlers.onAddressChange?.(nextAddress);
+      };
+      const disconnectHandler = () => handlers.onDisconnect();
+
+      provider.on?.("accountsChanged", accountHandler);
+      provider.on?.("disconnect", disconnectHandler);
+      cleanup.push(() => {
+        provider.removeListener?.("accountsChanged", accountHandler);
+        provider.off?.("accountsChanged", accountHandler);
+        provider.removeListener?.("disconnect", disconnectHandler);
+        provider.off?.("disconnect", disconnectHandler);
+      });
+      continue;
+    }
+
+    const provider = target as SolanaProvider;
+    const accountHandler = (publicKey: unknown) => {
+      const nextAddress =
+        publicKey && typeof publicKey === "object" && "toString" in publicKey
+          ? (publicKey as { toString: () => string }).toString()
+          : "";
+      if (!nextAddress) {
+        handlers.onDisconnect();
+        return;
+      }
+      handlers.onAddressChange?.(nextAddress);
+    };
+    const disconnectHandler = () => handlers.onDisconnect();
+
+    provider.on?.("accountChanged", accountHandler);
+    provider.on?.("disconnect", disconnectHandler);
+    cleanup.push(() => {
+      provider.removeListener?.("accountChanged", accountHandler);
+      provider.off?.("accountChanged", accountHandler);
+      provider.removeListener?.("disconnect", disconnectHandler);
+      provider.off?.("disconnect", disconnectHandler);
+    });
+  }
+
+  return () => {
+    cleanup.forEach((item) => item());
+  };
 }
 
 export async function disconnectWalletSession(session: ConnectedWalletSession) {

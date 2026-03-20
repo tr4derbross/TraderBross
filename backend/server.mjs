@@ -18,7 +18,7 @@ import { getMarketStats, getMempoolStats, getFearGreed, getEthGas, getDefiLlamaT
 import { getTrendingData } from "./services/trending-service.mjs";
 import { clearSecret, getSecret, storeSecret } from "./services/vault-service.mjs";
 import { createTerminalDataService } from "./data/terminal-data-service.mjs";
-import { canonicalSymbol } from "./data/core/symbol-map.mjs";
+import { CORE_SYMBOLS, canonicalSymbol, symbolAliases } from "./data/core/symbol-map.mjs";
 import { MemoryCache } from "./services/cache.mjs";
 
 const config = loadConfig();
@@ -334,6 +334,24 @@ const server = http.createServer(async (request, reply) => {
 
     if (request.method === "GET" && url.pathname === "/api/coins/meta") {
       json(reply, 200, buildSnapshot().coinMetadata || {});
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/symbols") {
+      const snapshot = buildSnapshot();
+      const seen = new Set();
+      const merged = [...CORE_SYMBOLS, ...(snapshot.quotes || []).map((item) => item.symbol)];
+      const symbols = [];
+      for (const raw of merged) {
+        const canonical = canonicalSymbol(raw);
+        if (!canonical || seen.has(canonical)) continue;
+        seen.add(canonical);
+        symbols.push({
+          symbol: canonical,
+          aliases: symbolAliases(canonical),
+        });
+      }
+      json(reply, 200, symbols);
       return;
     }
 

@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AVAILABLE_TICKERS } from "@/lib/mock-data";
 import type { TickerQuote } from "@/lib/mock-data";
+import { canonicalSymbol, symbolAliases } from "@/lib/symbol-map";
+import { apiFetch } from "@/lib/api-client";
 import { Star, X, Plus, TrendingUp, TrendingDown } from "lucide-react";
 
 type Props = {
@@ -27,6 +29,8 @@ export default function WatchlistPanel({ quotes, prices, onSelectTicker, activeT
   const [watchlist, setWatchlist] = useState<string[]>(DEFAULT_WATCHLIST);
   const [adding, setAdding] = useState(false);
   const [addTicker, setAddTicker] = useState("");
+  const [statusText, setStatusText] = useState<string>("");
+  const [backendSymbols, setBackendSymbols] = useState<string[]>([]);
 
   // Load from localStorage
   useEffect(() => {
@@ -41,20 +45,72 @@ export default function WatchlistPanel({ quotes, prices, onSelectTicker, activeT
     localStorage.setItem(STORAGE_KEY, JSON.stringify(watchlist));
   }, [watchlist]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void apiFetch<Array<{ symbol?: string }>>("/api/symbols")
+      .then((rows) => {
+        if (cancelled || !Array.isArray(rows)) return;
+        setBackendSymbols(
+          rows
+            .map((row) => canonicalSymbol(row.symbol || ""))
+            .filter(Boolean),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const quoteMap = Object.fromEntries(quotes.map((q) => [q.symbol, q]));
+  const supportedUniverse = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [...AVAILABLE_TICKERS, ...backendSymbols, ...quotes.map((q) => q.symbol)]
+            .map((value) => canonicalSymbol(value))
+            .filter(Boolean),
+        ),
+      ),
+    [backendSymbols, quotes],
+  );
+  const supportSet = useMemo(() => new Set(supportedUniverse), [supportedUniverse]);
 
   const removeTicker = (t: string) => setWatchlist((prev) => prev.filter((x) => x !== t));
 
-  const handleAdd = () => {
-    const t = addTicker.toUpperCase().trim();
-    if (t && AVAILABLE_TICKERS.includes(t) && !watchlist.includes(t)) {
-      setWatchlist((prev) => [...prev, t]);
+  const handleAdd = (inputValue?: string) => {
+    const raw = (inputValue ?? addTicker).trim();
+    const normalized = canonicalSymbol(raw);
+
+    if (!normalized) {
+      setStatusText("Please enter a ticker.");
+      return;
     }
+
+    if (!supportSet.has(normalized)) {
+      setStatusText(`${raw.toUpperCase()} is not supported yet on this terminal.`);
+      return;
+    }
+
+    if (watchlist.includes(normalized)) {
+      setStatusText(`${normalized} is already in watchlist.`);
+      return;
+    }
+
+    setWatchlist((prev) => [...prev, normalized].slice(0, 30));
+    onSelectTicker(normalized);
+    setStatusText(
+      normalized === raw.toUpperCase()
+        ? `${normalized} added.`
+        : `${raw.toUpperCase()} mapped to ${normalized} and added.`,
+    );
     setAdding(false);
     setAddTicker("");
   };
 
-  const available = AVAILABLE_TICKERS.filter((t) => !watchlist.includes(t));
+  const available = supportedUniverse.filter((t) => !watchlist.includes(t));
+  const normalizedInput = canonicalSymbol(addTicker);
+  const inputAliases = normalizedInput ? symbolAliases(normalizedInput) : [];
 
   return (
     <div className="flex h-full flex-col">
@@ -76,31 +132,60 @@ export default function WatchlistPanel({ quotes, prices, onSelectTicker, activeT
       {/* Add ticker dropdown */}
       {adding && (
         <div className="border-b border-[rgba(212,161,31,0.08)] bg-[rgba(18,16,13,0.72)] px-3 py-2.5">
-          <div className="flex gap-1.5">
-            <select
-              className="terminal-input min-h-[34px] flex-1 rounded-lg px-2.5 py-1 text-xs text-white outline-none"
-              value={addTicker}
-              onChange={(e) => setAddTicker(e.target.value)}
-              autoFocus
-            >
-              <option value="">Select ticker...</option>
-              {available.map((t) => (
-                <option key={t} value={t}>{t}/USDT</option>
+          <div className="space-y-2">
+            <div className="flex gap-1.5">
+              <input
+                className="terminal-input min-h-[34px] flex-1 rounded-lg px-2.5 py-1 text-xs text-white outline-none placeholder:text-zinc-600"
+                value={addTicker}
+                onChange={(e) => {
+                  setAddTicker(e.target.value);
+                  if (statusText) setStatusText("");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleAdd();
+                  }
+                }}
+                autoFocus
+                placeholder="Type ticker or alias (BTC, XBT, WBTC)"
+              />
+              <button
+                onClick={() => handleAdd()}
+                disabled={!addTicker.trim()}
+                className="brand-chip-active rounded-lg px-3 py-1.5 text-[10px] font-bold transition-colors disabled:opacity-40"
+              >
+                Add
+              </button>
+              <button
+                onClick={() => { setAdding(false); setAddTicker(""); setStatusText(""); }}
+                className="terminal-chip rounded-lg px-2 py-1.5 text-[10px] text-zinc-400 transition-colors hover:text-white"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {available.slice(0, 8).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => handleAdd(t)}
+                  className="terminal-chip rounded-full px-2 py-0.5 text-[9px] text-zinc-300 hover:text-white"
+                >
+                  {t}
+                </button>
               ))}
-            </select>
-            <button
-              onClick={handleAdd}
-              disabled={!addTicker}
-              className="brand-chip-active rounded-lg px-3 py-1.5 text-[10px] font-bold transition-colors disabled:opacity-40"
-            >
-              Add
-            </button>
-            <button
-              onClick={() => { setAdding(false); setAddTicker(""); }}
-              className="terminal-chip rounded-lg px-2 py-1.5 text-[10px] text-zinc-400 transition-colors hover:text-white"
-            >
-              <X className="h-3 w-3" />
-            </button>
+            </div>
+
+            {inputAliases.length > 1 && (
+              <div className="text-[9px] text-zinc-500">
+                Alias map: {inputAliases.join(" / ")}
+              </div>
+            )}
+
+            {statusText && (
+              <div className="text-[10px] text-amber-200">{statusText}</div>
+            )}
           </div>
         </div>
       )}
