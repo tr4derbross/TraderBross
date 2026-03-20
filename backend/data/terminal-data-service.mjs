@@ -312,8 +312,10 @@ export function createTerminalDataService({ config, logger }) {
       limiterKey: "news_aggregate",
       providerName: "news",
       primary: async () => {
-        const defaultSocialFeeds = config.enableDefaultSocialFeeds !== false ? getDefaultSocialRssFeeds() : [];
-        const nitterFeeds = getDefaultNitterSocialFeeds(config.nitterBaseUrl);
+        const defaultSocialFeeds = config.enableDefaultSocialFeeds !== false
+          ? getDefaultSocialRssFeeds(config.socialRedditSubreddits)
+          : [];
+        const nitterFeeds = getDefaultNitterSocialFeeds(config.nitterBaseUrl, config.socialTwitterHandles);
         const socialFeeds = Array.isArray(config.socialRssUrls)
           ? config.socialRssUrls.map((url, index) => ({
               id: `social-${index}`,
