@@ -126,7 +126,7 @@ export function loadConfig() {
       marketSnapshotMs: toNumber(process.env.TTL_MARKET_SNAPSHOT_MS, 20_000),
       coinMetadataMs: toNumber(process.env.TTL_COIN_METADATA_MS, 6 * 60 * 60 * 1000),
       newsFeedMs: toNumber(process.env.TTL_NEWS_FEED_MS, 60_000),
-      treeNewsLimit: toNumber(process.env.TREE_NEWS_LIMIT, 300),
+      treeNewsLimit: toNumber(process.env.TREE_NEWS_LIMIT, 1000),
       whaleScanMs: toNumber(process.env.TTL_WHALE_SCAN_MS, 75_000),
       discoveryMs: toNumber(process.env.TTL_DISCOVERY_MS, 45_000),
       fundingMs: toNumber(process.env.TTL_FUNDING_MS, 20_000),
