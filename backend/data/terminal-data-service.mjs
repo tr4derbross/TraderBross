@@ -41,6 +41,11 @@ function dedupeBy(items, getKey) {
   });
 }
 
+function toMs(value) {
+  const ts = new Date(value || 0).getTime();
+  return Number.isFinite(ts) ? ts : 0;
+}
+
 export function createTerminalDataService({ config, logger }) {
   const cache = new TtlCache();
   const limiter = new SlidingWindowRateLimiter({ limit: 120, windowMs: 60_000 });
@@ -348,7 +353,33 @@ export function createTerminalDataService({ config, logger }) {
           ...item,
           sourceType: item.sourceType || "news",
         }));
+        const treeSocialRows = treeRows.filter((item) => item.sourceType === "social");
         const engineSnapshot = newsEngine.ingest([...rss, ...json, ...treeRows, ...socialRows]);
+        const socialFeedRows = dedupeBy(
+          [...treeSocialRows, ...socialRows]
+            .sort((a, b) => toMs(b.timestamp) - toMs(a.timestamp))
+            .slice(0, 400),
+          (item) => item.id,
+        )
+          .slice(0, 120)
+          .map((item) =>
+            toFrontendNewsItem({
+              id: item.id,
+              title: item.title,
+              summary: item.summary,
+              source: item.source,
+              sourceType: "social",
+              sentiment: item.sentiment || "neutral",
+              importance: item.importance || "watch",
+              tickers: item.tickers || [],
+              relatedAssets: item.tickers || [],
+              watchlistRelevance: 0,
+              relevanceLabels: [],
+              priorityLabel: "watchlist hit",
+              timestamp: item.timestamp,
+              url: item.url || "#",
+            }),
+          );
         if (engineSnapshot.count === 0) {
           const errors = [];
           if (rssEnabled && rss.length === 0) errors.push("rss_empty_or_unavailable");
@@ -357,12 +388,13 @@ export function createTerminalDataService({ config, logger }) {
           if (mergedSocialFeeds.length > 0 && socialRows.length === 0) errors.push("social_rss_empty_or_unavailable");
           engineSnapshot.errors = errors;
         }
-        return engineSnapshot;
+        return { engineSnapshot, socialFeedRows };
       },
       fallback: async () => state.newsSnapshot,
     });
 
-    const snapshot = result.value || {
+    const snapshotEnvelope = result.value?.engineSnapshot ? result.value : { engineSnapshot: result.value, socialFeedRows: state.social };
+    const snapshot = snapshotEnvelope.engineSnapshot || {
       generatedAt: new Date().toISOString(),
       count: 0,
       items: [],
@@ -395,7 +427,9 @@ export function createTerminalDataService({ config, logger }) {
       }),
     );
     const nextPrimaryNews = nextNews.filter((item) => item.type !== "social");
-    const nextSocial = nextNews.filter((item) => item.type === "social").slice(0, 80);
+    const nextSocial = Array.isArray(snapshotEnvelope.socialFeedRows)
+      ? snapshotEnvelope.socialFeedRows.slice(0, 120)
+      : nextNews.filter((item) => item.type === "social").slice(0, 80);
     const prevIds = new Set(state.news.map((item) => item.id));
     state.news = nextPrimaryNews;
     state.social = nextSocial;
