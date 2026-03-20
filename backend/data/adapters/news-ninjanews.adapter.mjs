@@ -146,11 +146,12 @@ function normalizeNinjaTweetRow(row) {
     row?.source?.externalType,
     "Twitter",
   );
+  const normalizedSource = String(sourceLabel || "").toLowerCase() === "tweet" ? "Twitter" : sourceLabel;
   return normalizeNewsEvent({
     id: `ninja-social-${row?.id || Date.now()}`,
     title: row?.title || row?.data?.full_text || "",
     summary: String(row?.description || row?.data?.full_text || row?.title || "").slice(0, 380),
-    source: sourceLabel,
+    source: normalizedSource,
     sourceType: "social",
     sentiment: "neutral",
     importance: "watch",

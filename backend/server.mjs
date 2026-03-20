@@ -135,6 +135,8 @@ const server = http.createServer(async (request, reply) => {
             whales: status.whales,
             liquidations: status.liquidations,
           },
+          freshness: status.freshness || null,
+          news_sources: status.newsSourceHealth || {},
         },
       });
       return;

@@ -190,6 +190,24 @@ export type BackendSnapshot = {
     lastErrorAt: string | null;
     lastError: string | null;
   }>;
+  newsSourceHealth?: Record<string, {
+    status: string;
+    enabled: boolean;
+    lastFetchedAt: string | null;
+    lastSuccessAt: string | null;
+    lastErrorAt: string | null;
+    lastError: string | null;
+    lastCount: number;
+    errorStreak: number;
+    nextRetryAt: string | null;
+  }>;
+  freshness?: {
+    newsAgeSec: number | null;
+    socialAgeSec: number | null;
+    newsFresh: boolean;
+    socialFresh: boolean;
+    stale: boolean;
+  };
   connectionState: "connecting" | "connected" | "degraded" | "disconnected";
 };
 
