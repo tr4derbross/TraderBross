@@ -37,6 +37,16 @@ const SENSITIVE_ROUTES = new Set([
   "/api/hyperliquid/order",
 ]);
 
+if (config.security.proxyAuthEnabled && !String(config.security.proxyAuthSecret || "").trim()) {
+  throw new Error("Security misconfiguration: REQUIRE_PROXY_AUTH is enabled but PROXY_SHARED_SECRET is missing.");
+}
+
+if (String(process.env.NODE_ENV || "").toLowerCase() === "production" && !String(process.env.VAULT_ENCRYPTION_KEY || "").trim()) {
+  logger.warn("backend.security.vault_key_missing", {
+    message: "VAULT_ENCRYPTION_KEY is not set. Vault key will rotate on restart and invalidate sessions.",
+  });
+}
+
 process.on("unhandledRejection", (reason) => {
   logger.error("backend.unhandled_rejection", { reason: String(reason) });
 });

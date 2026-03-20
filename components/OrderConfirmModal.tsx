@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef } from "react";
 import { AlertTriangle, X, TrendingUp, TrendingDown } from "lucide-react";
@@ -29,7 +29,7 @@ interface Props {
 }
 
 function fmt(n: number) {
-  if (!Number.isFinite(n) || n === 0) return "—";
+  if (!Number.isFinite(n) || n === 0) return "â€”";
   if (Math.abs(n) < 0.01) return n.toFixed(5);
   if (Math.abs(n) < 1000) return n.toFixed(2);
   return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -67,7 +67,7 @@ export default function OrderConfirmModal({ data, onConfirm, onCancel }: Props) 
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <div className="text-[9px] uppercase tracking-[0.22em] text-zinc-500">
-              Confirm Order · {data.venue.toUpperCase()}
+              Confirm Order Â· {data.venue.toUpperCase()}
             </div>
             <div className="mt-1 flex items-center gap-2">
               <span
@@ -83,7 +83,7 @@ export default function OrderConfirmModal({ data, onConfirm, onCancel }: Props) 
                 {isLong ? "Long" : "Short"} {data.ticker}
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-zinc-400">
-                {data.leverage}x · {data.type}
+                {data.leverage}x Â· {data.type}
               </span>
             </div>
           </div>
@@ -123,7 +123,7 @@ export default function OrderConfirmModal({ data, onConfirm, onCancel }: Props) 
             { label: "Notional", value: `$${fmt(data.notional)}` },
             {
               label: "Liquidation",
-              value: data.liqPrice ? `$${fmt(data.liqPrice)}` : "—",
+              value: data.liqPrice ? `$${fmt(data.liqPrice)}` : "â€”",
               danger: true,
             },
             ...(data.tpPrice
@@ -183,12 +183,16 @@ export default function OrderConfirmModal({ data, onConfirm, onCancel }: Props) 
             Confirm {isLong ? "Long" : "Short"}
           </button>
         </div>
-
         <p className="mt-2.5 text-center text-[9px] text-zinc-700">
           Press <kbd className="rounded border border-white/10 px-1">Enter</kbd> to confirm ·{" "}
           <kbd className="rounded border border-white/10 px-1">Esc</kbd> to cancel
+        </p>
+        <p className="mt-1 text-center text-[9px] text-zinc-600">
+          Execution depends on exchange availability and market conditions. Not investment advice.
         </p>
       </div>
     </div>
   );
 }
+
+
