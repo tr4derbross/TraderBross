@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 
 const DEFAULT_LOCAL_BACKEND = "http://127.0.0.1:4001";
 const DEFAULT_PROD_BACKEND = "https://traderbross-production.up.railway.app";
+const EMERGENCY_CACHE_TTL_MS = 45_000;
+const emergencyCache = new Map<string, { expiresAt: number; value: unknown }>();
 
 function trimSlash(value: string) {
   return value.replace(/\/+$/, "");
@@ -184,8 +186,33 @@ function hashCode(value: string) {
   return h;
 }
 
+function readEmergencyCache<T>(key: string): T | null {
+  const hit = emergencyCache.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt <= Date.now()) {
+    emergencyCache.delete(key);
+    return null;
+  }
+  return hit.value as T;
+}
+
+function writeEmergencyCache(key: string, value: unknown, ttlMs = EMERGENCY_CACHE_TTL_MS) {
+  emergencyCache.set(key, {
+    value,
+    expiresAt: Date.now() + ttlMs,
+  });
+}
+
+function stripHtml(input: string) {
+  return String(input || "")
+    .replace(/<!\[CDATA\[|\]\]>/g, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function buildEmergencyBootstrap() {
-  const [market, news] = await Promise.all([fetchEmergencyQuotes(), fetchEmergencyNews()]);
+  const [market, news, social] = await Promise.all([fetchEmergencyQuotes(), fetchEmergencyNews(), fetchEmergencySocial()]);
   return {
     quotes: market.quotes,
     venueQuotes: market.venueQuotes,
@@ -199,7 +226,7 @@ async function buildEmergencyBootstrap() {
     news,
     whales: [],
     whaleEvents: [],
-    social: [],
+    social,
     newsSnapshot: {
       generatedAt: new Date().toISOString(),
       count: news.length,
@@ -245,6 +272,59 @@ async function buildEmergencyBootstrap() {
   };
 }
 
+async function fetchEmergencySocial() {
+  const feeds = [
+    { source: "Reddit r/CryptoCurrency", url: "https://www.reddit.com/r/CryptoCurrency/.rss" },
+    { source: "Reddit r/Bitcoin", url: "https://www.reddit.com/r/Bitcoin/.rss" },
+    { source: "Reddit r/ethfinance", url: "https://www.reddit.com/r/ethfinance/.rss" },
+  ];
+  const allItems: any[] = [];
+
+  for (const feed of feeds) {
+    try {
+      const res = await fetch(feed.url, { cache: "no-store", signal: AbortSignal.timeout(7000) });
+      if (!res.ok) continue;
+      const xml = await res.text();
+      const entryBlocks = xml.match(/<entry>[\s\S]*?<\/entry>/g) || [];
+      for (const block of entryBlocks.slice(0, 12)) {
+        const title = stripHtml(block.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "");
+        const link =
+          (block.match(/<link[^>]+href=\"([^\"]+)\"/i)?.[1] || block.match(/<id>([\s\S]*?)<\/id>/i)?.[1] || "#").trim();
+        const publishedAt = (block.match(/<updated>([\s\S]*?)<\/updated>/i)?.[1] || new Date().toISOString()).trim();
+        const summary = stripHtml(
+          block.match(/<content[^>]*>([\s\S]*?)<\/content>/i)?.[1] ||
+            block.match(/<summary[^>]*>([\s\S]*?)<\/summary>/i)?.[1] ||
+            "",
+        );
+        if (!title) continue;
+        const tickers = extractTickers(`${title} ${summary}`);
+        allItems.push({
+          id: `social-rss-${Math.abs(hashCode(`${feed.source}:${title}:${link}`))}`,
+          headline: title,
+          summary: summary.slice(0, 320),
+          source: feed.source,
+          ticker: tickers,
+          sector: tickers[0] || "Crypto",
+          timestamp: new Date(publishedAt).toISOString(),
+          url: link || "#",
+          type: "social",
+          sentiment: "neutral",
+          importance: "watch",
+          relatedAssets: tickers,
+          watchlistRelevance: tickers.length > 0 ? 55 : 20,
+          relevanceLabels: tickers.length > 0 ? ["watchlist_hit"] : ["low_relevance"],
+          priorityLabel: tickers.length > 0 ? "watchlist hit" : "low relevance",
+        });
+      }
+    } catch {
+      // continue
+    }
+  }
+
+  allItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  return allItems.slice(0, 80);
+}
+
 function buildEmergencyScreenerFromQuotes(quotes: Array<{ symbol: string; price: number; changePct: number }>, sort: string) {
   const rows = quotes.map((q) => ({
     symbol: q.symbol,
@@ -266,41 +346,64 @@ function buildEmergencyScreenerFromQuotes(quotes: Array<{ symbol: string; price:
 
 async function emergencyResponse(path: string[], request: NextRequest) {
   const key = (path?.[0] || "").toLowerCase();
+  const cacheKey = `${key}:${request.nextUrl.searchParams.toString()}`;
+  const cached = readEmergencyCache<unknown>(cacheKey);
+  if (cached != null) {
+    return json(cached);
+  }
+
   if (key === "bootstrap") {
-    return json(await buildEmergencyBootstrap());
+    const payload = await buildEmergencyBootstrap();
+    writeEmergencyCache(cacheKey, payload, 30_000);
+    return json(payload);
   }
   if (key === "news") {
-    return json(await fetchEmergencyNews());
+    const payload = await fetchEmergencyNews();
+    writeEmergencyCache(cacheKey, payload, 20_000);
+    return json(payload);
+  }
+  if (key === "social") {
+    const payload = await fetchEmergencySocial();
+    writeEmergencyCache(cacheKey, payload, 20_000);
+    return json(payload);
   }
   if (key === "prices" && request.nextUrl.searchParams.get("type") === "quotes") {
     const market = await fetchEmergencyQuotes();
+    writeEmergencyCache(cacheKey, market.quotes, 10_000);
     return json(market.quotes);
   }
   if (key === "prices") {
-    return json(await fetchEmergencyCandles({
+    const payload = await fetchEmergencyCandles({
       ticker: request.nextUrl.searchParams.get("ticker") || "BTC",
       interval: request.nextUrl.searchParams.get("interval") || "1h",
       limit: request.nextUrl.searchParams.get("limit") || "120",
       quote: request.nextUrl.searchParams.get("quote") || "USDT",
-    }));
+    });
+    writeEmergencyCache(cacheKey, payload, 10_000);
+    return json(payload);
   }
   if (key === "okx" || key === "bybit" || key === "hyperliquid" || key === "dydx") {
     const type = request.nextUrl.searchParams.get("type") || "";
     if (type === "ohlcv" || !type) {
-      return json(await fetchEmergencyCandles({
+      const payload = await fetchEmergencyCandles({
         ticker: request.nextUrl.searchParams.get("ticker") || "BTC",
         interval: request.nextUrl.searchParams.get("interval") || "1h",
         limit: request.nextUrl.searchParams.get("limit") || "120",
         quote: request.nextUrl.searchParams.get("quote") || "USDT",
-      }));
+      });
+      writeEmergencyCache(cacheKey, payload, 10_000);
+      return json(payload);
     }
     if (type === "quotes") {
       const market = await fetchEmergencyQuotes();
-      return json(market.quotes.slice(0, 12));
+      const payload = market.quotes.slice(0, 12);
+      writeEmergencyCache(cacheKey, payload, 10_000);
+      return json(payload);
     }
   }
   if (key === "market") {
     const market = await fetchEmergencyQuotes();
+    writeEmergencyCache(cacheKey, market.marketStats, 20_000);
     return json(market.marketStats);
   }
   if (key === "symbols") {
@@ -321,7 +424,9 @@ async function emergencyResponse(path: string[], request: NextRequest) {
   if (key === "screener") {
     const market = await fetchEmergencyQuotes();
     const sort = request.nextUrl.searchParams.get("sort") || "volume";
-    return json(buildEmergencyScreenerFromQuotes(market.quotes, sort));
+    const payload = buildEmergencyScreenerFromQuotes(market.quotes, sort);
+    writeEmergencyCache(cacheKey, payload, 20_000);
+    return json(payload);
   }
   if (key === "venues" && (path?.[1] || "").toLowerCase() === "symbols") {
     return json(["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "AVAX", "LINK", "DOT", "ADA", "TRX"]);
