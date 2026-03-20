@@ -161,6 +161,11 @@ export default function NewsFeed({
           )}
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2.5 text-[10px] text-zinc-500">
+          {!isSpecialFeed && (
+            <span className="hidden md:inline rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[9px] text-zinc-500">
+              informational only
+            </span>
+          )}
           {liveCount > 0 && !isSpecialFeed && (
             <span className="inline-flex items-center gap-1 text-amber-200">
               <Radio className="h-2.5 w-2.5 animate-pulse" />
