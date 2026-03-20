@@ -39,8 +39,34 @@ function parseCsvList(value, fallback = []) {
   return out.length > 0 ? out : fallback;
 }
 
-export function loadConfig() {
+function applyFreeTierOverrides(config, env = process.env) {
+  const freeTierMode = toBoolean(env.FREE_TIER_MODE, false);
+  if (!freeTierMode) return { ...config, freeTierMode: false };
+
   return {
+    ...config,
+    freeTierMode: true,
+    featureFlags: {
+      ...config.featureFlags,
+      enableNewsRss: true,
+      enableNewsJson: true,
+      enableNewsTree: true,
+      // WS mode typically needs an API key/login flow; keep free mode on delayed history by default.
+      enableNewsTreeWs: false,
+      enableWhaleApi: false,
+      enableWhaleEngine: true,
+      enableCoinGeckoMarket: true,
+      enableCoinGeckoMetadata: true,
+      enableCoincap: true,
+      enableCoinpaprika: true,
+      enableCoinlore: true,
+    },
+    enableDefaultSocialFeeds: true,
+  };
+}
+
+export function loadConfig() {
+  const baseConfig = {
     apiHost: process.env.API_HOST || DEFAULT_API_HOST,
     apiPort: toNumber(process.env.PORT || process.env.API_PORT, DEFAULT_API_PORT),
     logLevel: process.env.LOG_LEVEL || "info",
@@ -116,4 +142,5 @@ export function loadConfig() {
         .filter(Boolean),
     },
   };
+  return applyFreeTierOverrides(baseConfig, process.env);
 }
