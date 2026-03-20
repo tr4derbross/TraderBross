@@ -24,6 +24,8 @@ function cloneHeaders(request: NextRequest) {
   headers.delete("connection");
   headers.delete("content-length");
   headers.delete("accept-encoding");
+  headers.delete("x-traderbross-proxy");
+  headers.delete("x-traderbross-proxy-secret");
   return headers;
 }
 
@@ -348,6 +350,11 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
     redirect: "manual",
     cache: "no-store",
   };
+  const headers = init.headers as Headers;
+  headers.set("x-traderbross-proxy", "1");
+  if (process.env.PROXY_SHARED_SECRET) {
+    headers.set("x-traderbross-proxy-secret", process.env.PROXY_SHARED_SECRET);
+  }
 
   if (method !== "GET" && method !== "HEAD") {
     init.body = await request.arrayBuffer();

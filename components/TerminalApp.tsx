@@ -868,14 +868,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         // Preferred: vault token — raw keys stay on the server
         return { sessionToken: token };
       }
-      // Fallback: raw credentials (only if user hasn't saved to vault yet)
-      if (selectedHeaderCredentials) {
-        return {
-          apiKey: selectedHeaderCredentials.apiKey.trim(),
-          apiSecret: selectedHeaderCredentials.apiSecret.trim(),
-          passphrase: selectedHeaderCredentials.passphrase.trim(),
-        };
-      }
+      return undefined;
     }
 
     if (activeVenueState.venueType === "wallet") {

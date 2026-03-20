@@ -31,6 +31,10 @@ function toBoolean(value, fallback = true) {
   return fallback;
 }
 
+function isProductionNodeEnv() {
+  return String(process.env.NODE_ENV || "").toLowerCase() === "production";
+}
+
 function parseCsvList(value, fallback = []) {
   const out = String(value || "")
     .split(",")
@@ -144,6 +148,12 @@ export function loadConfig() {
         .split(",")
         .map((entry) => entry.trim().toUpperCase())
         .filter(Boolean),
+    },
+    security: {
+      proxyAuthEnabled: toBoolean(process.env.REQUIRE_PROXY_AUTH, isProductionNodeEnv()),
+      proxyAuthHeader: process.env.PROXY_AUTH_HEADER || "x-traderbross-proxy-secret",
+      proxyAuthSecret: process.env.PROXY_SHARED_SECRET || "",
+      requireProxyMarker: toBoolean(process.env.REQUIRE_PROXY_MARKER, true),
     },
   };
   return applyFreeTierOverrides(baseConfig, process.env);

@@ -26,6 +26,16 @@ const logger = createLogger(config.logLevel);
 const terminalData = createTerminalDataService({ config, logger });
 const endpointCache = new MemoryCache();
 const clients = new Set();
+const endpointRateWindows = new Map();
+const SENSITIVE_ROUTES = new Set([
+  "/api/vault/store",
+  "/api/vault/clear",
+  "/api/vault/status",
+  "/api/venues/validate",
+  "/api/binance",
+  "/api/binance/order",
+  "/api/hyperliquid/order",
+]);
 
 process.on("unhandledRejection", (reason) => {
   logger.error("backend.unhandled_rejection", { reason: String(reason) });
@@ -43,6 +53,97 @@ function binanceSignedQuery(secret, params = {}) {
 
 function canonicalTickerParam(value, fallback = "BTC") {
   return canonicalSymbol(value || fallback) || fallback;
+}
+
+function normalizeVenueId(value) {
+  const venue = String(value || "").trim().toLowerCase();
+  return ["binance", "okx", "bybit", "hyperliquid"].includes(venue) ? venue : "generic";
+}
+
+function getClientIp(request) {
+  const raw =
+    request.headers["x-forwarded-for"] ||
+    request.headers["x-real-ip"] ||
+    request.socket?.remoteAddress ||
+    "unknown";
+  return String(raw).split(",")[0].trim();
+}
+
+function consumeRateLimit(key, limit, windowMs) {
+  const now = Date.now();
+  const existing = endpointRateWindows.get(key);
+  if (!existing || existing.resetAt <= now) {
+    endpointRateWindows.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (existing.count >= limit) {
+    return false;
+  }
+  existing.count += 1;
+  return true;
+}
+
+function enforceRateLimit(reply, key, limit, windowMs) {
+  if (!consumeRateLimit(key, limit, windowMs)) {
+    json(reply, 429, { error: "Too many requests. Please try again shortly." });
+    return false;
+  }
+  return true;
+}
+
+function trustedProxyRequest(request) {
+  const marker = String(request.headers["x-traderbross-proxy"] || "");
+  if (config.security.requireProxyMarker && marker !== "1") {
+    return false;
+  }
+
+  if (config.security.proxyAuthEnabled) {
+    const expected = String(config.security.proxyAuthSecret || "").trim();
+    const headerName = String(config.security.proxyAuthHeader || "x-traderbross-proxy-secret").toLowerCase();
+    const provided = String(request.headers[headerName] || "");
+    if (!expected) return false;
+    if (!provided) return false;
+    const expectedBuf = Buffer.from(expected);
+    const providedBuf = Buffer.from(provided);
+    if (providedBuf.length !== expectedBuf.length) {
+      return false;
+    }
+    if (!crypto.timingSafeEqual(providedBuf, expectedBuf)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function sanitizeVaultPayload(scope, payload) {
+  const venueId = normalizeVenueId(payload?.venueId || scope);
+  if (venueId === "hyperliquid") {
+    return {
+      venueId,
+      privateKey: String(payload?.privateKey || "").trim().slice(0, 256),
+      walletAddress: String(payload?.walletAddress || "").trim().slice(0, 128),
+    };
+  }
+  return {
+    venueId,
+    apiKey: String(payload?.apiKey || "").trim().slice(0, 256),
+    apiSecret: String(payload?.apiSecret || "").trim().slice(0, 256),
+    passphrase: String(payload?.passphrase || "").trim().slice(0, 256),
+    testnet: Boolean(payload?.testnet),
+  };
+}
+
+function normalizeTradeSymbol(rawSymbol, rawQuote = "USDT") {
+  const base = canonicalTickerParam(rawSymbol, "BTC");
+  const quote = String(rawQuote || "USDT").toUpperCase() === "USDC" ? "USDC" : "USDT";
+  return `${base}${quote}`;
+}
+
+function finitePositiveNumber(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
 }
 
 function toBaseSymbol(value) {
@@ -188,6 +289,24 @@ const server = http.createServer(async (request, reply) => {
   });
 
   try {
+    const clientIp = getClientIp(request);
+    const isSensitiveRoute = SENSITIVE_ROUTES.has(url.pathname);
+    if (isSensitiveRoute && !trustedProxyRequest(request)) {
+      logger.warn("backend.request.blocked_untrusted_proxy", {
+        path: url.pathname,
+        ip: clientIp,
+      });
+      json(reply, 403, { error: "Forbidden" });
+      return;
+    }
+
+    if (isSensitiveRoute) {
+      const key = `${clientIp}:${url.pathname}:${request.method}`;
+      if (!enforceRateLimit(reply, key, 40, 60_000)) {
+        return;
+      }
+    }
+
     if (request.method === "GET" && url.pathname === "/health") {
       const status = terminalData.getStatus();
       json(reply, 200, {
@@ -610,33 +729,63 @@ const server = http.createServer(async (request, reply) => {
 
     if (request.method === "POST" && url.pathname === "/api/vault/store") {
       const body = await readJson(request);
-      const token = storeSecret(body.scope || "generic", body.payload || body);
+      const scope = normalizeVenueId(body.scope || body.venueId || "generic");
+      const sanitizedPayload = sanitizeVaultPayload(scope, body.payload || body);
+      if (
+        (scope === "hyperliquid" && !sanitizedPayload.privateKey) ||
+        (scope !== "hyperliquid" && (!sanitizedPayload.apiKey || !sanitizedPayload.apiSecret))
+      ) {
+        json(reply, 400, { ok: false, message: "Missing required credentials." });
+        return;
+      }
+      const token = storeSecret(scope, sanitizedPayload);
       json(reply, 200, { ok: true, sessionToken: token });
       return;
     }
 
     if ((request.method === "POST" || request.method === "DELETE") && url.pathname === "/api/vault/clear") {
       const body = await readJson(request);
-      json(reply, 200, { ok: clearSecret(body.token || body.sessionToken || "") });
+      const token = String(body.token || body.sessionToken || "");
+      if (token.length < 16) {
+        json(reply, 200, { ok: false });
+        return;
+      }
+      json(reply, 200, { ok: clearSecret(token) });
       return;
     }
 
     if (request.method === "GET" && url.pathname === "/api/vault/status") {
       const token = url.searchParams.get("token") || "";
+      if (String(token).length < 16) {
+        json(reply, 200, { ok: false });
+        return;
+      }
       json(reply, 200, { ok: Boolean(getSecret(token)) });
       return;
     }
 
     if (request.method === "POST" && url.pathname === "/api/venues/validate") {
       const body = await readJson(request);
-      const token = body.sessionToken;
+      const token = String(body.sessionToken || "");
       const entry = token ? getSecret(token) : null;
-      const apiKey = entry?.payload?.apiKey || body.apiKey || "";
-      const apiSecret = entry?.payload?.apiSecret || body.apiSecret || "";
+      const scope = entry?.scope || "";
+      if (!entry || !["binance", "okx", "bybit"].includes(scope)) {
+        json(reply, 401, { ok: false, message: "Session expired. Re-save your credentials." });
+        return;
+      }
+      if (scope !== "binance") {
+        json(reply, 200, {
+          ok: false,
+          message: `${scope.toUpperCase()} validation endpoint is not enabled yet in backend routing.`,
+        });
+        return;
+      }
+      const apiKey = entry?.payload?.apiKey || "";
+      const apiSecret = entry?.payload?.apiSecret || "";
       const testnet = entry?.payload?.testnet || false;
       const base = testnet ? "https://testnet.binancefuture.com" : "https://fapi.binance.com";
       if (!apiKey || !apiSecret) {
-        json(reply, 200, { ok: false, message: "API key and secret are required." });
+        json(reply, 401, { ok: false, message: "Session expired. Re-save your credentials." });
         return;
       }
       try {
@@ -650,16 +799,21 @@ const server = http.createServer(async (request, reply) => {
         const usdt = Array.isArray(data) ? data.find((b) => b.asset === "USDT") : null;
         json(reply, 200, { ok: true, message: `Connected${usdt ? ` · USDT balance: ${parseFloat(usdt.availableBalance || "0").toFixed(2)}` : ""}` });
       } catch (err) {
-        json(reply, 200, { ok: false, message: String(err) });
+        logger.warn("venues.validate.failed", { error: String(err) });
+        json(reply, 200, { ok: false, message: "Validation request failed. Please try again." });
       }
       return;
     }
 
     if (request.method === "POST" && url.pathname === "/api/binance") {
       const body = await readJson(request);
-      const entry = getSecret(body.sessionToken || "");
-      if (!entry) {
+      const entry = getSecret(String(body.sessionToken || ""));
+      if (!entry || entry.scope !== "binance") {
         json(reply, 401, { error: "Session expired. Re-save your credentials." });
+        return;
+      }
+      if (!["balance", "positions"].includes(String(body.type || ""))) {
+        json(reply, 400, { error: "Unknown type" });
         return;
       }
       const { apiKey, apiSecret, testnet } = entry.payload;
@@ -699,16 +853,31 @@ const server = http.createServer(async (request, reply) => {
         }
         json(reply, 400, { error: "Unknown type" });
       } catch (err) {
-        json(reply, 500, { error: String(err) });
+        logger.warn("binance.data.failed", { type: body.type, error: String(err) });
+        json(reply, 500, { error: "Binance request failed." });
       }
       return;
     }
 
     if (request.method === "POST" && url.pathname === "/api/binance/order") {
       const body = await readJson(request);
-      const entry = getSecret(body.sessionToken || "");
-      if (!entry) {
+      const entry = getSecret(String(body.sessionToken || ""));
+      if (!entry || entry.scope !== "binance") {
         json(reply, 401, { ok: false, error: "Session expired. Re-save your credentials." });
+        return;
+      }
+      const action = String(body.type || "");
+      if (!["leverage", "marginType", "cancel", "closePosition", "tpsl", "order"].includes(action)) {
+        json(reply, 400, { ok: false, error: "Unknown action type" });
+        return;
+      }
+      const symbol = normalizeTradeSymbol(body.symbol, body.quoteAsset || "USDT");
+      if (!/^[A-Z0-9]{4,20}$/.test(symbol)) {
+        json(reply, 400, { ok: false, error: "Invalid symbol." });
+        return;
+      }
+      if (["order", "closePosition", "tpsl"].includes(action) && !["long", "short"].includes(String(body.side || ""))) {
+        json(reply, 400, { ok: false, error: "Invalid side." });
         return;
       }
       const { apiKey, apiSecret, testnet } = entry.payload;
@@ -728,9 +897,9 @@ const server = http.createServer(async (request, reply) => {
           if (!res.ok) throw new Error(data.msg || `Binance error ${res.status}`);
           return data;
         };
-        const symbol = `${body.symbol}USDT`;
         if (body.type === "leverage") {
-          await binancePost("/fapi/v1/leverage", { symbol, leverage: String(Math.round(body.leverage)) });
+          const leverage = Math.max(1, Math.min(125, Math.round(Number(body.leverage) || 1)));
+          await binancePost("/fapi/v1/leverage", { symbol, leverage: String(leverage) });
           json(reply, 200, { ok: true });
           return;
         }
@@ -797,16 +966,22 @@ const server = http.createServer(async (request, reply) => {
           return;
         }
         if (body.type === "order") {
+          const marginAmount = finitePositiveNumber(body.marginAmount);
+          const leverage = Math.max(1, Math.min(125, Math.round(Number(body.leverage) || 1)));
+          if (!marginAmount) {
+            json(reply, 400, { ok: false, error: "Invalid margin amount." });
+            return;
+          }
           // Pre-set margin type and leverage before placing
           const marginType = body.marginMode === "cross" ? "CROSSED" : "ISOLATED";
           await binancePost("/fapi/v1/marginType", { symbol, marginType }).catch(() => {});
-          await binancePost("/fapi/v1/leverage", { symbol, leverage: String(Math.round(body.leverage || 1)) });
+          await binancePost("/fapi/v1/leverage", { symbol, leverage: String(leverage) });
           // Fetch mark price
           const mpRes = await fetch(`${base}/fapi/v1/premiumIndex?symbol=${symbol}`, { signal: AbortSignal.timeout(5000) });
           const mpData = await mpRes.json();
           const markPrice = parseFloat(mpData.markPrice || "0");
           if (!markPrice) throw new Error(`Could not fetch mark price for ${symbol}`);
-          const qty = (body.marginAmount * body.leverage) / markPrice;
+          const qty = (marginAmount * leverage) / markPrice;
           const quantity = qty >= 100 ? qty.toFixed(0) : qty >= 10 ? qty.toFixed(1) : qty >= 1 ? qty.toFixed(2) : qty.toFixed(3);
           const side = body.side === "long" ? "BUY" : "SELL";
           const params = { symbol, side, quantity };
@@ -843,7 +1018,8 @@ const server = http.createServer(async (request, reply) => {
         }
         json(reply, 400, { ok: false, error: "Unknown action type" });
       } catch (err) {
-        json(reply, 500, { ok: false, error: String(err) });
+        logger.warn("binance.order.failed", { type: body.type, symbol, error: String(err) });
+        json(reply, 500, { ok: false, error: "Order request failed." });
       }
       return;
     }
