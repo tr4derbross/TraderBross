@@ -220,6 +220,7 @@ function WhaleCard({ item, isNew, onSelect, onQuickTrade, selected }: Props) {
               WHALE
             </span>
             <span className="text-[10px] text-zinc-500">Whale Alert</span>
+            <span className="text-[10px] text-zinc-500">Source: {item.source}</span>
             <ImportanceBadge importance={item.importance} />
             <TimeAgoLabel timestamp={item.timestamp} />
           </div>
@@ -308,6 +309,7 @@ function SocialCard({ item, isNew, onSelect, onTickerSelect, onQuickTrade, selec
             {item.authorCategory && (
               <span className="text-[9px] capitalize text-zinc-600">{item.authorCategory}</span>
             )}
+            <span className="text-[10px] text-zinc-500">Source: {item.source}</span>
             <TimeAgoLabel timestamp={item.timestamp} />
             <span className="ml-auto text-[9px] font-bold text-sky-400">X</span>
           </div>
@@ -420,7 +422,7 @@ function NewsCardInner({ item, isNew, onSelect, onTickerSelect, onQuickTrade, on
             {isNew && (
               <span className="rounded bg-green-500 px-1 text-[9px] font-bold text-black animate-pulse">LIVE</span>
             )}
-            <span className="text-[10px] text-zinc-500">{item.source}</span>
+            <span className="text-[10px] text-zinc-500">Source: {item.source}</span>
             <SourceTierBadge tier={item.sourceTier} />
             <ImportanceBadge importance={item.importance} />
             <TimeAgoLabel timestamp={item.timestamp} />
