@@ -31,6 +31,14 @@ function toBoolean(value, fallback = true) {
   return fallback;
 }
 
+function parseCsvList(value, fallback = []) {
+  const out = String(value || "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return out.length > 0 ? out : fallback;
+}
+
 export function loadConfig() {
   return {
     apiHost: process.env.API_HOST || DEFAULT_API_HOST,
@@ -52,6 +60,14 @@ export function loadConfig() {
       .split(",")
       .map((entry) => entry.trim())
       .filter(Boolean),
+    socialTwitterHandles: parseCsvList(
+      process.env.SOCIAL_TWITTER_HANDLES,
+      ["wublockchain", "watcherguru", "tier10k", "lookonchain", "whale_alert", "coindesk"],
+    ),
+    socialRedditSubreddits: parseCsvList(
+      process.env.SOCIAL_REDDIT_SUBREDDITS,
+      ["CryptoCurrency", "Bitcoin", "ethfinance", "solana"],
+    ),
     enableDefaultSocialFeeds: toBoolean(process.env.FEATURE_SOCIAL_DEFAULT_FEEDS, true),
     nitterBaseUrl: process.env.NITTER_BASE_URL || "",
     coinMarketCalApiKey: process.env.COINMARKETCAL_API_KEY || "",

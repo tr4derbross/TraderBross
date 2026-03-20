@@ -8,12 +8,7 @@ const DEFAULT_RSS_FEEDS = [
   { id: "theblock", source: "The Block", url: "https://www.theblock.co/rss.xml" },
 ];
 
-const DEFAULT_SOCIAL_RSS_FEEDS = [
-  { id: "reddit-cryptocurrency", source: "Reddit r/CryptoCurrency", url: "https://www.reddit.com/r/CryptoCurrency/.rss" },
-  { id: "reddit-bitcoin", source: "Reddit r/Bitcoin", url: "https://www.reddit.com/r/Bitcoin/.rss" },
-  { id: "reddit-ethfinance", source: "Reddit r/ethfinance", url: "https://www.reddit.com/r/ethfinance/.rss" },
-  { id: "reddit-solana", source: "Reddit r/solana", url: "https://www.reddit.com/r/solana/.rss" },
-];
+const DEFAULT_SOCIAL_REDDITS = ["CryptoCurrency", "Bitcoin", "ethfinance", "solana"];
 
 function parseRss(xml) {
   const items = [];
@@ -146,22 +141,28 @@ export async function fetchRssNews({ feeds = DEFAULT_RSS_FEEDS } = {}) {
   return output;
 }
 
-export function getDefaultSocialRssFeeds() {
-  return DEFAULT_SOCIAL_RSS_FEEDS.map((item) => ({ ...item }));
+export function getDefaultSocialRssFeeds(subreddits = DEFAULT_SOCIAL_REDDITS) {
+  return (Array.isArray(subreddits) ? subreddits : DEFAULT_SOCIAL_REDDITS)
+    .map((value) => String(value || "").trim().replace(/^r\//i, ""))
+    .filter(Boolean)
+    .slice(0, 30)
+    .map((subreddit) => ({
+      id: `reddit-${subreddit.toLowerCase()}`,
+      source: `Reddit r/${subreddit}`,
+      url: `https://www.reddit.com/r/${subreddit}/.rss`,
+    }));
 }
 
-export function getDefaultNitterSocialFeeds(nitterBaseUrl = "") {
+export function getDefaultNitterSocialFeeds(nitterBaseUrl = "", handles = []) {
   const base = String(nitterBaseUrl || "").trim().replace(/\/+$/, "");
   if (!base) return [];
-  const handles = [
-    { id: "wublockchain", label: "Wu Blockchain" },
-    { id: "watcherguru", label: "Watcher.Guru" },
-    { id: "tier10k", label: "Tier10k" },
-    { id: "coindesk", label: "CoinDesk" },
-  ];
-  return handles.map((h) => ({
-    id: `nitter-${h.id}`,
-    source: `Nitter ${h.label}`,
-    url: `${base}/${h.id}/rss`,
-  }));
+  return (Array.isArray(handles) ? handles : [])
+    .map((value) => String(value || "").trim().replace(/^@/, ""))
+    .filter(Boolean)
+    .slice(0, 40)
+    .map((handle) => ({
+      id: `nitter-${handle.toLowerCase()}`,
+      source: `Nitter @${handle}`,
+      url: `${base}/${handle}/rss`,
+    }));
 }
