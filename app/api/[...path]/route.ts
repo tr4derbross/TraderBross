@@ -42,6 +42,30 @@ function extractTickers(text: string) {
   return Array.from(new Set(matches)).slice(0, 3);
 }
 
+function toBinanceSymbol(ticker: string) {
+  const symbol = String(ticker || "BTC").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return `${symbol || "BTC"}USDT`;
+}
+
+async function fetchEmergencyCandles(params: { ticker?: string; interval?: string; limit?: string }) {
+  const ticker = String(params.ticker || "BTC").toUpperCase();
+  const interval = String(params.interval || "1h");
+  const limit = Math.min(Math.max(Number(params.limit || 120) || 120, 10), 500);
+  const symbol = toBinanceSymbol(ticker);
+  const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${encodeURIComponent(interval)}&limit=${limit}`;
+  const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(9000) });
+  if (!res.ok) return [];
+  const rows = await res.json();
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    time: Math.floor(Number(row[0] || 0) / 1000),
+    open: Number(row[1] || 0),
+    high: Number(row[2] || 0),
+    low: Number(row[3] || 0),
+    close: Number(row[4] || 0),
+    volume: Number(row[5] || 0),
+  }));
+}
+
 async function fetchEmergencyQuotes() {
   const symbols = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "AVAX", "LINK", "DOT", "ADA", "TRX"];
   const ids = "bitcoin,ethereum,solana,binancecoin,ripple,dogecoin,avalanche-2,chainlink,polkadot,cardano,tron";
@@ -249,6 +273,27 @@ async function emergencyResponse(path: string[], request: NextRequest) {
     const market = await fetchEmergencyQuotes();
     return json(market.quotes);
   }
+  if (key === "prices") {
+    return json(await fetchEmergencyCandles({
+      ticker: request.nextUrl.searchParams.get("ticker") || "BTC",
+      interval: request.nextUrl.searchParams.get("interval") || "1h",
+      limit: request.nextUrl.searchParams.get("limit") || "120",
+    }));
+  }
+  if (key === "okx" || key === "bybit" || key === "hyperliquid") {
+    const type = request.nextUrl.searchParams.get("type") || "";
+    if (type === "ohlcv" || !type) {
+      return json(await fetchEmergencyCandles({
+        ticker: request.nextUrl.searchParams.get("ticker") || "BTC",
+        interval: request.nextUrl.searchParams.get("interval") || "1h",
+        limit: request.nextUrl.searchParams.get("limit") || "120",
+      }));
+    }
+    if (type === "quotes") {
+      const market = await fetchEmergencyQuotes();
+      return json(market.quotes.slice(0, 12));
+    }
+  }
   if (key === "market") {
     const market = await fetchEmergencyQuotes();
     return json(market.marketStats);
@@ -296,6 +341,32 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
   }
   if (method === "GET" && upstream.status >= 500) {
     return emergencyResponse(normalizedPath, request);
+  }
+  if (method === "GET" && upstream.ok) {
+    const primary = (normalizedPath?.[0] || "").toLowerCase();
+    if (["bootstrap", "news", "market", "screener", "prices", "okx", "bybit", "hyperliquid"].includes(primary)) {
+      try {
+        const clone = upstream.clone();
+        const payload = await clone.json();
+        const looksEmptyBootstrap =
+          primary === "bootstrap" &&
+          (!Array.isArray(payload?.quotes) || payload.quotes.length === 0) &&
+          (!Array.isArray(payload?.news) || payload.news.length === 0);
+        const looksEmptyNews = primary === "news" && Array.isArray(payload) && payload.length === 0;
+        const looksEmptyMarket = primary === "market" && (!payload || (!payload.marketCapUsd && !payload.total24hVolume));
+        const type = request.nextUrl.searchParams.get("type") || "";
+        const looksEmptyCandles =
+          ["prices", "okx", "bybit", "hyperliquid"].includes(primary) &&
+          (type === "ohlcv" || type === "" || primary === "prices") &&
+          Array.isArray(payload) &&
+          payload.length === 0;
+        if (looksEmptyBootstrap || looksEmptyNews || looksEmptyMarket || looksEmptyCandles) {
+          return emergencyResponse(normalizedPath, request);
+        }
+      } catch {
+        // If response is not JSON, keep upstream response as-is.
+      }
+    }
   }
   const responseHeaders = new Headers(upstream.headers);
   responseHeaders.delete("content-encoding");

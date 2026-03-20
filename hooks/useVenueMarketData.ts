@@ -9,7 +9,11 @@ export function useVenueMarketData(venueId: TradingVenueId, symbol: string) {
   const venueQuotes = useRealtimeSelector((state) => state.venueQuotes);
   const quotes = useRealtimeSelector((state) => state.quotes);
   const connectionState = useRealtimeSelector<MarketDataConnectionState>((state) =>
-    state.connectionStatus === "connected" ? "connected" : state.connectionStatus === "connecting" ? "connecting" : "error",
+    state.connectionStatus === "live" || state.connectionStatus === "degraded" || state.connectionStatus === "stale"
+      ? "connected"
+      : state.connectionStatus === "connecting" || state.connectionStatus === "reconnecting"
+        ? "connecting"
+        : "error",
   );
 
   const ticker = useMemo<NormalizedTicker | null>(() => {

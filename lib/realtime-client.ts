@@ -21,6 +21,7 @@ const STALE_CHECK_MS = 5_000;
 const HEARTBEAT_INTERVAL = 20_000;
 const BASE_DELAY = 1_000;
 const MAX_RECONNECT_DELAY = 30_000;
+const CONNECT_TIMEOUT_MS = 8_000;
 
 const fallbackSnapshot: RealtimeStore = {
   quotes: [],
@@ -54,6 +55,7 @@ let started = false;
 let reconnectTimer: number | null = null;
 let heartbeatTimer: number | null = null;
 let staleTimer: number | null = null;
+let connectTimer: number | null = null;
 let reconnectAttempts = 0;
 
 function emit() {
@@ -151,9 +153,18 @@ function applyEnvelope(envelope: RealtimeEnvelope) {
 async function loadBootstrap() {
   try {
     const snapshot = await apiFetch<BackendSnapshot>("/api/bootstrap");
+    const hasData = (snapshot.news?.length || 0) > 0 || (snapshot.quotes?.length || 0) > 0;
+    const bootstrapStatus: ConnectionStatus =
+      snapshot.connectionState === "degraded"
+        ? "degraded"
+        : snapshot.connectionState === "connected"
+          ? "live"
+          : hasData
+            ? "stale"
+            : "connecting";
     setState({
       ...snapshot,
-      connectionStatus: "connecting",
+      connectionStatus: bootstrapStatus,
       lastMessageAt: Date.now(),
     });
   } catch {
@@ -184,10 +195,31 @@ function scheduleReconnect() {
 function connect() {
   if (socket || typeof window === "undefined") return;
   if (state.connectionStatus !== "reconnecting") setState({ connectionStatus: "connecting" });
+  if (connectTimer) {
+    window.clearTimeout(connectTimer);
+    connectTimer = null;
+  }
   socket = new WebSocket(runtimeEnv.wsUrl);
+  connectTimer = window.setTimeout(() => {
+    if (!socket || socket.readyState === WebSocket.OPEN) return;
+    if (state.news.length > 0 || state.quotes.length > 0) {
+      setState({ connectionStatus: "stale" });
+    } else {
+      setState({ connectionStatus: "disconnected" });
+    }
+    try {
+      socket.close();
+    } catch {
+      // no-op
+    }
+  }, CONNECT_TIMEOUT_MS);
 
   socket.onopen = () => {
     reconnectAttempts = 0;
+    if (connectTimer) {
+      window.clearTimeout(connectTimer);
+      connectTimer = null;
+    }
     setState({ connectionStatus: state.connectionState === "degraded" ? "degraded" : "live" });
     if (heartbeatTimer) window.clearInterval(heartbeatTimer);
     heartbeatTimer = window.setInterval(() => {
@@ -209,6 +241,10 @@ function connect() {
   };
 
   socket.onclose = () => {
+    if (connectTimer) {
+      window.clearTimeout(connectTimer);
+      connectTimer = null;
+    }
     socket = null;
     if (heartbeatTimer) {
       window.clearInterval(heartbeatTimer);
