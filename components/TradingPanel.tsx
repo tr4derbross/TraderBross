@@ -123,10 +123,48 @@ export default function TradingPanel({
   const [submitMessage, setSubmitMessage] = useState("");
   const [confirmData, setConfirmData] = useState<OrderConfirmData | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [venueFallbackMark, setVenueFallbackMark] = useState<number | null>(null);
   const futuresTickers = useMemo(() => {
     const source = availableTickers.length > 0 ? availableTickers : FUTURES_TICKERS;
     return Array.from(new Set(source.filter((ticker) => !["COIN", "MSTR"].includes(ticker))));
   }, [availableTickers]);
+
+  useEffect(() => {
+    let active = true;
+    setVenueFallbackMark(null);
+
+    const endpoint =
+      activeVenueState.venueId === "okx"
+        ? `/api/okx?type=ohlcv&ticker=${ticker}&interval=1m&limit=2`
+        : activeVenueState.venueId === "bybit"
+          ? `/api/bybit?type=ohlcv&ticker=${ticker}&interval=1m&limit=2`
+          : activeVenueState.venueId === "hyperliquid"
+            ? `/api/hyperliquid?type=ohlcv&ticker=${ticker}&interval=1m&limit=2`
+            : activeVenueState.venueId === "dydx"
+              ? `/api/dydx?type=ohlcv&ticker=${ticker}&interval=1m&limit=2`
+              : `/api/prices?ticker=${ticker}&interval=1m&limit=2`;
+
+    const loadMark = async () => {
+      try {
+        const rows = await apiFetch<Array<{ close?: number }>>(endpoint);
+        if (!active || !Array.isArray(rows) || rows.length === 0) return;
+        const last = rows[rows.length - 1];
+        const close = Number(last?.close ?? 0);
+        if (Number.isFinite(close) && close > 0) {
+          setVenueFallbackMark(close);
+        }
+      } catch {
+        // keep previous valid mark
+      }
+    };
+
+    void loadMark();
+    const id = setInterval(loadMark, 8_000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [activeVenueState.venueId, ticker]);
 
   useEffect(() => {
     setTicker(activeVenueState.activeSymbol);
@@ -190,7 +228,7 @@ export default function TradingPanel({
     return [5, 10, 20, 50, 100];
   }, [maxLeverage]);
 
-  const currentPrice = prices[ticker] ?? getBasePrice(ticker);
+  const currentPrice = prices[ticker] ?? venueFallbackMark ?? getBasePrice(ticker);
   const execPrice =
     ticketType === "limit" || ticketType === "stop" ? parseFloat(limitPrice) || currentPrice : currentPrice;
   const margin = parseFloat(marginUSD) || 0;

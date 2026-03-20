@@ -82,7 +82,7 @@ export async function getBinanceCandles(symbol, interval, limit) {
   return cache.remember(`candles:binance:${symbol}:${interval}:${limit}`, 10000, async () => {
     try {
       const payload = await fetchJson(
-        `https://data-api.binance.vision/api/v3/klines?symbol=${venueSymbol}&interval=${interval}&limit=${limit}`,
+        `https://fapi.binance.com/fapi/v1/klines?symbol=${venueSymbol}&interval=${interval}&limit=${limit}`,
         { timeoutMs: 3500 },
       );
 
