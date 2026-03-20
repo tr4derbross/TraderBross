@@ -1626,6 +1626,15 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         {/* Right: wallet connect */}
         <div ref={headerControlRef} className="absolute right-2 top-1/2 z-10 -translate-y-1/2 sm:right-4">
           <div className="panel-shell-alt flex items-center gap-1 rounded-2xl px-1.5 py-1 sm:gap-1.5 sm:px-2 sm:py-1.5">
+            <button
+              type="button"
+              onClick={() => setQuoteAsset((prev) => (prev === "USDT" ? "USDC" : "USDT"))}
+              className="terminal-chip hidden items-center gap-1 rounded-xl px-2 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)] sm:inline-flex"
+              title="Toggle pair quote asset (USDT/USDC)"
+            >
+              <span className="text-zinc-500">Pair</span>
+              <span className="text-[#f3ead7]">{quoteAsset}</span>
+            </button>
             {/* Wallet icon-only on mobile, icon+text on desktop */}
             <button
               type="button"
