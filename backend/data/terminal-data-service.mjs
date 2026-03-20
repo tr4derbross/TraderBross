@@ -15,6 +15,8 @@ import { fetchCoinloreMarketData } from "./adapters/coinlore-market.adapter.mjs"
 import { createHyperliquidMarketStream } from "./adapters/hyperliquid-ws-market.adapter.mjs";
 import { fetchDexScreenerDiscovery } from "./adapters/dexscreener.adapter.mjs";
 import { fetchRssNews } from "./adapters/news-rss.adapter.mjs";
+import { getDefaultSocialRssFeeds } from "./adapters/news-rss.adapter.mjs";
+import { getDefaultNitterSocialFeeds } from "./adapters/news-rss.adapter.mjs";
 import { fetchJsonNews } from "./adapters/news-json.adapter.mjs";
 import { createLiquidationEventStream, fetchOnchainWhaleEvents } from "./adapters/onchain-whale-events.adapter.mjs";
 import { fetchCoingeckoCoinMetadata } from "./adapters/coingecko-metadata.adapter.mjs";
@@ -310,6 +312,8 @@ export function createTerminalDataService({ config, logger }) {
       limiterKey: "news_aggregate",
       providerName: "news",
       primary: async () => {
+        const defaultSocialFeeds = config.enableDefaultSocialFeeds !== false ? getDefaultSocialRssFeeds() : [];
+        const nitterFeeds = getDefaultNitterSocialFeeds(config.nitterBaseUrl);
         const socialFeeds = Array.isArray(config.socialRssUrls)
           ? config.socialRssUrls.map((url, index) => ({
               id: `social-${index}`,
@@ -317,10 +321,11 @@ export function createTerminalDataService({ config, logger }) {
               url,
             }))
           : [];
+        const mergedSocialFeeds = [...defaultSocialFeeds, ...nitterFeeds, ...socialFeeds];
         const [rss, json, social] = await Promise.all([
           rssEnabled ? fetchRssNews() : Promise.resolve([]),
           jsonEnabled ? fetchJsonNews({ cryptopanicKey: config.cryptopanicKey }) : Promise.resolve([]),
-          socialFeeds.length > 0 ? fetchRssNews({ feeds: socialFeeds }) : Promise.resolve([]),
+          mergedSocialFeeds.length > 0 ? fetchRssNews({ feeds: mergedSocialFeeds }) : Promise.resolve([]),
         ]);
         const socialRows = social.map((item) => ({ ...item, sourceType: "social" }));
         const engineSnapshot = newsEngine.ingest([...rss, ...json, ...socialRows]);
@@ -328,7 +333,7 @@ export function createTerminalDataService({ config, logger }) {
           const errors = [];
           if (rssEnabled && rss.length === 0) errors.push("rss_empty_or_unavailable");
           if (jsonEnabled && json.length === 0) errors.push("json_empty_or_unavailable");
-          if (socialFeeds.length > 0 && socialRows.length === 0) errors.push("social_rss_empty_or_unavailable");
+          if (mergedSocialFeeds.length > 0 && socialRows.length === 0) errors.push("social_rss_empty_or_unavailable");
           engineSnapshot.errors = errors;
         }
         return engineSnapshot;
@@ -351,7 +356,7 @@ export function createTerminalDataService({ config, logger }) {
         title: item.title,
         summary: item.summary,
         source: item.source,
-        sourceType: item.eventType === "watchlist" ? "news" : "news",
+        sourceType: item.sourceType || "news",
         sentiment: item.sentiment,
         importance:
           item.priority?.score >= 70
@@ -370,7 +375,7 @@ export function createTerminalDataService({ config, logger }) {
     );
     const prevIds = new Set(state.news.map((item) => item.id));
     state.news = nextNews;
-    state.social = nextNews.filter((item) => item.type === "social").slice(0, 60);
+    state.social = nextNews.filter((item) => item.type === "social").slice(0, 80);
 
     nextNews.forEach((item) => {
       if (!prevIds.has(item.id) && item.type !== "social") {

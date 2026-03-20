@@ -8,6 +8,13 @@ const DEFAULT_RSS_FEEDS = [
   { id: "theblock", source: "The Block", url: "https://www.theblock.co/rss.xml" },
 ];
 
+const DEFAULT_SOCIAL_RSS_FEEDS = [
+  { id: "reddit-cryptocurrency", source: "Reddit r/CryptoCurrency", url: "https://www.reddit.com/r/CryptoCurrency/.rss" },
+  { id: "reddit-bitcoin", source: "Reddit r/Bitcoin", url: "https://www.reddit.com/r/Bitcoin/.rss" },
+  { id: "reddit-ethfinance", source: "Reddit r/ethfinance", url: "https://www.reddit.com/r/ethfinance/.rss" },
+  { id: "reddit-solana", source: "Reddit r/solana", url: "https://www.reddit.com/r/solana/.rss" },
+];
+
 function parseRss(xml) {
   const items = [];
   const blocks = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)];
@@ -31,6 +38,36 @@ function parseRss(xml) {
       new Date().toISOString();
     if (!title) continue;
     items.push({ title, description, link, pubDate });
+  }
+  if (items.length > 0) return items;
+
+  // Atom fallback (Reddit and many social feeds)
+  const atomBlocks = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)];
+  for (const block of atomBlocks.slice(0, 20)) {
+    const content = block[1];
+    const title =
+      (content.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "")
+        .replace(/<!\[CDATA\[|\]\]>/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    const summary =
+      (content.match(/<content[^>]*>([\s\S]*?)<\/content>/i)?.[1] ||
+        content.match(/<summary[^>]*>([\s\S]*?)<\/summary>/i)?.[1] ||
+        "")
+        .replace(/<!\[CDATA\[|\]\]>/g, "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    const link =
+      content.match(/<link[^>]+href=["']([^"']+)["'][^>]*\/?>/i)?.[1]?.trim() ||
+      content.match(/<id>([\s\S]*?)<\/id>/i)?.[1]?.trim() ||
+      "#";
+    const pubDate =
+      content.match(/<updated>([\s\S]*?)<\/updated>/i)?.[1] ||
+      content.match(/<published>([\s\S]*?)<\/published>/i)?.[1] ||
+      new Date().toISOString();
+    if (!title) continue;
+    items.push({ title, description: summary, link, pubDate });
   }
   return items;
 }
@@ -70,7 +107,17 @@ function inferSentiment(text) {
 }
 
 export async function fetchRssNews({ feeds = DEFAULT_RSS_FEEDS } = {}) {
-  const settled = await Promise.allSettled(feeds.map((feed) => fetchText(feed.url, { timeoutMs: 7000 })));
+  const settled = await Promise.allSettled(
+    feeds.map((feed) =>
+      fetchText(feed.url, {
+        timeoutMs: 7000,
+        headers: {
+          "User-Agent": "TraderBross/1.0 (+https://trader-bross.vercel.app)",
+          Accept: "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5",
+        },
+      }),
+    ),
+  );
   const output = [];
 
   settled.forEach((result, index) => {
@@ -97,4 +144,24 @@ export async function fetchRssNews({ feeds = DEFAULT_RSS_FEEDS } = {}) {
   });
 
   return output;
+}
+
+export function getDefaultSocialRssFeeds() {
+  return DEFAULT_SOCIAL_RSS_FEEDS.map((item) => ({ ...item }));
+}
+
+export function getDefaultNitterSocialFeeds(nitterBaseUrl = "") {
+  const base = String(nitterBaseUrl || "").trim().replace(/\/+$/, "");
+  if (!base) return [];
+  const handles = [
+    { id: "wublockchain", label: "Wu Blockchain" },
+    { id: "watcherguru", label: "Watcher.Guru" },
+    { id: "tier10k", label: "Tier10k" },
+    { id: "coindesk", label: "CoinDesk" },
+  ];
+  return handles.map((h) => ({
+    id: `nitter-${h.id}`,
+    source: `Nitter ${h.label}`,
+    url: `${base}/${h.id}/rss`,
+  }));
 }
