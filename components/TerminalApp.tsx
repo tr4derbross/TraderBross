@@ -385,10 +385,11 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const [vaultTokens, setVaultTokens] = useState<Partial<Record<HeaderCexPlatform, string>>>({});
   const [binanceTestnet, setBinanceTestnet] = useState(false);
   const [newsTradeIntent, setNewsTradeIntent] = useState<NewsTradeIntent | null>(null);
+  const [venueSymbols, setVenueSymbols] = useState<string[]>([]);
   const [activeVenueState, setActiveVenueState] = useState<ActiveVenueState>({
     venueId: "hyperliquid",
     venueType: "wallet",
-    activeSymbol: initialTicker && AVAILABLE_TICKERS.includes(initialTicker) ? initialTicker : "BTC",
+    activeSymbol: (initialTicker || "BTC").toUpperCase(),
     connectionStatus: "disconnected",
   });
   const { checkNewsAgainstAlerts, checkPriceAlerts } = useAlerts();
@@ -750,42 +751,112 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         : {}),
     };
   const activeVenueMarketLabel = getVenueAdapter(activeVenueState.venueId).marketDataLabel;
+  const tradableSymbols = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [...venueSymbols, ...wsQuotes.map((quote) => quote.symbol), ...AVAILABLE_TICKERS]
+            .map((value) =>
+              String(value || "")
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, "")
+                .replace(/USDT$/i, ""),
+            )
+            .filter(Boolean),
+        ),
+      ),
+    [venueSymbols, wsQuotes],
+  );
+  const tradableSet = useMemo(() => new Set(tradableSymbols), [tradableSymbols]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void apiFetch<string[]>(`/api/venues/symbols?venue=${encodeURIComponent(activeVenueState.venueId)}`)
+      .then((rows) => {
+        if (cancelled || !Array.isArray(rows)) return;
+        const normalized = Array.from(
+          new Set(
+            rows
+              .map((row) =>
+                String(row || "")
+                  .toUpperCase()
+                  .replace(/[^A-Z0-9]/g, "")
+                  .replace(/USDT$/i, ""),
+              )
+              .filter(Boolean),
+          ),
+        );
+        setVenueSymbols(normalized);
+      })
+      .catch(() => {
+        if (!cancelled) setVenueSymbols([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeVenueState.venueId]);
+
+  useEffect(() => {
+    if (tradableSymbols.length === 0) return;
+    if (!tradableSet.has(activeVenueState.activeSymbol)) {
+      setActiveVenueState((prev) => ({
+        ...prev,
+        activeSymbol: tradableSymbols[0],
+      }));
+    }
+  }, [activeVenueState.activeSymbol, tradableSet, tradableSymbols]);
 
   const setActiveSymbol = useCallback((symbol: string) => {
     setActiveVenueState((prev) => ({
       ...prev,
-      activeSymbol: symbol,
+      activeSymbol:
+        String(symbol || "")
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "")
+          .replace(/USDT$/i, "") || "BTC",
     }));
   }, []);
 
   const handleSelectItem = useCallback((item: NewsItem) => {
     setSelectedItem(item);
     if (item.ticker.length > 0) {
-      // Derive symbol directly from parameter — avoids stale closure on activeSymbol
-      const match = item.ticker.find((t) => AVAILABLE_TICKERS.includes(t));
+      const match = item.ticker
+        .map((ticker) =>
+          String(ticker || "")
+            .toUpperCase()
+            .replace(/[^A-Z0-9]/g, "")
+            .replace(/USDT$/i, ""),
+        )
+        .find((ticker) => tradableSet.has(ticker));
       if (match) {
         setActiveSymbol(match);
         setRightTab("trade");
         setMobileWorkspaceTab(() => {
-          // Read viewport inline to avoid stale closure on showDesktopLayout
           const desktop = window.innerWidth >= 1280;
           return desktop ? "chart" : "tools";
         });
       }
     }
-  }, [setActiveSymbol]);
+  }, [setActiveSymbol, tradableSet]);
 
   const handleTickerRoute = useCallback((ticker: string, item: NewsItem) => {
     setSelectedItem(item);
-    // Derive symbol directly from the ticker parameter — no stale state read
-    const symbol = ticker.split("-")[0].replace(/USDT$/i, "").replace(/PERP$/i, "") || ticker;
-    setActiveSymbol(AVAILABLE_TICKERS.includes(symbol) ? symbol : ticker);
+    const symbol = String(ticker || "")
+      .split("-")[0]
+      .replace(/USDT$/i, "")
+      .replace(/PERP$/i, "")
+      .replace(/[^A-Z0-9]/gi, "")
+      .toUpperCase();
+    if (symbol && tradableSet.has(symbol)) {
+      setActiveSymbol(symbol);
+    }
     setRightTab("trade");
     setMobileWorkspaceTab((prev) => {
       const desktop = window.innerWidth >= 1280;
       return desktop ? prev : "tools";
     });
-  }, [setActiveSymbol]);
+  }, [setActiveSymbol, tradableSet]);
 
   const buildActiveVenueConnection = useCallback((): VenueConnectionInput | undefined => {
     if (activeVenueState.venueType === "cex" && selectedHeaderCexPlatform) {
@@ -1276,6 +1347,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         activeVenueState={activeVenueState}
         selectedNews={selectedItem}
         newsTradeIntent={newsTradeIntent}
+        availableTickers={tradableSymbols}
         balance={displayBalance}
         isDemoMode={venueBalance === null}
         positions={displayPositions}
@@ -1349,6 +1421,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           activeVenueState={activeVenueState}
           selectedNews={selectedItem}
           newsTradeIntent={newsTradeIntent}
+          availableTickers={tradableSymbols}
           balance={displayBalance}
           isDemoMode={venueBalance === null}
           positions={displayPositions}
@@ -1455,6 +1528,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                 <WatchlistPanel
                   quotes={wsQuotes}
                   prices={prices}
+                  venueId={activeVenueState.venueId}
+                  availableTickers={tradableSymbols}
                   activeTicker={activeVenueState.activeSymbol}
                   onSelectTicker={(ticker) => {
                     setActiveSymbol(ticker);
@@ -2173,3 +2248,4 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     </div>
   );
 }
+

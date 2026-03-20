@@ -318,6 +318,9 @@ async function emergencyResponse(path: string[], request: NextRequest) {
     const sort = request.nextUrl.searchParams.get("sort") || "volume";
     return json(buildEmergencyScreenerFromQuotes(market.quotes, sort));
   }
+  if (key === "venues" && (path?.[1] || "").toLowerCase() === "symbols") {
+    return json(["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "AVAX", "LINK", "DOT", "ADA", "TRX"]);
+  }
   if (key === "health") {
     return json({ status: "degraded", emergencyFallback: true, timestamp: new Date().toISOString() });
   }
@@ -359,7 +362,7 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
   }
   if (method === "GET" && upstream.ok) {
     const primary = (normalizedPath?.[0] || "").toLowerCase();
-    if (["bootstrap", "news", "market", "screener", "prices", "okx", "bybit", "hyperliquid", "symbols"].includes(primary)) {
+    if (["bootstrap", "news", "market", "screener", "prices", "okx", "bybit", "hyperliquid", "symbols", "venues"].includes(primary)) {
       try {
         const clone = upstream.clone();
         const payload = await clone.json();

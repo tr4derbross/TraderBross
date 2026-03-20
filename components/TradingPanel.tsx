@@ -25,6 +25,7 @@ type Props = {
   activeVenueState: ActiveVenueState;
   selectedNews: NewsItem | null;
   newsTradeIntent?: (NewsTradePreset & { sourceItemId?: string }) | null;
+  availableTickers?: string[];
   balance: number;
   isDemoMode?: boolean;
   positions: Position[];
@@ -92,6 +93,7 @@ export default function TradingPanel({
   activeVenueState,
   selectedNews,
   newsTradeIntent,
+  availableTickers = [],
   balance,
   isDemoMode = false,
   positions,
@@ -121,10 +123,23 @@ export default function TradingPanel({
   const [submitMessage, setSubmitMessage] = useState("");
   const [confirmData, setConfirmData] = useState<OrderConfirmData | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const futuresTickers = useMemo(() => {
+    const source = availableTickers.length > 0 ? availableTickers : FUTURES_TICKERS;
+    return Array.from(new Set(source.filter((ticker) => !["COIN", "MSTR"].includes(ticker))));
+  }, [availableTickers]);
 
   useEffect(() => {
     setTicker(activeVenueState.activeSymbol);
   }, [activeVenueState.activeSymbol]);
+
+  useEffect(() => {
+    if (futuresTickers.length === 0) return;
+    if (!futuresTickers.includes(ticker)) {
+      const next = futuresTickers[0];
+      setTicker(next);
+      onActiveSymbolChange(next);
+    }
+  }, [futuresTickers, onActiveSymbolChange, ticker]);
 
   // Fetch leverage brackets once on mount (Binance only)
   useEffect(() => {
@@ -382,7 +397,7 @@ export default function TradingPanel({
             value={ticker}
             onChange={(e) => handleTickerChange(e.target.value)}
           >
-            {FUTURES_TICKERS.map((value) => (
+            {futuresTickers.map((value) => (
               <option key={value} value={value} className="bg-zinc-950">
                 {value}
               </option>
