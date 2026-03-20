@@ -31,6 +31,7 @@ type ChartMenu = { x: number; y: number; price: number } | null;
 type Props = {
   activeVenue: TradingVenueId;
   activeSymbol: string;
+  availableTickers?: string[];
   marketDataSourceLabel: string;
   liveTickerPrice?: number;
   liveFeedConnected?: boolean;
@@ -110,6 +111,7 @@ function isValidProtectiveLevel(
 export default function PriceChart({
   activeVenue,
   activeSymbol,
+  availableTickers = AVAILABLE_TICKERS,
   marketDataSourceLabel,
   liveTickerPrice,
   liveFeedConnected = false,
@@ -131,6 +133,7 @@ export default function PriceChart({
   const slLineRef = useRef<unknown>(null);
   const openOrderLinesRef = useRef<unknown[]>([]);
   const ticker = activeSymbol;
+  const chartTickers = availableTickers.length > 0 ? availableTickers : AVAILABLE_TICKERS;
 
   const [isMobile, setIsMobile] = useState(false);
   const [timeframe, setTimeframe] = useState<Timeframe>("5m");
@@ -431,6 +434,8 @@ export default function PriceChart({
           ? `/api/bybit?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
           : activeVenue === "hyperliquid"
             ? `/api/hyperliquid?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
+            : activeVenue === "dydx"
+              ? `/api/dydx?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
             : `/api/prices?ticker=${ticker}&interval=${interval}&limit=${limit}`;
 
     if (process.env.NODE_ENV !== "production") { console.log("[PriceChart] fetching candles:", endpoint); }
@@ -719,7 +724,7 @@ export default function PriceChart({
               value={ticker}
               onChange={(event) => onTickerChange?.(event.target.value)}
             >
-              {AVAILABLE_TICKERS.map((item) => (
+              {chartTickers.map((item) => (
                 <option key={item} value={item} className="bg-[#0d0d14]">{item}</option>
               ))}
             </select>
@@ -786,7 +791,7 @@ export default function PriceChart({
               value={ticker}
               onChange={(event) => onTickerChange?.(event.target.value)}
             >
-              {AVAILABLE_TICKERS.map((item) => (
+              {chartTickers.map((item) => (
                 <option key={item} value={item} className="bg-[#0d0d14]">
                   {item}USDT
                 </option>

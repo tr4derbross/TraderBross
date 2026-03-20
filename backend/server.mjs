@@ -6,7 +6,7 @@ import { loadConfig } from "./config.mjs";
 import { createLogger } from "./logger.mjs";
 import { getProviderLabel, streamChat, classifySentiment } from "./services/ai-service.mjs";
 import { getCalendarEvents } from "./services/calendar-service.mjs";
-import { getDydxAccount, getDydxMarkets } from "./services/dydx-service.mjs";
+import { getDydxAccount, getDydxCandles, getDydxMarkets } from "./services/dydx-service.mjs";
 import { getHyperliquidAccount, getHyperliquidCandles, getHyperliquidMarket } from "./services/hyperliquid-service.mjs";
 import {
   getBinanceCandles,
@@ -354,6 +354,13 @@ const server = http.createServer(async (request, reply) => {
       }
       if (type === "account") {
         json(reply, 200, await getDydxAccount(url.searchParams.get("address") || ""));
+        return;
+      }
+      if (type === "ohlcv") {
+        const ticker = canonicalTickerParam(url.searchParams.get("ticker"), "BTC");
+        const interval = url.searchParams.get("interval") || "1h";
+        const limit = Math.min(Number(url.searchParams.get("limit") || 120), 500);
+        json(reply, 200, await getDydxCandles(ticker, interval, limit));
         return;
       }
     }
