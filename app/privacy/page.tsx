@@ -2,7 +2,7 @@ import LegalPage from "@/components/LegalPage";
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" effectiveDate="13.03.26">
+    <LegalPage title="Privacy Policy" effectiveDate="21.03.26">
       <p>
         TraderBross (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) provides a crypto news trading terminal and related
         tools for traders.
@@ -38,6 +38,11 @@ export default function PrivacyPage() {
           If exchange connectivity is supported, TraderBross is designed to use credentials only for
           the purpose of enabling user-authorized platform functionality.
         </p>
+        <p>
+          Credential handling may use session tokens and server-side security controls such as
+          encryption, expiry windows, and abuse protection. Session invalidation can occur during
+          normal security operations.
+        </p>
         <p>Users are responsible for creating exchange API keys with the correct permissions.</p>
         <p>We strongly recommend:</p>
         <ul>
@@ -52,6 +57,10 @@ export default function PrivacyPage() {
         <p>
           We retain data only as long as reasonably necessary to provide the service, maintain
           security, comply with legal obligations, and resolve disputes.
+        </p>
+        <p>
+          Security session data may be retained for limited operational windows and may be removed
+          automatically based on system policies.
         </p>
       </section>
 

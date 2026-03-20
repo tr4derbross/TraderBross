@@ -2,7 +2,7 @@ import LegalPage from "@/components/LegalPage";
 
 export default function TermsPage() {
   return (
-    <LegalPage title="Terms of Service" effectiveDate="13.03.26">
+    <LegalPage title="Terms of Service" effectiveDate="21.03.26">
       <p>
         Welcome to TraderBross. By accessing or using TraderBross, you agree to these Terms of
         Service.
@@ -50,6 +50,7 @@ export default function TermsPage() {
           <li>withdrawal permissions are disabled</li>
           <li>only necessary permissions are granted</li>
           <li>exchange-side security settings are properly configured</li>
+          <li>IP whitelisting is enabled where available</li>
         </ul>
         <p>
           TraderBross is not responsible for losses caused by misconfigured API permissions,
@@ -58,12 +59,25 @@ export default function TermsPage() {
       </section>
 
       <section>
-        <h2>5. No Custody</h2>
+        <h2>5. Security Model and Session Handling</h2>
+        <p>
+          TraderBross uses a tokenized connection model for supported exchange actions. Credentials
+          are processed for connection/session purposes and are not displayed in plain text in the
+          product UI after secure storage flow.
+        </p>
+        <p>
+          Session tokens may expire, rotate, or be revoked at any time for security reasons.
+          Re-authentication may be required.
+        </p>
+      </section>
+
+      <section>
+        <h2>6. No Custody</h2>
         <p>TraderBross does not hold, store, manage, or custody customer funds.</p>
       </section>
 
       <section>
-        <h2>6. Availability</h2>
+        <h2>7. Availability</h2>
         <p>
           We do not guarantee uninterrupted access, uptime, data accuracy, or execution
           availability.
@@ -75,7 +89,7 @@ export default function TermsPage() {
       </section>
 
       <section>
-        <h2>7. Risk Disclosure</h2>
+        <h2>8. Risk Disclosure</h2>
         <p>Trading digital assets involves substantial risk.</p>
         <p>You understand and accept that:</p>
         <ul>
@@ -89,7 +103,7 @@ export default function TermsPage() {
       </section>
 
       <section>
-        <h2>8. Acceptable Use</h2>
+        <h2>9. Acceptable Use</h2>
         <p>You agree not to:</p>
         <ul>
           <li>misuse the platform</li>
@@ -101,7 +115,7 @@ export default function TermsPage() {
       </section>
 
       <section>
-        <h2>9. Suspension or Termination</h2>
+        <h2>10. Suspension or Termination</h2>
         <p>
           We may suspend or terminate access at any time if we detect abuse, security risks, legal
           concerns, or violations of these terms.
@@ -109,7 +123,7 @@ export default function TermsPage() {
       </section>
 
       <section>
-        <h2>10. Limitation of Liability</h2>
+        <h2>11. Limitation of Liability</h2>
         <p>
           To the maximum extent permitted by law, TraderBross and its operators are not liable for
           any direct, indirect, incidental, consequential, or financial losses arising from use of
@@ -118,7 +132,7 @@ export default function TermsPage() {
       </section>
 
       <section>
-        <h2>11. Changes to Terms</h2>
+        <h2>12. Changes to Terms</h2>
         <p>
           We may update these Terms at any time. Continued use of TraderBross after updates means
           you accept the revised Terms.
@@ -126,7 +140,7 @@ export default function TermsPage() {
       </section>
 
       <section>
-        <h2>12. Contact</h2>
+        <h2>13. Contact</h2>
         <p>For questions regarding these Terms, contact:</p>
         <p>
           <strong>hello@traderbross.com</strong>

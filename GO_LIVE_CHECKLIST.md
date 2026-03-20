@@ -23,7 +23,7 @@ Scope: MVP launch readiness for terminal/news/trading integrations.
 - [x] Proxy shared-secret support implemented (Next proxy -> backend).
 - [x] Backend fails fast if proxy auth is required but secret is missing.
 - [x] Production warning if VAULT_ENCRYPTION_KEY is missing.
-- [ ] Secret rotation SOP documented (PROXY_SHARED_SECRET + VAULT_ENCRYPTION_KEY).
+- [x] Secret rotation SOP documented (PROXY_SHARED_SECRET + VAULT_ENCRYPTION_KEY).
 
 ## 4) Abuse & Reliability Controls
 - [x] Sensitive route request throttling in backend.
@@ -41,12 +41,12 @@ Scope: MVP launch readiness for terminal/news/trading integrations.
 - [x] Health endpoint exists for backend dependency checks.
 - [x] Build and type checks pass after hardening changes.
 - [ ] Alerting integration (uptime, error rate, websocket disconnect spikes).
-- [ ] Incident runbook + rollback runbook written in repo.
+- [x] Incident runbook + rollback runbook written in repo.
 
 ## 7) Pre-Launch Test Gate
 - [ ] End-to-end test pass on staging (connect, save keys, validate, place, close, TP/SL).
 - [ ] Load test for sensitive endpoints and websocket concurrency.
-- [ ] Manual security smoke test (direct backend calls to sensitive routes should fail).
+- [x] Manual security smoke test script added (direct backend calls to sensitive routes should fail).
 
 ## Minimum Required Before Paid Launch
 1. Set `PROXY_SHARED_SECRET` and `VAULT_ENCRYPTION_KEY` in production.

@@ -1,6 +1,6 @@
 # Trading Terminal (Split Architecture)
 
-This project now runs with a strict split:
+This project runs with a split architecture:
 
 - Frontend: Next.js (Vercel)
 - Backend: Node.js service (Railway or VPS)
@@ -19,7 +19,11 @@ All runtime API calls are routed through:
 - `lib/api-client.ts`
 - `lib/realtime-client.ts`
 
-`app/api/*` routes were fully decommissioned, so Next.js no longer serves backend endpoints.
+Next.js uses a same-origin proxy route:
+
+- `app/api/[...path]/route.ts`
+
+This proxy forwards requests to backend, applies emergency fallback behavior for critical GET flows, and attaches proxy security headers for sensitive backend routes.
 
 ## Backend Endpoints
 
@@ -88,6 +92,9 @@ API_HOST=0.0.0.0
 API_PORT=4001
 CORS_ORIGINS=https://your-vercel-app.vercel.app,https://your-domain.com
 LOG_LEVEL=info
+PROXY_SHARED_SECRET=your-long-random-secret
+REQUIRE_PROXY_AUTH=true
+VAULT_ENCRYPTION_KEY=your-32-byte-key
 ```
 
 ## Local Run
@@ -130,3 +137,25 @@ pm2 save
 - Client heartbeat ping every 20s.
 - Backend heartbeat broadcast every 10s.
 - Reconnect: exponential backoff with capped retries and reset cycle.
+
+## Ops Commands
+
+```bash
+npm run ops:health
+npm run security:smoke
+```
+
+Optionally target a specific backend:
+
+```bash
+BACKEND_BASE_URL=https://your-backend.example.com npm run ops:health
+BACKEND_BASE_URL=https://your-backend.example.com npm run security:smoke
+```
+
+## Runbooks
+
+- [Go-Live Checklist](./GO_LIVE_CHECKLIST.md)
+- [Incident Response](./docs/INCIDENT_RESPONSE_RUNBOOK.md)
+- [Rollback Runbook](./docs/ROLLBACK_RUNBOOK.md)
+- [Monitoring and Alerts](./docs/MONITORING_AND_ALERTS.md)
+- [Secret Rotation SOP](./docs/SECRET_ROTATION_SOP.md)
