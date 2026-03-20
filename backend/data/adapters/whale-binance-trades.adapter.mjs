@@ -9,8 +9,8 @@ function toNum(value) {
 
 export async function fetchBinanceLargeTradeEvents({
   symbols = DEFAULT_SYMBOLS,
-  minUsd = 500_000,
-  perSymbolLimit = 90,
+  minUsd = 250_000,
+  perSymbolLimit = 700,
 } = {}) {
   const symbolList = (Array.isArray(symbols) ? symbols : DEFAULT_SYMBOLS)
     .map((item) => String(item || "").toUpperCase())
@@ -20,28 +20,28 @@ export async function fetchBinanceLargeTradeEvents({
     symbolList.map(async (symbol) => {
       try {
         const rows = await fetchJson(
-          `https://api.binance.com/api/v3/trades?symbol=${encodeURIComponent(symbol)}&limit=${perSymbolLimit}`,
+          `https://api.binance.com/api/v3/aggTrades?symbol=${encodeURIComponent(symbol)}&limit=${perSymbolLimit}`,
           { timeoutMs: 6000 },
         );
         const token = symbol.replace(/USDT$/, "");
         return (Array.isArray(rows) ? rows : [])
           .map((row) => {
-            const price = toNum(row.price);
-            const qty = toNum(row.qty);
+            const price = toNum(row.p);
+            const qty = toNum(row.q);
             const usdValue = price * qty;
             return {
-              id: `binance-trade-${symbol}-${row.id}`,
+              id: `binance-trade-${symbol}-${row.a}`,
               chain: "binance_spot",
               txHash: null,
               token,
               amount: qty,
               usdValue,
-              fromLabel: row.isBuyerMaker ? "Smart Money Seller" : "Smart Money Buyer",
+              fromLabel: row.m ? "Smart Money Seller" : "Smart Money Buyer",
               fromOwnerType: "smart_money",
               toLabel: "Market Fill",
               toOwnerType: "unknown",
               eventType: "smart_money_watch",
-              timestamp: new Date(Number(row.time || Date.now())).toISOString(),
+              timestamp: new Date(Number(row.T || Date.now())).toISOString(),
               relatedAssets: [token],
               provider: "binance_large_trades",
               rawText: `${symbol} large tape trade @ ${price}`,
@@ -59,4 +59,3 @@ export async function fetchBinanceLargeTradeEvents({
     .sort((a, b) => b.usdValue - a.usdValue || new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, 140);
 }
-
