@@ -12,7 +12,9 @@
     "build": "next build",
     "start": "next start",
     "start:frontend": "next start",
-    "start:backend": "node backend/server.mjs"
+    "start:backend": "node backend/server.mjs",
+    "security:smoke": "node scripts/security-smoke-test.mjs",
+    "ops:health": "node scripts/ops-health-check.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
