@@ -26,6 +26,21 @@ function inferEventType({ token, fromLabelType, toLabelType, rawText, whaleConfi
   return "large_transfer";
 }
 
+function normalizeEventType(input) {
+  const value = String(input || "").toLowerCase().trim();
+  if (!value) return null;
+  const allowed = new Set([
+    "large_transfer",
+    "exchange_inflow",
+    "exchange_outflow",
+    "stablecoin_mint",
+    "stablecoin_burn",
+    "treasury_movement",
+    "smart_money_watch",
+  ]);
+  return allowed.has(value) ? value : null;
+}
+
 function clip(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -99,13 +114,15 @@ export function createWhaleEventEngine({ watchlistTickers = [], extraWalletLabel
       address: rawEvent.toAddress || rawEvent.to?.address,
     });
 
-    const eventType = inferEventType({
-      token,
-      fromLabelType: fromInfo.labelType,
-      toLabelType: toInfo.labelType,
-      rawText: rawEvent.rawText || "",
-      whaleConfig,
-    });
+    const eventType =
+      normalizeEventType(rawEvent.eventType) ||
+      inferEventType({
+        token,
+        fromLabelType: fromInfo.labelType,
+        toLabelType: toInfo.labelType,
+        rawText: rawEvent.rawText || "",
+        whaleConfig,
+      });
     const relatedAssets = deriveRelatedAssets(token, rawEvent.relatedAssets);
     const significance = scoreSignificance({
       usdValue,

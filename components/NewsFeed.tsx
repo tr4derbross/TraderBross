@@ -108,6 +108,8 @@ export default function NewsFeed({
   };
 
   const isSpecialFeed = sourceFilter === "whale" || sourceFilter === "liquidation";
+  const devSimEnabled = process.env.NEXT_PUBLIC_ENABLE_DEV_SIM_FEEDS === "true";
+  const hasSpecialLiveData = sourceFilter === "whale" ? counts.whale > 0 : sourceFilter === "liquidation" ? counts.liquidation > 0 : false;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -145,10 +147,16 @@ export default function NewsFeed({
               </span>
             )
           )}
-          {isSpecialFeed && (
+          {isSpecialFeed && hasSpecialLiveData && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/8 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400">
+              <span className="live-dot h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              LIVE
+            </span>
+          )}
+          {isSpecialFeed && !hasSpecialLiveData && devSimEnabled && (
             <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/8 px-1.5 py-0.5 text-[9px] font-bold text-amber-400">
               <span className="live-dot h-1.5 w-1.5 rounded-full bg-amber-400" />
-              SIM
+              DEV SIM
             </span>
           )}
         </div>
