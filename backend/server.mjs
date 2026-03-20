@@ -45,6 +45,78 @@ function canonicalTickerParam(value, fallback = "BTC") {
   return canonicalSymbol(value || fallback) || fallback;
 }
 
+function toBaseSymbol(value) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[-_/]/g, "")
+    .replace(/USDT|USD|USDC|PERP|SWAP|SPOT/g, "")
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+function uniqueSortedSymbols(input) {
+  return Array.from(new Set((Array.isArray(input) ? input : []).map((item) => toBaseSymbol(item)).filter(Boolean))).sort(
+    (a, b) => a.localeCompare(b),
+  );
+}
+
+async function getVenueSymbols(venueId) {
+  const venue = String(venueId || "binance").toLowerCase();
+  return endpointCache.remember(`venue:symbols:${venue}`, 60_000, async () => {
+    if (venue === "okx") {
+      const payload = await fetch("https://www.okx.com/api/v5/public/instruments?instType=SWAP", {
+        signal: AbortSignal.timeout(6000),
+      }).then((res) => res.json());
+      const symbols = (payload?.data || [])
+        .filter((row) => row.state === "live" && String(row.instId || "").includes("-USDT-SWAP"))
+        .map((row) => String(row.instId || "").split("-")[0]);
+      return uniqueSortedSymbols(symbols);
+    }
+
+    if (venue === "bybit") {
+      const payload = await fetch("https://api.bybit.com/v5/market/instruments-info?category=linear&limit=1000", {
+        signal: AbortSignal.timeout(7000),
+      }).then((res) => res.json());
+      const symbols = (payload?.result?.list || [])
+        .filter((row) => row.status === "Trading" && String(row.symbol || "").endsWith("USDT"))
+        .map((row) => String(row.baseCoin || row.symbol).replace(/USDT$/i, ""));
+      return uniqueSortedSymbols(symbols);
+    }
+
+    if (venue === "hyperliquid") {
+      const payload = await fetch("https://api.hyperliquid.xyz/info", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: "meta" }),
+        signal: AbortSignal.timeout(7000),
+      }).then((res) => res.json());
+      const symbols = (payload?.universe || []).map((row) => row?.name || "");
+      return uniqueSortedSymbols(symbols);
+    }
+
+    if (venue === "dydx") {
+      const payload = await fetch("https://indexer.dydx.trade/v4/perpetualMarkets", {
+        signal: AbortSignal.timeout(7000),
+      }).then((res) => res.json());
+      const markets = payload?.markets || {};
+      const symbols = Object.keys(markets).map((market) => String(market).split("-")[0]);
+      return uniqueSortedSymbols(symbols);
+    }
+
+    const payload = await fetch("https://fapi.binance.com/fapi/v1/exchangeInfo", {
+      signal: AbortSignal.timeout(7000),
+    }).then((res) => res.json());
+    const symbols = (payload?.symbols || [])
+      .filter(
+        (row) =>
+          row.status === "TRADING" &&
+          row.contractType === "PERPETUAL" &&
+          String(row.symbol || "").endsWith("USDT"),
+      )
+      .map((row) => String(row.baseAsset || row.symbol).replace(/USDT$/i, ""));
+    return uniqueSortedSymbols(symbols);
+  });
+}
+
 function json(reply, statusCode, payload) {
   const body = JSON.stringify(payload);
   reply.writeHead(statusCode, {
@@ -334,6 +406,17 @@ const server = http.createServer(async (request, reply) => {
 
     if (request.method === "GET" && url.pathname === "/api/coins/meta") {
       json(reply, 200, buildSnapshot().coinMetadata || {});
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/venues/symbols") {
+      const venue = (url.searchParams.get("venue") || "binance").toLowerCase();
+      try {
+        json(reply, 200, await getVenueSymbols(venue));
+      } catch {
+        const fallback = [...CORE_SYMBOLS, ...(buildSnapshot().quotes || []).map((q) => q.symbol)];
+        json(reply, 200, uniqueSortedSymbols(fallback));
+      }
       return;
     }
 

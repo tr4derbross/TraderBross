@@ -76,10 +76,8 @@ export async function getBinanceQuotes() {
 }
 
 export async function getBinanceCandles(symbol, interval, limit) {
-  const venueSymbol = BINANCE_SYMBOLS[symbol];
-  if (!venueSymbol) {
-    return generateMockCandles(symbol, interval, limit);
-  }
+  const raw = String(symbol || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const venueSymbol = BINANCE_SYMBOLS[raw] || (raw.endsWith("USDT") ? raw : `${raw}USDT`);
 
   return cache.remember(`candles:binance:${symbol}:${interval}:${limit}`, 10000, async () => {
     try {
@@ -153,10 +151,8 @@ export async function getBybitQuotes() {
 }
 
 export async function getOkxCandles(symbol, interval, limit) {
-  const instId = OKX_SYMBOLS[symbol];
-  if (!instId) {
-    return generateMockCandles(symbol, interval, limit);
-  }
+  const raw = String(symbol || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const instId = OKX_SYMBOLS[raw] || `${raw}-USDT-SWAP`;
 
   const bar = { "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "1H", "4h": "4H", "1d": "1D", "1w": "1W", "1H": "1H", "4H": "4H", "1D": "1D", "1W": "1W" }[interval] || "1D";
   return cache.remember(`candles:okx:${symbol}:${interval}:${limit}`, 12000, async () => {
@@ -179,10 +175,8 @@ export async function getOkxCandles(symbol, interval, limit) {
 }
 
 export async function getBybitCandles(symbol, interval, limit) {
-  const venueSymbol = BYBIT_SYMBOLS[symbol];
-  if (!venueSymbol) {
-    return generateMockCandles(symbol, interval, limit);
-  }
+  const raw = String(symbol || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const venueSymbol = BYBIT_SYMBOLS[raw] || (raw.endsWith("USDT") ? raw : `${raw}USDT`);
 
   const bucket = { "1m": "1", "5m": "5", "15m": "15", "30m": "30", "1h": "60", "4h": "240", "1d": "D", "1w": "W" }[interval] || "D";
   return cache.remember(`candles:bybit:${symbol}:${interval}:${limit}`, 12000, async () => {

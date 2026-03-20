@@ -12,6 +12,8 @@ type Props = {
   prices: Record<string, number>;
   onSelectTicker: (ticker: string) => void;
   activeTicker: string;
+  venueId?: string;
+  availableTickers?: string[];
 };
 
 const DEFAULT_WATCHLIST = ["BTC", "ETH", "SOL", "BNB", "XRP"];
@@ -25,7 +27,14 @@ function fmt(n: number) {
   return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 
-export default function WatchlistPanel({ quotes, prices, onSelectTicker, activeTicker }: Props) {
+export default function WatchlistPanel({
+  quotes,
+  prices,
+  onSelectTicker,
+  activeTicker,
+  venueId = "binance",
+  availableTickers = [],
+}: Props) {
   const [watchlist, setWatchlist] = useState<string[]>(DEFAULT_WATCHLIST);
   const [adding, setAdding] = useState(false);
   const [addTicker, setAddTicker] = useState("");
@@ -47,12 +56,12 @@ export default function WatchlistPanel({ quotes, prices, onSelectTicker, activeT
 
   useEffect(() => {
     let cancelled = false;
-    void apiFetch<Array<{ symbol?: string }>>("/api/symbols")
+    void apiFetch<Array<string | { symbol?: string }>>(`/api/venues/symbols?venue=${encodeURIComponent(venueId)}`)
       .then((rows) => {
         if (cancelled || !Array.isArray(rows)) return;
         setBackendSymbols(
           rows
-            .map((row) => canonicalSymbol(row.symbol || ""))
+            .map((row) => canonicalSymbol(typeof row === "string" ? row : row.symbol || ""))
             .filter(Boolean),
         );
       })
@@ -60,19 +69,19 @@ export default function WatchlistPanel({ quotes, prices, onSelectTicker, activeT
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [venueId]);
 
   const quoteMap = Object.fromEntries(quotes.map((q) => [q.symbol, q]));
   const supportedUniverse = useMemo(
     () =>
       Array.from(
         new Set(
-          [...AVAILABLE_TICKERS, ...backendSymbols, ...quotes.map((q) => q.symbol)]
+          [...AVAILABLE_TICKERS, ...availableTickers, ...backendSymbols, ...quotes.map((q) => q.symbol)]
             .map((value) => canonicalSymbol(value))
             .filter(Boolean),
         ),
       ),
-    [backendSymbols, quotes],
+    [availableTickers, backendSymbols, quotes],
   );
   const supportSet = useMemo(() => new Set(supportedUniverse), [supportedUniverse]);
 
