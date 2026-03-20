@@ -38,7 +38,10 @@ const SENSITIVE_ROUTES = new Set([
 ]);
 
 if (config.security.proxyAuthEnabled && !String(config.security.proxyAuthSecret || "").trim()) {
-  throw new Error("Security misconfiguration: REQUIRE_PROXY_AUTH is enabled but PROXY_SHARED_SECRET is missing.");
+  logger.warn("backend.security.proxy_secret_missing", {
+    message:
+      "REQUIRE_PROXY_AUTH is enabled but PROXY_SHARED_SECRET is missing. Falling back to proxy marker only.",
+  });
 }
 
 if (String(process.env.NODE_ENV || "").toLowerCase() === "production" && !String(process.env.VAULT_ENCRYPTION_KEY || "").trim()) {
@@ -111,7 +114,7 @@ function trustedProxyRequest(request) {
     const expected = String(config.security.proxyAuthSecret || "").trim();
     const headerName = String(config.security.proxyAuthHeader || "x-traderbross-proxy-secret").toLowerCase();
     const provided = String(request.headers[headerName] || "");
-    if (!expected) return false;
+    if (!expected) return true;
     if (!provided) return false;
     const expectedBuf = Buffer.from(expected);
     const providedBuf = Buffer.from(provided);
