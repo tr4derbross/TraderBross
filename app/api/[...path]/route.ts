@@ -298,6 +298,21 @@ async function emergencyResponse(path: string[], request: NextRequest) {
     const market = await fetchEmergencyQuotes();
     return json(market.marketStats);
   }
+  if (key === "symbols") {
+    return json([
+      { symbol: "BTC", aliases: ["BTC", "XBT", "WBTC"] },
+      { symbol: "ETH", aliases: ["ETH", "WETH", "STETH"] },
+      { symbol: "SOL", aliases: ["SOL", "WSOL"] },
+      { symbol: "BNB", aliases: ["BNB"] },
+      { symbol: "XRP", aliases: ["XRP"] },
+      { symbol: "DOGE", aliases: ["DOGE"] },
+      { symbol: "AVAX", aliases: ["AVAX", "WAVAX"] },
+      { symbol: "LINK", aliases: ["LINK"] },
+      { symbol: "DOT", aliases: ["DOT"] },
+      { symbol: "ADA", aliases: ["ADA"] },
+      { symbol: "TRX", aliases: ["TRX"] },
+    ]);
+  }
   if (key === "screener") {
     const market = await fetchEmergencyQuotes();
     const sort = request.nextUrl.searchParams.get("sort") || "volume";
@@ -344,7 +359,7 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
   }
   if (method === "GET" && upstream.ok) {
     const primary = (normalizedPath?.[0] || "").toLowerCase();
-    if (["bootstrap", "news", "market", "screener", "prices", "okx", "bybit", "hyperliquid"].includes(primary)) {
+    if (["bootstrap", "news", "market", "screener", "prices", "okx", "bybit", "hyperliquid", "symbols"].includes(primary)) {
       try {
         const clone = upstream.clone();
         const payload = await clone.json();

@@ -38,8 +38,11 @@ import {
   connectWalletByLabel,
   disconnectWalletSession,
   formatWalletAddress,
+  isWalletInstalled,
+  subscribeWalletSession,
   type ConnectedWalletSession,
   type SupportedWalletLabel,
+  walletInstallUrl,
 } from "@/lib/wallet-connect";
 import {
   GripVertical,
@@ -393,6 +396,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const headerPanelRef = useRef<HTMLDivElement | null>(null);
   const [headerAnchorRect, setHeaderAnchorRect] = useState<DOMRect | null>(null);
   const headerWalletSessionRef = useRef<ConnectedWalletSession | null>(null);
+  const headerWalletListenerCleanupRef = useRef<(() => void) | null>(null);
 
   const [newsWidth, setNewsWidth] = useState(480);
   const [rightWidth, setRightWidth] = useState(390);
@@ -532,6 +536,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
   useEffect(() => {
     return () => {
+      headerWalletListenerCleanupRef.current?.();
+      headerWalletListenerCleanupRef.current = null;
       headerWalletSessionRef.current = null;
     };
   }, []);
@@ -724,6 +730,13 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     : null;
   const selectedHeaderCredentials =
     selectedHeaderCexPlatform ? headerCexCredentials[selectedHeaderCexPlatform] : null;
+  const walletAvailability = useMemo(() => {
+    if (!selectedHeaderPlatform.wallets?.length) {
+      return {} as Record<SupportedWalletLabel, boolean>;
+    }
+    const entries = selectedHeaderPlatform.wallets.map((wallet) => [wallet, isWalletInstalled(wallet)] as const);
+    return Object.fromEntries(entries) as Record<SupportedWalletLabel, boolean>;
+  }, [headerConnectOpen, selectedHeaderPlatform.wallets]);
   const activeVenuePriceMap =
     {
       ...(venueMarketPrices[activeVenueState.venueId] ?? (activeVenueState.venueId === "binance" ? wsPrices : {})),
@@ -945,6 +958,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   );
 
   const disconnectHeaderWallet = useCallback(async () => {
+    headerWalletListenerCleanupRef.current?.();
+    headerWalletListenerCleanupRef.current = null;
     const activeSession = headerWalletSessionRef.current;
     headerWalletSessionRef.current = null;
     setHeaderActionMessage("");
@@ -979,6 +994,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       });
 
       const previousSession = headerWalletSessionRef.current;
+      headerWalletListenerCleanupRef.current?.();
+      headerWalletListenerCleanupRef.current = null;
       if (previousSession) {
         try {
           await disconnectWalletSession(previousSession);
@@ -990,6 +1007,30 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       try {
         const session = await connectWalletByLabel(walletLabel);
         headerWalletSessionRef.current = session;
+        headerWalletListenerCleanupRef.current = subscribeWalletSession(session, {
+          onDisconnect: () => {
+            headerWalletSessionRef.current = null;
+            setHeaderConnection((prev) => ({
+              status: "disconnected",
+              platform: prev.platform,
+              walletLabel: prev.walletLabel,
+              address: undefined,
+            }));
+            if (headerPlatform === "hyperliquid") {
+              setHlWallet("");
+            }
+          },
+          onAddressChange: (nextAddress) => {
+            setHeaderConnection((prev) => ({
+              ...prev,
+              status: "connected",
+              address: nextAddress,
+            }));
+            if (headerPlatform === "hyperliquid") {
+              setHlWallet(nextAddress);
+            }
+          },
+        });
         if (process.env.NODE_ENV !== "production") { console.info("[TraderBross Header Wallet]", "connected", headerPlatform, walletLabel, session.address); }
 
         setHeaderConnection({
@@ -1003,6 +1044,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           setHlWallet(session.address);
         }
       } catch (error) {
+        headerWalletListenerCleanupRef.current?.();
+        headerWalletListenerCleanupRef.current = null;
         headerWalletSessionRef.current = null;
         if (process.env.NODE_ENV !== "production") { console.info("[TraderBross Header Wallet]", "failed", headerPlatform, walletLabel, error); }
         setHeaderConnection({
@@ -1854,13 +1897,15 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                           headerConnection.platform === headerPlatform &&
                           headerConnection.status === "testing" &&
                           headerConnection.walletLabel === walletLabel;
+                        const walletReady = walletAvailability[walletLabel] ?? false;
+                        const installUrl = walletInstallUrl(walletLabel);
 
                         return (
                           <button
                             key={walletLabel}
                             type="button"
                             onClick={() => connectHeaderWallet(walletLabel)}
-                            disabled={headerConnection.status === "testing"}
+                            disabled={headerConnection.status === "testing" || !walletReady}
                             className={`rounded-xl border px-3 py-2 text-left transition-colors ${
                               isActiveHeaderConnection && headerConnection.walletLabel === walletLabel
                                 ? "border-emerald-400/20 bg-emerald-500/10"
@@ -1876,8 +1921,13 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                               ) : null}
                             </div>
                             <div className="mt-1 text-[9px] uppercase tracking-[0.14em] text-zinc-500">
-                              Direct wallet request
+                              {walletReady ? "Direct wallet request" : "Wallet not detected"}
                             </div>
+                            {!walletReady && installUrl && (
+                              <div className="mt-1 text-[9px] text-amber-300">
+                                Install: {installUrl}
+                              </div>
+                            )}
                           </button>
                         );
                       })}
