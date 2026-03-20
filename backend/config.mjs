@@ -63,7 +63,7 @@ export function loadConfig() {
       .filter(Boolean),
     socialTwitterHandles: parseCsvList(
       process.env.SOCIAL_TWITTER_HANDLES,
-      ["wublockchain", "tier10k", "lookonchain", "treenewsfeed", "glassnode", "santimentfeed", "coindesk"],
+      ["wublockchain", "tier10k", "lookonchain", "treenewsfeed", "unusual_whales", "glassnode", "santimentfeed", "coindesk"],
     ),
     socialRedditSubreddits: parseCsvList(
       process.env.SOCIAL_REDDIT_SUBREDDITS,
