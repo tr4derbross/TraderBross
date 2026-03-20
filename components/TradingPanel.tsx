@@ -15,7 +15,7 @@ import {
   MAKER_FEE,
   TAKER_FEE,
 } from "@/hooks/useTradingState";
-import { AlertTriangle, CheckCircle2, ChevronDown, Loader2, Shield, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Loader2, Shield, SlidersHorizontal, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import OrderConfirmModal, { type OrderConfirmData } from "@/components/OrderConfirmModal";
 
@@ -54,7 +54,7 @@ type SubmitState = "idle" | "submitting" | "success" | "failure";
 // Dynamic leverage presets computed from Binance exchange info
 const DEFAULT_LEVERAGE_PRESETS = [2, 5, 10, 20, 50];
 const LEVERAGE_PRESETS = DEFAULT_LEVERAGE_PRESETS; // used as fallback
-const TPSL_PRESETS = [1, 2, 3, 5, 10];
+const TPSL_PRESETS = [1, 2, 3, 5];
 const MARGIN_PCT_PRESETS = [5, 10, 25, 50];
 const FUTURES_TICKERS = AVAILABLE_TICKERS.filter((ticker) => !["COIN", "MSTR"].includes(ticker));
 
@@ -676,6 +676,18 @@ export default function TradingPanel({
                     value={tpPercent}
                     onChange={(e) => setTpPercent(e.target.value)}
                   />
+                  <button
+                    type="button"
+                    disabled={!tpEnabled}
+                    onClick={() => {
+                      setTpPrice("");
+                      setTpPercent("");
+                    }}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-700/60 bg-zinc-900 text-zinc-500 transition hover:text-zinc-300 disabled:opacity-40"
+                    title="Clear TP"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </div>
                 {tpEnabled && (
                   <div className="flex gap-0.5 pl-8">
@@ -693,6 +705,11 @@ export default function TradingPanel({
                         {pct}%
                       </button>
                     ))}
+                  </div>
+                )}
+                {tpEnabled && (
+                  <div className="pl-8 text-[9px] text-zinc-600">
+                    {side === "long" ? "TP must be above entry." : "TP must be below entry."}
                   </div>
                 )}
               </div>
@@ -727,6 +744,18 @@ export default function TradingPanel({
                     value={slPercent}
                     onChange={(e) => setSlPercent(e.target.value)}
                   />
+                  <button
+                    type="button"
+                    disabled={!slEnabled}
+                    onClick={() => {
+                      setSlPrice("");
+                      setSlPercent("");
+                    }}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-700/60 bg-zinc-900 text-zinc-500 transition hover:text-zinc-300 disabled:opacity-40"
+                    title="Clear SL"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </div>
                 {slEnabled && (
                   <div className="flex gap-0.5 pl-8">
@@ -744,6 +773,11 @@ export default function TradingPanel({
                         {pct}%
                       </button>
                     ))}
+                  </div>
+                )}
+                {slEnabled && (
+                  <div className="pl-8 text-[9px] text-zinc-600">
+                    {side === "long" ? "SL must be below entry." : "SL must be above entry."}
                   </div>
                 )}
               </div>
