@@ -15,7 +15,8 @@
     "start:backend": "node backend/server.mjs",
     "security:smoke": "node scripts/security-smoke-test.mjs",
     "ops:health": "node scripts/ops-health-check.mjs",
-    "e2e:terminal": "node scripts/e2e-terminal-flow.mjs"
+    "e2e:terminal": "node scripts/e2e-terminal-flow.mjs",
+    "ops:go-live": "node scripts/staging-go-live-check.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
