@@ -456,7 +456,7 @@ export default function TradingPanel({
               ))}
             </select>
             <select
-              className="w-[64px] rounded border border-zinc-700/50 bg-zinc-900 px-1 py-px text-[8px] font-bold text-zinc-100 outline-none transition hover:border-zinc-600 sm:w-[74px] sm:px-2 sm:py-1.5 sm:text-[11px] sm:rounded-lg"
+              className="min-w-[68px] rounded border border-zinc-700/50 bg-zinc-900 px-1 py-px text-[8px] font-bold text-zinc-100 outline-none transition hover:border-zinc-600 sm:min-w-[74px] sm:px-2 sm:py-1.5 sm:text-[11px] sm:rounded-lg"
               value={quoteAsset}
               onChange={(e) => onQuoteAssetChange?.(e.target.value as "USDT" | "USDC")}
             >
