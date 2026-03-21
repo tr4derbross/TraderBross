@@ -758,7 +758,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const isTablet = viewportWidth >= 768 && viewportWidth < 1280;
   const showDesktopLayout = viewportWidth >= 1280;
   const showBottomPanel = !isMobile;
-  const mobileChartHeight = viewportWidth < 390 ? 142 : viewportWidth < 430 ? 154 : 166;
+  const mobileChartHeight = viewportWidth < 390 ? 186 : viewportWidth < 430 ? 206 : 224;
   const mobileNewsPaneFlex = viewportWidth < 390 ? "0 0 56%" : "0 0 53%";
   const mobileTradePaneFlex = viewportWidth < 390 ? "0 0 44%" : "0 0 47%";
   const tabletRightPanelWidth = Math.max(304, Math.min(360, Math.round(viewportWidth * 0.36)));
@@ -1480,7 +1480,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         eventItems={chartEventItems}
         positions={displayPositions}
         orders={orders}
-        onUpdatePositionTpSl={updatePositionTpSl}
+        onUpdatePositionTpSl={handleSetVenueTpSl}
         onPlaceOrder={placeOrder}
         onTickerChange={setActiveSymbol}
       />
