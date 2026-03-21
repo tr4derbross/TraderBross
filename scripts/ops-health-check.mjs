@@ -27,7 +27,17 @@ async function run() {
   }
 
   const provider = await providerRes.json().catch(() => null);
-  const state = provider?.connectionState || "unknown";
+  const derived =
+    provider?.connectionState ||
+    (provider?.providerState
+      ? (() => {
+          const values = Object.values(provider.providerState);
+          if (values.includes("error") || values.includes("disconnected")) return "degraded";
+          if (values.includes("ok")) return "connected";
+          return "connecting";
+        })()
+      : null);
+  const state = derived || "unknown";
 
   console.log(`health=ok connectionState=${state}`);
   process.exit(0);

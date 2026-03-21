@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: npm --prefix backend ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Start backend
+        run: |
+          nohup node backend/server.mjs > backend.log 2>&1 &
+          sleep 4
+
+      - name: Ops health check
+        run: BACKEND_BASE_URL=http://127.0.0.1:4001 npm run ops:health
+
+      - name: Security smoke check
+        run: BACKEND_BASE_URL=http://127.0.0.1:4001 npm run security:smoke

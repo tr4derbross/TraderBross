@@ -47,7 +47,7 @@ const SENSITIVE_ROUTES = new Set([
 if (config.security.proxyAuthEnabled && !String(config.security.proxyAuthSecret || "").trim()) {
   logger.warn("backend.security.proxy_secret_missing", {
     message:
-      "REQUIRE_PROXY_AUTH is enabled but PROXY_SHARED_SECRET is missing. Falling back to proxy marker only.",
+      "REQUIRE_PROXY_AUTH is enabled but PROXY_SHARED_SECRET is missing. Sensitive routes will be denied until configured.",
   });
 }
 
@@ -151,7 +151,8 @@ function trustedProxyRequest(request) {
     const expected = String(config.security.proxyAuthSecret || "").trim();
     const headerName = String(config.security.proxyAuthHeader || "x-traderbross-proxy-secret").toLowerCase();
     const provided = String(request.headers[headerName] || "");
-    if (!expected) return true;
+    // Fail closed when proxy auth is enabled but secret is missing.
+    if (!expected) return false;
     if (!provided) return false;
     const expectedBuf = Buffer.from(expected);
     const providedBuf = Buffer.from(provided);
@@ -164,6 +165,13 @@ function trustedProxyRequest(request) {
   }
 
   return true;
+}
+
+function isAllowedWsOrigin(request) {
+  const origin = String(request.headers.origin || "").trim();
+  if (!origin) return String(process.env.NODE_ENV || "").toLowerCase() !== "production";
+  const normalized = origin.replace(/\/+$/, "");
+  return config.frontendOrigins.includes(normalized);
 }
 
 function sanitizeVaultPayload(scope, payload) {
@@ -553,7 +561,15 @@ const server = http.createServer(async (request, reply) => {
     }
 
     if (request.method === "GET" && url.pathname === "/api/providers/health") {
-      json(reply, 200, terminalData.getStatus());
+      const status = terminalData.getStatus();
+      const aggregate = Object.values(status.providerState || {});
+      const hasOk = aggregate.includes("ok");
+      const hasHardFail = aggregate.includes("error") || aggregate.includes("disconnected");
+      const connectionState = hasHardFail ? "degraded" : hasOk ? "connected" : "connecting";
+      json(reply, 200, {
+        ...status,
+        connectionState,
+      });
       return;
     }
 
@@ -2158,6 +2174,10 @@ const websocketServer = new WebSocketServer({ noServer: true });
 server.on("upgrade", (request, socket, head) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
   if (url.pathname !== "/ws") {
+    socket.destroy();
+    return;
+  }
+  if (!isAllowedWsOrigin(request)) {
     socket.destroy();
     return;
   }
