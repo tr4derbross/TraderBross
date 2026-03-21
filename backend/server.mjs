@@ -29,6 +29,7 @@ const terminalData = createTerminalDataService({ config, logger });
 const endpointCache = new MemoryCache();
 const clients = new Set();
 const endpointRateWindows = new Map();
+let bootstrapRefreshInFlight = false;
 const SENSITIVE_ROUTES = new Set([
   "/api/vault/store",
   "/api/vault/clear",
@@ -560,9 +561,17 @@ const server = http.createServer(async (request, reply) => {
       const mode = (url.searchParams.get("mode") || "").toLowerCase();
       const snapshot = buildSnapshot();
       if ((snapshot.quotes?.length || 0) === 0 && snapshot.connectionState !== "connected") {
-        await terminalData.refreshAll().catch((error) => {
-          logger.warn("data.snapshot.refresh_failed", { error: String(error) });
-        });
+        if (!bootstrapRefreshInFlight) {
+          bootstrapRefreshInFlight = true;
+          void terminalData
+            .refreshAll()
+            .catch((error) => {
+              logger.warn("data.snapshot.refresh_failed", { error: String(error) });
+            })
+            .finally(() => {
+              bootstrapRefreshInFlight = false;
+            });
+        }
       }
       const latest = buildSnapshot();
       json(reply, 200, mode === "lite" ? buildLiteSnapshot(latest) : latest);
