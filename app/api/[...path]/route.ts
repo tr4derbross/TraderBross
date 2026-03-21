@@ -225,6 +225,33 @@ function stripHtml(input: string) {
     .trim();
 }
 
+function compactBootstrapPayload(payload: any) {
+  if (!payload || typeof payload !== "object") return payload;
+  const news = Array.isArray(payload.news) ? payload.news.slice(0, 40) : [];
+  const social = Array.isArray(payload.social) ? payload.social.slice(0, 48) : [];
+  const whales = Array.isArray(payload.whales) ? payload.whales.slice(0, 24) : [];
+  const whaleEvents = Array.isArray(payload.whaleEvents) ? payload.whaleEvents.slice(0, 24) : [];
+  const liquidations = Array.isArray(payload.liquidations) ? payload.liquidations.slice(0, 40) : [];
+  const discovery = Array.isArray(payload.discovery) ? payload.discovery.slice(0, 50) : [];
+  const snapshotItems = Array.isArray(payload?.newsSnapshot?.items) ? payload.newsSnapshot.items.slice(0, 80) : [];
+  return {
+    ...payload,
+    news,
+    social,
+    whales,
+    whaleEvents,
+    liquidations,
+    discovery,
+    newsSnapshot: payload.newsSnapshot
+      ? {
+          ...payload.newsSnapshot,
+          items: snapshotItems,
+          count: payload.newsSnapshot.count ?? snapshotItems.length,
+        }
+      : payload.newsSnapshot,
+  };
+}
+
 async function buildEmergencyBootstrap(options: { lite?: boolean } = {}) {
   const [market, news, social] = await Promise.all([fetchEmergencyQuotes(), fetchEmergencyNews(), fetchEmergencySocial()]);
   const lite = options.lite !== false;
@@ -614,6 +641,10 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
       try {
         const clone = upstream.clone();
         const payload = await clone.json();
+        const mode = (request.nextUrl.searchParams.get("mode") || "").toLowerCase();
+        if (primary === "bootstrap" && mode === "lite") {
+          return json(compactBootstrapPayload(payload));
+        }
         const looksEmptyBootstrap =
           primary === "bootstrap" &&
           (!Array.isArray(payload?.quotes) || payload.quotes.length === 0) &&
