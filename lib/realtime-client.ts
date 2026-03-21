@@ -152,7 +152,7 @@ function applyEnvelope(envelope: RealtimeEnvelope) {
 
 async function loadBootstrap() {
   try {
-    const snapshot = await apiFetch<BackendSnapshot>("/api/bootstrap");
+    const snapshot = await apiFetch<BackendSnapshot>("/api/bootstrap?mode=lite");
     const hasData = (snapshot.news?.length || 0) > 0 || (snapshot.quotes?.length || 0) > 0;
     const bootstrapStatus: ConnectionStatus =
       snapshot.connectionState === "degraded"

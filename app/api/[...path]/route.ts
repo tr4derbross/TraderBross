@@ -225,8 +225,11 @@ function stripHtml(input: string) {
     .trim();
 }
 
-async function buildEmergencyBootstrap() {
+async function buildEmergencyBootstrap(options: { lite?: boolean } = {}) {
   const [market, news, social] = await Promise.all([fetchEmergencyQuotes(), fetchEmergencyNews(), fetchEmergencySocial()]);
+  const lite = options.lite !== false;
+  const newsItems = lite ? news.slice(0, 40) : news;
+  const socialItems = lite ? social.slice(0, 48) : social;
   return {
     quotes: market.quotes,
     venueQuotes: market.venueQuotes,
@@ -237,14 +240,14 @@ async function buildEmergencyBootstrap() {
     defiTvl: null,
     forex: null,
     liquidations: [],
-    news,
+    news: newsItems,
     whales: [],
     whaleEvents: [],
-    social,
+    social: socialItems,
     newsSnapshot: {
       generatedAt: new Date().toISOString(),
-      count: news.length,
-      items: news.map((n) => ({
+      count: newsItems.length,
+      items: newsItems.map((n) => ({
         kind: "news",
         id: n.id,
         source: n.source,
@@ -263,7 +266,7 @@ async function buildEmergencyBootstrap() {
         eventType: "watchlist",
       })),
       clusters: [],
-      status: news.length > 0 ? "ok" : "empty",
+      status: newsItems.length > 0 ? "ok" : "empty",
       errors: [],
     },
     coinMetadata: {},
@@ -451,7 +454,8 @@ async function emergencyResponse(path: string[], request: NextRequest) {
   }
 
   if (key === "bootstrap") {
-    const payload = await buildEmergencyBootstrap();
+    const mode = (request.nextUrl.searchParams.get("mode") || "").toLowerCase();
+    const payload = await buildEmergencyBootstrap({ lite: mode !== "full" });
     writeEmergencyCache(cacheKey, payload, 30_000);
     return json(payload);
   }
