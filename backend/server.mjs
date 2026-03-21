@@ -457,21 +457,21 @@ function sliceRecent(items, limit) {
 }
 
 function buildLiteSnapshot(snapshot) {
-  const news = sliceRecent(snapshot.news, 40);
-  const social = sliceRecent(snapshot.social, 48);
-  const whales = sliceRecent(snapshot.whales, 24);
-  const whaleEvents = sliceRecent(snapshot.whaleEvents, 24);
+  const news = sliceRecent(snapshot.news, 32);
+  const social = sliceRecent(snapshot.social, 36);
+  const whales = sliceRecent(snapshot.whales, 20);
   const liquidations = sliceRecent(snapshot.liquidations, 40);
-  const discovery = sliceRecent(snapshot.discovery, 50);
+  const discovery = [];
   const newsSnapshotItems = sliceRecent(snapshot.newsSnapshot?.items, 80);
   return {
     ...snapshot,
     news,
     social,
     whales,
-    whaleEvents,
+    whaleEvents: [],
     liquidations,
     discovery,
+    coinMetadata: {},
     newsSnapshot: {
       ...(snapshot.newsSnapshot || {}),
       items: newsSnapshotItems,

@@ -227,21 +227,21 @@ function stripHtml(input: string) {
 
 function compactBootstrapPayload(payload: any) {
   if (!payload || typeof payload !== "object") return payload;
-  const news = Array.isArray(payload.news) ? payload.news.slice(0, 40) : [];
-  const social = Array.isArray(payload.social) ? payload.social.slice(0, 48) : [];
-  const whales = Array.isArray(payload.whales) ? payload.whales.slice(0, 24) : [];
-  const whaleEvents = Array.isArray(payload.whaleEvents) ? payload.whaleEvents.slice(0, 24) : [];
+  const news = Array.isArray(payload.news) ? payload.news.slice(0, 32) : [];
+  const social = Array.isArray(payload.social) ? payload.social.slice(0, 36) : [];
+  const whales = Array.isArray(payload.whales) ? payload.whales.slice(0, 20) : [];
   const liquidations = Array.isArray(payload.liquidations) ? payload.liquidations.slice(0, 40) : [];
-  const discovery = Array.isArray(payload.discovery) ? payload.discovery.slice(0, 50) : [];
+  const discovery: any[] = [];
   const snapshotItems = Array.isArray(payload?.newsSnapshot?.items) ? payload.newsSnapshot.items.slice(0, 80) : [];
   return {
     ...payload,
     news,
     social,
     whales,
-    whaleEvents,
+    whaleEvents: [],
     liquidations,
     discovery,
+    coinMetadata: {},
     newsSnapshot: payload.newsSnapshot
       ? {
           ...payload.newsSnapshot,
