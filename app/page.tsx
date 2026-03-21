@@ -30,41 +30,41 @@ const stagger = {
 
 const STATS = [
   { value: "4",    label: "Exchanges" },
-  { value: "AI",   label: "Powered" },
-  { value: "Low",  label: "Latency" },
-  { value: "Free", label: "Always" },
+  { value: "News+AI", label: "Decision Flow" },
+  { value: "Live", label: "Market Feed" },
+  { value: "Free", label: "Access" },
 ];
 
 const FEATURES = [
   {
     icon: Newspaper,
-    title: "News-First Workflow",
-    desc: "Real-time crypto news from 15+ sources, filtered by sentiment and relevance. Trade the news before the crowd.",
+    title: "Breaking News, Ranked Fast",
+    desc: "See market-moving headlines in real time, ranked by relevance so you can react before momentum fades.",
   },
   {
     icon: Zap,
-    title: "Multi-Exchange Trading",
-    desc: "Trade on Hyperliquid, Binance, OKX, and Bybit from a single interface with unified position management.",
+    title: "Execution Across 4 Venues",
+    desc: "Trade Hyperliquid, Binance, OKX, and Bybit from one terminal with the same workflow.",
   },
   {
     icon: Bot,
-    title: "AI Market Analysis",
-    desc: "Groq-powered AI assistant analyzes headlines, summarizes market conditions, and suggests trade setups in real time.",
+    title: "AI Context in Seconds",
+    desc: "Turn raw headlines into clear market context, key risks, and actionable trade direction.",
   },
   {
     icon: BarChart2,
-    title: "Advanced Screener",
-    desc: "Screen 100+ pairs with RSI-14, Open Interest, Long/Short ratio, and 24h volume — all computed live.",
+    title: "Screener Built for Entries",
+    desc: "Scan liquid pairs with RSI, open interest, long/short pressure, and volume to find setups faster.",
   },
   {
     icon: Shield,
-    title: "Risk Management",
-    desc: "TP/SL inputs sync to chart lines. R/R ratio calculated automatically. Liquidation price always visible.",
+    title: "Risk Controls at Order Time",
+    desc: "Set TP/SL, see risk-reward instantly, and keep liquidation visibility before you confirm the trade.",
   },
   {
     icon: Globe,
-    title: "On-Chain Intelligence",
-    desc: "Whale alerts, DeFi TVL, mempool stats, Fear & Greed index, and halving countdown in the stats bar.",
+    title: "Market Intelligence in One View",
+    desc: "Track whales, sentiment, macro metrics, and flow signals without switching between tools.",
   },
 ];
 
@@ -127,14 +127,14 @@ export default function LandingPage() {
             variants={fadeUp}
             className="font-mono text-[10px] tracking-[0.2em] text-[#F2B705] uppercase"
           >
-            Real-Time Crypto Intelligence
+            Real-Time News Trading Terminal
           </motion.p>
 
           <motion.h1
             variants={fadeUp}
             className="text-4xl font-bold leading-tight tracking-tight text-[#FFFFFF] sm:text-5xl md:text-6xl"
           >
-            Crypto Terminal for<br />News + AI Signals
+            Trade Crypto News<br />Before the Repricing
           </motion.h1>
 
           <motion.p
@@ -153,7 +153,7 @@ export default function LandingPage() {
               href="/terminal"
               className="flex items-center gap-2 rounded-lg bg-[#F2B705] px-6 py-3 text-[13px] font-semibold text-[#0B0B0B] transition-opacity hover:opacity-90"
             >
-              Open Terminal <ArrowRight size={15} />
+              Open Live Terminal <ArrowRight size={15} />
             </Link>
             <a
               href="https://t.me/traderbross"
@@ -161,7 +161,7 @@ export default function LandingPage() {
               rel="noreferrer"
               className="flex items-center gap-2 rounded-lg border border-[rgba(242,183,5,0.2)] px-6 py-3 text-[13px] font-medium text-[#A0A0A0] transition-colors hover:border-[rgba(242,183,5,0.4)] hover:text-[#FFFFFF]"
             >
-              <Send size={14} /> Get Live Alerts
+              <Send size={14} /> Get News Alerts
             </a>
           </motion.div>
 
@@ -200,7 +200,7 @@ export default function LandingPage() {
             Features
           </p>
           <h2 className="mt-2 text-2xl font-bold text-[#FFFFFF] sm:text-3xl">
-            Everything you need to trade smarter
+            Why Active Crypto Traders Use TraderBross
           </h2>
         </motion.div>
 
@@ -242,10 +242,10 @@ export default function LandingPage() {
               AI Assistant
             </p>
             <h2 className="mt-2 text-2xl font-bold text-[#FFFFFF]">
-              Market analysis, on demand
+              Fast Analysis You Can Trade On
             </h2>
             <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.15em] text-[#6B6B6B]">
-              ★ Example conversation — not live data
+              Sample output — not live data
             </p>
           </motion.div>
 
@@ -290,7 +290,7 @@ export default function LandingPage() {
               href="/terminal"
               className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#F2B705] hover:underline"
             >
-              Try it live in the terminal <ChevronRight size={14} />
+              Open Terminal and Test It Live <ChevronRight size={14} />
             </Link>
           </motion.div>
         </div>
@@ -306,10 +306,10 @@ export default function LandingPage() {
           className="mx-auto max-w-lg px-4"
         >
           <h2 className="text-2xl font-bold text-[#FFFFFF] sm:text-3xl">
-            Start trading smarter today
+            Turn Headlines Into Trades Faster
           </h2>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-            {["Free forever", "No sign-up required", "4 exchanges"].map(
+            {["Live market feed", "AI trade context", "4 exchanges"].map(
               (pill) => (
                 <span
                   key={pill}
@@ -324,10 +324,12 @@ export default function LandingPage() {
             href="/terminal"
             className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#F2B705] px-8 py-3.5 text-[13px] font-semibold text-[#0B0B0B] transition-opacity hover:opacity-90"
           >
-            Open Terminal — Free <ArrowRight size={15} />
+            Start Trading Smarter <ArrowRight size={15} />
           </Link>
         </motion.div>
       </section>
     </PageWrapper>
   );
 }
+
+
