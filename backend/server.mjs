@@ -1187,7 +1187,7 @@ const server = http.createServer(async (request, reply) => {
           method,
           headers,
           body: bodyStr || undefined,
-          signal: AbortSignal.timeout(10_000),
+          signal: AbortSignal.timeout(8_000),
         });
         const data = await res.json();
         if (!res.ok || data?.code !== "0") {
@@ -1473,9 +1473,12 @@ const server = http.createServer(async (request, reply) => {
           return;
         }
         if (body.type === "order") {
-          const ticker = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${encodeURIComponent(instId)}`, {
-            signal: AbortSignal.timeout(5000),
-          }).then((r) => r.json());
+          const [ticker, contractValue] = await Promise.all([
+            fetch(`https://www.okx.com/api/v5/market/ticker?instId=${encodeURIComponent(instId)}`, {
+              signal: AbortSignal.timeout(3500),
+            }).then((r) => r.json()),
+            getOkxContractValue(instId),
+          ]);
           const markPrice = parseFloat(ticker?.data?.[0]?.last || "0");
           const marginAmount = finitePositiveNumber(body.marginAmount);
           const leverage = Math.max(1, Math.min(100, Math.round(Number(body.leverage) || 1)));
@@ -1483,19 +1486,38 @@ const server = http.createServer(async (request, reply) => {
             json(reply, 400, { ok: false, error: "Invalid margin amount or mark price." });
             return;
           }
-          const inst = await fetch(`https://www.okx.com/api/v5/public/instruments?instType=SWAP&instId=${encodeURIComponent(instId)}`, {
-            signal: AbortSignal.timeout(5000),
-          }).then((r) => r.json());
-          const ctVal = parseFloat(inst?.data?.[0]?.ctVal || "1");
+          const ctVal = Number(contractValue || 1);
           const rawSz = (marginAmount * leverage) / Math.max(1e-9, markPrice * ctVal);
           const sz = rawSz >= 100 ? rawSz.toFixed(0) : rawSz >= 1 ? rawSz.toFixed(2) : rawSz.toFixed(3);
+          const tp = finitePositiveNumber(body.tpPrice);
+          const sl = finitePositiveNumber(body.slPrice);
+          const side = body.side === "short" ? "sell" : "buy";
+          const isShort = side === "sell";
+          if (tp && (!isShort ? tp <= markPrice : tp >= markPrice)) {
+            json(reply, 400, { ok: false, error: "TP must be above mark for long and below mark for short." });
+            return;
+          }
+          if (sl && (!isShort ? sl >= markPrice : sl <= markPrice)) {
+            json(reply, 400, { ok: false, error: "SL must be below mark for long and above mark for short." });
+            return;
+          }
+          const attachAlgoOrds =
+            tp || sl
+              ? [
+                  {
+                    ...(tp ? { tpTriggerPx: String(tp), tpOrdPx: "-1", tpTriggerPxType: "last" } : {}),
+                    ...(sl ? { slTriggerPx: String(sl), slOrdPx: "-1", slTriggerPxType: "last" } : {}),
+                  },
+                ]
+              : undefined;
           const result = await requestOkx("POST", "/api/v5/trade/order", {
             instId,
             tdMode: body.marginMode === "cross" ? "cross" : "isolated",
-            side: body.side === "short" ? "sell" : "buy",
+            side,
             ordType: body.orderType === "limit" ? "limit" : "market",
             sz,
             ...(body.orderType === "limit" && body.limitPrice ? { px: String(body.limitPrice) } : {}),
+            ...(attachAlgoOrds ? { attachAlgoOrds } : {}),
           });
           json(reply, 200, { ok: true, data: result });
           return;

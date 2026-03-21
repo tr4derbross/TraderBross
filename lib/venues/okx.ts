@@ -120,23 +120,30 @@ export const okxAdapter: VenueAdapter = {
     }
   },
   placeOrder: async (input, connection) => {
-    const res = await fetch(buildApiUrl("/api/okx/order"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: "order",
-        symbol: input.symbol,
-        side: input.side,
-        orderType: input.type,
-        marginAmount: input.marginAmount,
-        leverage: input.leverage,
-        marginMode: input.marginMode,
-        limitPrice: input.limitPrice,
-        sessionToken: connection?.sessionToken,
-      }),
-    });
-    const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };
-    return data.ok ? { ok: true, message: "Order submitted to OKX." } : { ok: false, message: data.error || `HTTP ${res.status}` };
+    try {
+      const res = await fetch(buildApiUrl("/api/okx/order"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(12_000),
+        body: JSON.stringify({
+          type: "order",
+          symbol: input.symbol,
+          side: input.side,
+          orderType: input.type,
+          marginAmount: input.marginAmount,
+          leverage: input.leverage,
+          marginMode: input.marginMode,
+          limitPrice: input.limitPrice,
+          tpPrice: input.tpPrice,
+          slPrice: input.slPrice,
+          sessionToken: connection?.sessionToken,
+        }),
+      });
+      const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };
+      return data.ok ? { ok: true, message: "Order submitted to OKX." } : { ok: false, message: data.error || `HTTP ${res.status}` };
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : "OKX request timeout." };
+    }
   },
   cancelOrder: async (orderId, connection) => {
     const [symbol, oid] = orderId.split(":");

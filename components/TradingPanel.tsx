@@ -377,17 +377,25 @@ export default function TradingPanel({
     setSubmitState("submitting");
     setSubmitMessage("");
 
-    const result = await onPlaceOrder(
-      ticker,
-      side,
-      ticketType,
-      margin,
-      leverage,
-      marginMode,
-      ticketType === "market" ? undefined : parseFloat(limitPrice) || undefined,
-      tpEnabled ? parseFloat(tpPrice) || undefined : undefined,
-      slEnabled ? parseFloat(slPrice) || undefined : undefined
-    );
+    let result: SubmitResult;
+    try {
+      result = await onPlaceOrder(
+        ticker,
+        side,
+        ticketType,
+        margin,
+        leverage,
+        marginMode,
+        ticketType === "market" ? undefined : parseFloat(limitPrice) || undefined,
+        tpEnabled ? parseFloat(tpPrice) || undefined : undefined,
+        slEnabled ? parseFloat(slPrice) || undefined : undefined
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Order request failed.";
+      setSubmitState("failure");
+      setSubmitMessage(message);
+      return;
+    }
 
     if (result.ok) {
       setSubmitState("success");

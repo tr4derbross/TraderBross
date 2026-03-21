@@ -936,19 +936,25 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
       const connection = buildActiveVenueConnection();
 
-      const result = await adapter.placeOrder(
-        {
-          symbol: ticker,
-          side,
-          type,
-          marginAmount,
-          leverage,
-          limitPrice,
-          tpPrice,
-          slPrice,
-        },
-        connection
-      );
+      let result;
+      try {
+        result = await adapter.placeOrder(
+          {
+            symbol: ticker,
+            side,
+            type,
+            marginAmount,
+            leverage,
+            limitPrice,
+            tpPrice,
+            slPrice,
+          },
+          connection
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Order request failed.";
+        return { ok: false, message };
+      }
 
       if (result.ok) {
         // Trigger a positions refresh ~2s after the order is accepted
