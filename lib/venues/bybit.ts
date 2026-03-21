@@ -1,11 +1,9 @@
 import type { VenueAdapter } from "@/lib/venues/types";
+import { buildApiUrl } from "@/lib/runtime-env";
 import {
   createPollingSubscribe,
-  emptyBalance,
-  emptyPositions,
   fetchJson,
   normalizeQuoteTicker,
-  notEnabledAction,
 } from "@/lib/venues/shared";
 
 const PERP_MAP: Record<string, string> = {
@@ -70,23 +68,110 @@ export const bybitAdapter: VenueAdapter = {
   id: "bybit",
   venueType: "cex",
   marketDataLabel: "Bybit Linear",
-  supportsOrderPlacement: false,
+  supportsOrderPlacement: true,
   getTicker,
   subscribeTicker,
-  getBalance: emptyBalance,
-  getPositions: emptyPositions,
-  placeOrder: notEnabledAction("Bybit execution is not enabled yet."),
-  cancelOrder: notEnabledAction("Bybit execution is not enabled yet."),
-  setLeverage: notEnabledAction("Bybit leverage configuration is not enabled yet."),
-  setMarginMode: notEnabledAction("Bybit margin mode configuration is not enabled yet."),
+  getBalance: async (connection) => {
+    const token = connection?.sessionToken;
+    if (!token) return null;
+    try {
+      const data = await fetchJson<{ total: number; available: number; currency: string }>("/api/bybit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "balance", sessionToken: token }),
+      });
+      return { total: data.total, available: data.available, currency: data.currency };
+    } catch {
+      return null;
+    }
+  },
+  getPositions: async (connection) => {
+    const token = connection?.sessionToken;
+    if (!token) return [];
+    try {
+      const data = await fetchJson<{
+        positions: Array<{
+          coin: string;
+          side: "long" | "short";
+          size: number;
+          entryPx: number;
+          pnl: number;
+          liquidationPx: number | null;
+          leverage: number;
+          marginMode: "isolated" | "cross";
+        }>;
+      }>("/api/bybit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "positions", sessionToken: token }),
+      });
+      return data.positions.map((p) => ({
+        symbol: p.coin,
+        side: p.side,
+        size: p.size,
+        entryPrice: p.entryPx,
+        pnl: p.pnl,
+        liquidationPrice: p.liquidationPx,
+        leverage: p.leverage,
+        marginMode: p.marginMode,
+      }));
+    } catch {
+      return [];
+    }
+  },
+  placeOrder: async (input, connection) => {
+    const res = await fetch(buildApiUrl("/api/bybit/order"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "order",
+        symbol: input.symbol,
+        side: input.side,
+        orderType: input.type,
+        marginAmount: input.marginAmount,
+        leverage: input.leverage,
+        marginMode: input.marginMode,
+        limitPrice: input.limitPrice,
+        sessionToken: connection?.sessionToken,
+      }),
+    });
+    const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };
+    return data.ok ? { ok: true, message: "Order submitted to Bybit." } : { ok: false, message: data.error || `HTTP ${res.status}` };
+  },
+  cancelOrder: async (orderId, connection) => {
+    const [symbol, oid] = orderId.split(":");
+    const res = await fetch(buildApiUrl("/api/bybit/order"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "cancel", symbol, orderId: oid, sessionToken: connection?.sessionToken }),
+    });
+    const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };
+    return data.ok ? { ok: true, message: "Order cancelled on Bybit." } : { ok: false, message: data.error || `HTTP ${res.status}` };
+  },
+  setLeverage: async (input, connection) => {
+    const res = await fetch(buildApiUrl("/api/bybit/order"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "leverage", symbol: input.symbol, leverage: input.leverage, sessionToken: connection?.sessionToken }),
+    });
+    const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };
+    return data.ok ? { ok: true, message: "Bybit leverage updated." } : { ok: false, message: data.error || `HTTP ${res.status}` };
+  },
+  setMarginMode: async (input, connection) => {
+    const res = await fetch(buildApiUrl("/api/bybit/order"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "marginType", symbol: input.symbol, marginMode: input.marginMode, sessionToken: connection?.sessionToken }),
+    });
+    const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };
+    return data.ok ? { ok: true, message: "Bybit margin mode updated." } : { ok: false, message: data.error || `HTTP ${res.status}` };
+  },
   testConnection: async (connection) =>
     fetchJson("/api/venues/validate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(
-        connection?.sessionToken
-          ? { venueId: "bybit", sessionToken: connection.sessionToken }
-          : { venueId: "bybit", apiKey: connection?.apiKey, apiSecret: connection?.apiSecret }
+        connection?.sessionToken ? { venueId: "bybit", sessionToken: connection.sessionToken } : {}
       ),
     }),
 };
