@@ -904,8 +904,15 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   }, [setActiveSymbol, tradableSet]);
 
   const buildActiveVenueConnection = useCallback((): VenueConnectionInput | undefined => {
-    if (activeVenueState.venueType === "cex" && selectedHeaderCexPlatform) {
-      const token = vaultTokens[selectedHeaderCexPlatform];
+    if (activeVenueState.venueType === "cex") {
+      const activeCexPlatform =
+        activeVenueState.venueId === "binance" ||
+        activeVenueState.venueId === "okx" ||
+        activeVenueState.venueId === "bybit"
+          ? activeVenueState.venueId
+          : null;
+      if (!activeCexPlatform) return undefined;
+      const token = vaultTokens[activeCexPlatform];
       if (token) {
         // Preferred: vault token — raw keys stay on the server
         return { sessionToken: token };
@@ -934,8 +941,6 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     headerConnection.walletLabel,
     hlVaultToken,
     hlWallet,
-    selectedHeaderCexPlatform,
-    selectedHeaderCredentials,
     vaultTokens,
   ]);
 
@@ -1018,6 +1023,10 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         if (pos) {
           const connection = buildActiveVenueConnection();
           const venueId = activeVenueState.venueId;
+          if ((venueId === "binance" || venueId === "okx" || venueId === "bybit") && !connection?.sessionToken) {
+            window.alert(`No API session for active venue (${venueId.toUpperCase()}). Reconnect this exchange first.`);
+            return;
+          }
           const orderEndpoint =
             venueId === "binance" || venueId === "okx" || venueId === "bybit" || venueId === "hyperliquid"
               ? `/api/${venueId}/order`
@@ -1069,6 +1078,10 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         if (pos) {
           const connection = buildActiveVenueConnection();
           const venueId = activeVenueState.venueId;
+          if ((venueId === "binance" || venueId === "okx" || venueId === "bybit") && !connection?.sessionToken) {
+            window.alert(`No API session for active venue (${venueId.toUpperCase()}). Reconnect this exchange first.`);
+            return;
+          }
           const orderEndpoint =
             venueId === "binance" || venueId === "okx" || venueId === "bybit" || venueId === "hyperliquid"
               ? `/api/${venueId}/order`
