@@ -344,6 +344,79 @@ function buildEmergencyScreenerFromQuotes(quotes: Array<{ symbol: string; price:
   return rows.sort((a, b) => b.volume24h - a.volume24h);
 }
 
+function normalizeSymbols(input: unknown) {
+  return Array.from(
+    new Set(
+      (Array.isArray(input) ? input : [])
+        .map((row) =>
+          String(row || "")
+            .toUpperCase()
+            .replace(/[^A-Z0-9]/g, "")
+            .replace(/(USDT|USDC|USD|PERP|SWAP)$/i, ""),
+        )
+        .filter(Boolean),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+}
+
+async function fetchEmergencyVenueSymbols(venueId: string, quoteAsset: string) {
+  const venue = String(venueId || "binance").toLowerCase();
+  const quote = String(quoteAsset || "USDT").toUpperCase() === "USDC" ? "USDC" : "USDT";
+
+  if (venue === "okx") {
+    const payload = await fetch("https://www.okx.com/api/v5/public/instruments?instType=SWAP", {
+      cache: "no-store",
+      signal: AbortSignal.timeout(9000),
+    }).then((res) => res.json());
+    return normalizeSymbols(
+      (payload?.data || [])
+        .filter((row: any) => row?.state === "live" && String(row?.instId || "").includes(`-${quote}-SWAP`))
+        .map((row: any) => String(row?.instId || "").split("-")[0]),
+    );
+  }
+
+  if (venue === "bybit") {
+    const payload = await fetch("https://api.bybit.com/v5/market/instruments-info?category=linear&limit=1000", {
+      cache: "no-store",
+      signal: AbortSignal.timeout(9000),
+    }).then((res) => res.json());
+    return normalizeSymbols(
+      (payload?.result?.list || [])
+        .filter((row: any) => row?.status === "Trading" && String(row?.symbol || "").endsWith(quote))
+        .map((row: any) => String(row?.baseCoin || row?.symbol || "").replace(new RegExp(`${quote}$`, "i"), "")),
+    );
+  }
+
+  if (venue === "hyperliquid") {
+    const payload = await fetch("https://api.hyperliquid.xyz/info", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "meta" }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(9000),
+    }).then((res) => res.json());
+    return normalizeSymbols((payload?.universe || []).map((row: any) => row?.name || ""));
+  }
+
+  if (venue === "dydx") {
+    const payload = await fetch("https://indexer.dydx.trade/v4/perpetualMarkets", {
+      cache: "no-store",
+      signal: AbortSignal.timeout(9000),
+    }).then((res) => res.json());
+    return normalizeSymbols(Object.keys(payload?.markets || {}).map((market) => String(market).split("-")[0]));
+  }
+
+  const payload = await fetch("https://fapi.binance.com/fapi/v1/exchangeInfo", {
+    cache: "no-store",
+    signal: AbortSignal.timeout(9000),
+  }).then((res) => res.json());
+  return normalizeSymbols(
+    (payload?.symbols || [])
+      .filter((row: any) => row?.status === "TRADING" && row?.contractType === "PERPETUAL" && String(row?.symbol || "").endsWith(quote))
+      .map((row: any) => String(row?.baseAsset || row?.symbol || "").replace(new RegExp(`${quote}$`, "i"), "")),
+  );
+}
+
 async function emergencyResponse(path: string[], request: NextRequest) {
   const key = (path?.[0] || "").toLowerCase();
   const cacheKey = `${key}:${request.nextUrl.searchParams.toString()}`;
@@ -429,6 +502,17 @@ async function emergencyResponse(path: string[], request: NextRequest) {
     return json(payload);
   }
   if (key === "venues" && (path?.[1] || "").toLowerCase() === "symbols") {
+    const venue = request.nextUrl.searchParams.get("venue") || "binance";
+    const quote = request.nextUrl.searchParams.get("quote") || "USDT";
+    try {
+      const symbols = await fetchEmergencyVenueSymbols(venue, quote);
+      if (Array.isArray(symbols) && symbols.length > 0) {
+        writeEmergencyCache(cacheKey, symbols, 60_000);
+        return json(symbols);
+      }
+    } catch {
+      // fall through to curated core set
+    }
     return json(["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "AVAX", "LINK", "DOT", "ADA", "TRX"]);
   }
   if (key === "health") {
