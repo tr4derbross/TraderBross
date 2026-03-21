@@ -39,3 +39,11 @@ jobs:
 
       - name: Security smoke check
         run: BACKEND_BASE_URL=http://127.0.0.1:4001 npm run security:smoke
+
+      - name: Start frontend
+        run: |
+          nohup npm run start > frontend.log 2>&1 &
+          sleep 6
+
+      - name: Terminal E2E flow
+        run: FRONTEND_BASE_URL=http://127.0.0.1:3000 npm run e2e:terminal

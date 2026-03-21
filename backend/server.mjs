@@ -22,14 +22,15 @@ import { clearSecret, getSecret, storeSecret } from "./services/vault-service.mj
 import { createTerminalDataService } from "./data/terminal-data-service.mjs";
 import { CORE_SYMBOLS, canonicalSymbol, symbolAliases } from "./data/core/symbol-map.mjs";
 import { MemoryCache } from "./services/cache.mjs";
+import { createRateLimiter } from "./services/rate-limiter.mjs";
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel);
 const terminalData = createTerminalDataService({ config, logger });
 const endpointCache = new MemoryCache();
 const clients = new Set();
-const endpointRateWindows = new Map();
 let bootstrapRefreshInFlight = false;
+const rateLimiter = createRateLimiter(config, logger);
 const SENSITIVE_ROUTES = new Set([
   "/api/vault/store",
   "/api/vault/clear",
@@ -119,22 +120,8 @@ function getClientIp(request) {
   return String(raw).split(",")[0].trim();
 }
 
-function consumeRateLimit(key, limit, windowMs) {
-  const now = Date.now();
-  const existing = endpointRateWindows.get(key);
-  if (!existing || existing.resetAt <= now) {
-    endpointRateWindows.set(key, { count: 1, resetAt: now + windowMs });
-    return true;
-  }
-  if (existing.count >= limit) {
-    return false;
-  }
-  existing.count += 1;
-  return true;
-}
-
-function enforceRateLimit(reply, key, limit, windowMs) {
-  if (!consumeRateLimit(key, limit, windowMs)) {
+async function enforceRateLimit(reply, key, limit, windowMs) {
+  if (!(await rateLimiter.consume(key, limit, windowMs))) {
     json(reply, 429, { error: "Too many requests. Please try again shortly." });
     return false;
   }
@@ -528,7 +515,7 @@ const server = http.createServer(async (request, reply) => {
 
     if (isSensitiveRoute) {
       const key = `${clientIp}:${url.pathname}:${request.method}`;
-      if (!enforceRateLimit(reply, key, 40, 60_000)) {
+      if (!(await enforceRateLimit(reply, key, 40, 60_000))) {
         return;
       }
     }
