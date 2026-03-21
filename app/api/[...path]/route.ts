@@ -590,6 +590,7 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
     headers: cloneHeaders(request),
     redirect: "manual",
     cache: "no-store",
+    signal: AbortSignal.timeout(method === "GET" || method === "HEAD" ? 6000 : 10000),
   };
   const headers = init.headers as Headers;
   headers.set("x-traderbross-proxy", "1");
