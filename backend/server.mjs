@@ -193,6 +193,27 @@ function finitePositiveNumber(value) {
   return parsed;
 }
 
+async function getOkxContractValue(instId) {
+  if (!instId) return 1;
+  try {
+    const meta = await endpointCache.remember(`okx:inst-meta:${instId}`, 6 * 60 * 60 * 1000, async () => {
+      const res = await fetch(
+        `https://www.okx.com/api/v5/public/instruments?instType=SWAP&instId=${encodeURIComponent(instId)}`,
+        { signal: AbortSignal.timeout(5000) },
+      );
+      const data = await res.json();
+      const row = Array.isArray(data?.data) ? data.data[0] : null;
+      return {
+        ctVal: parseFloat(row?.ctVal || "1") || 1,
+        ctMult: parseFloat(row?.ctMult || "1") || 1,
+      };
+    });
+    return (meta?.ctVal || 1) * (meta?.ctMult || 1);
+  } catch {
+    return 1;
+  }
+}
+
 function toBaseSymbol(value) {
   return String(value || "")
     .toUpperCase()
@@ -1186,23 +1207,35 @@ const server = http.createServer(async (request, reply) => {
         }
         if (body.type === "positions") {
           const data = await requestOkx("GET", "/api/v5/account/positions?instType=SWAP");
-          const positions = (Array.isArray(data?.data) ? data.data : [])
-            .filter((row) => Math.abs(parseFloat(row.pos || "0")) > 0)
-            .map((row) => {
-              const size = Math.abs(parseFloat(row.pos || "0"));
-              const symbol = String(row.instId || "").split("-")[0] || "BTC";
-              const side = String(row.posSide || row.direction || "").toLowerCase() === "short" ? "short" : "long";
-              return {
-                coin: symbol,
-                side,
-                size,
-                entryPx: parseFloat(row.avgPx || "0"),
-                pnl: parseFloat(row.upl || "0"),
-                liquidationPx: parseFloat(row.liqPx || "0") || null,
-                leverage: parseInt(row.lever || "1", 10) || 1,
-                marginMode: String(row.mgnMode || "").toLowerCase() === "cross" ? "cross" : "isolated",
-              };
-            });
+          const rows = (Array.isArray(data?.data) ? data.data : [])
+            .filter((row) => Math.abs(parseFloat(row.pos || "0")) > 0);
+          const instIds = Array.from(new Set(rows.map((row) => String(row.instId || "")).filter(Boolean)));
+          const contractValueMap = new Map();
+          await Promise.all(
+            instIds.map(async (instId) => {
+              contractValueMap.set(instId, await getOkxContractValue(instId));
+            }),
+          );
+
+          const positions = rows.map((row) => {
+            const contracts = Math.abs(parseFloat(row.pos || "0"));
+            const instId = String(row.instId || "");
+            const contractValue = Number(contractValueMap.get(instId) || 1);
+            // OKX reports `pos` in contracts. Convert to base-asset quantity for UI parity.
+            const size = contracts * contractValue;
+            const symbol = instId.split("-")[0] || "BTC";
+            const side = String(row.posSide || row.direction || "").toLowerCase() === "short" ? "short" : "long";
+            return {
+              coin: symbol,
+              side,
+              size,
+              entryPx: parseFloat(row.avgPx || "0"),
+              pnl: parseFloat(row.upl || "0"),
+              liquidationPx: parseFloat(row.liqPx || "0") || null,
+              leverage: parseInt(row.lever || "1", 10) || 1,
+              marginMode: String(row.mgnMode || "").toLowerCase() === "cross" ? "cross" : "isolated",
+            };
+          });
           json(reply, 200, { positions });
           return;
         }
