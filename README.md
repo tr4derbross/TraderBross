@@ -143,6 +143,7 @@ pm2 save
 ```bash
 npm run ops:health
 npm run security:smoke
+npm run ops:go-live
 ```
 
 Optionally target a specific backend:
@@ -150,11 +151,13 @@ Optionally target a specific backend:
 ```bash
 BACKEND_BASE_URL=https://your-backend.example.com npm run ops:health
 BACKEND_BASE_URL=https://your-backend.example.com npm run security:smoke
+FRONTEND_BASE_URL=https://your-frontend.example.com BACKEND_BASE_URL=https://your-backend.example.com npm run ops:go-live
 ```
 
 ## Runbooks
 
 - [Go-Live Checklist](./GO_LIVE_CHECKLIST.md)
+- [Staging Acceptance Checklist](./docs/STAGING_ACCEPTANCE_CHECKLIST.md)
 - [Incident Response](./docs/INCIDENT_RESPONSE_RUNBOOK.md)
 - [Rollback Runbook](./docs/ROLLBACK_RUNBOOK.md)
 - [Monitoring and Alerts](./docs/MONITORING_AND_ALERTS.md)
