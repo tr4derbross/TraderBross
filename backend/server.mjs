@@ -199,6 +199,80 @@ function toWireDecimal(value, precision = 8) {
   return trimmed === "" || trimmed === "-0" ? "0" : trimmed;
 }
 
+function decimalPlacesFromStep(stepValue) {
+  const step = String(stepValue || "1");
+  if (!step.includes(".")) return 0;
+  return step.replace(/0+$/, "").split(".")[1]?.length || 0;
+}
+
+function floorToStep(value, step, precision = 8) {
+  const num = Number(value);
+  const size = Number(step);
+  if (!Number.isFinite(num) || !Number.isFinite(size) || size <= 0) return null;
+  const floored = Math.floor(num / size) * size;
+  if (floored <= 0) return null;
+  return Number(floored.toFixed(Math.max(0, precision)));
+}
+
+async function getBinanceExchangeInfo(baseUrl) {
+  const cacheKey = `binance:exchangeInfo:${baseUrl}`;
+  return endpointCache.remember(cacheKey, 10 * 60_000, async () => {
+    const res = await fetch(`${baseUrl}/fapi/v1/exchangeInfo`, { signal: AbortSignal.timeout(8000) });
+    const payload = await res.json();
+    if (!res.ok) {
+      throw new Error(payload?.msg || `Binance exchangeInfo error ${res.status}`);
+    }
+    return payload;
+  });
+}
+
+async function getBinanceSymbolSpec(baseUrl, symbol) {
+  const info = await getBinanceExchangeInfo(baseUrl);
+  const row = Array.isArray(info?.symbols)
+    ? info.symbols.find((item) => String(item?.symbol || "").toUpperCase() === String(symbol || "").toUpperCase())
+    : null;
+  if (!row) return null;
+  const lotFilter = Array.isArray(row.filters)
+    ? row.filters.find((f) => f?.filterType === "LOT_SIZE")
+    : null;
+  const priceFilter = Array.isArray(row.filters)
+    ? row.filters.find((f) => f?.filterType === "PRICE_FILTER")
+    : null;
+  const stepSize = Number(lotFilter?.stepSize || "0");
+  const minQty = Number(lotFilter?.minQty || "0");
+  const tickSize = Number(priceFilter?.tickSize || "0");
+  return {
+    stepSize: Number.isFinite(stepSize) && stepSize > 0 ? stepSize : null,
+    minQty: Number.isFinite(minQty) && minQty > 0 ? minQty : null,
+    tickSize: Number.isFinite(tickSize) && tickSize > 0 ? tickSize : null,
+    qtyPrecision: Number(row?.quantityPrecision || 3),
+    pricePrecision: Number(row?.pricePrecision || 6),
+  };
+}
+
+async function normalizeBinanceQuantity(baseUrl, symbol, value) {
+  const spec = await getBinanceSymbolSpec(baseUrl, symbol);
+  const qty = Number(value);
+  if (!Number.isFinite(qty) || qty <= 0) return null;
+  if (!spec?.stepSize) return toWireDecimal(qty, 6);
+  const precision = Math.max(spec.qtyPrecision || 0, decimalPlacesFromStep(spec.stepSize));
+  const floored = floorToStep(qty, spec.stepSize, precision);
+  if (!floored) return null;
+  if (spec.minQty && floored < spec.minQty) return null;
+  return toWireDecimal(floored, precision);
+}
+
+async function normalizeBinancePrice(baseUrl, symbol, value) {
+  const spec = await getBinanceSymbolSpec(baseUrl, symbol);
+  const price = Number(value);
+  if (!Number.isFinite(price) || price <= 0) return null;
+  if (!spec?.tickSize) return toWireDecimal(price, 6);
+  const precision = Math.max(spec.pricePrecision || 0, decimalPlacesFromStep(spec.tickSize));
+  const floored = floorToStep(price, spec.tickSize, precision);
+  if (!floored) return null;
+  return toWireDecimal(floored, precision);
+}
+
 function concatBytes(parts) {
   const total = parts.reduce((sum, part) => sum + part.length, 0);
   const merged = new Uint8Array(total);
@@ -1385,23 +1459,72 @@ const server = http.createServer(async (request, reply) => {
           return;
         }
         if (body.type === "positions") {
-          const qs = binanceSignedQuery(apiSecret);
-          const res = await fetch(`${base}/fapi/v2/positionRisk?${qs}`, { headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(8000) });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.msg || `Binance error ${res.status}`);
+          const [positionResp, openOrders] = await Promise.all([
+            (async () => {
+              const qs = binanceSignedQuery(apiSecret);
+              const res = await fetch(`${base}/fapi/v2/positionRisk?${qs}`, {
+                headers: { "X-MBX-APIKEY": apiKey },
+                signal: AbortSignal.timeout(8000),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.msg || `Binance error ${res.status}`);
+              return data;
+            })(),
+            (async () => {
+              try {
+                const qs = binanceSignedQuery(apiSecret);
+                const res = await fetch(`${base}/fapi/v1/openOrders?${qs}`, {
+                  headers: { "X-MBX-APIKEY": apiKey },
+                  signal: AbortSignal.timeout(5000),
+                });
+                const data = await res.json();
+                return Array.isArray(data) ? data : [];
+              } catch {
+                return [];
+              }
+            })(),
+          ]);
+          const tpslByKey = new Map();
+          for (const order of openOrders) {
+            const ordType = String(order?.type || "").toUpperCase();
+            if (ordType !== "STOP_MARKET" && ordType !== "TAKE_PROFIT_MARKET") continue;
+            const orderSymbol = String(order?.symbol || "");
+            if (!orderSymbol.endsWith("USDT") && !orderSymbol.endsWith("USDC")) continue;
+            const baseCoin = orderSymbol.replace(/USDT$|USDC$/i, "");
+            const closeSide = String(order?.side || "").toUpperCase();
+            const positionSide = closeSide === "SELL" ? "long" : "short";
+            const key = `${baseCoin}_${positionSide}`;
+            const current = tpslByKey.get(key) || {};
+            const trigger = finitePositiveNumber(order?.stopPrice);
+            if (!trigger) continue;
+            if (ordType === "TAKE_PROFIT_MARKET" && !current.tpPrice) {
+              current.tpPrice = trigger;
+            }
+            if (ordType === "STOP_MARKET" && !current.slPrice) {
+              current.slPrice = trigger;
+            }
+            tpslByKey.set(key, current);
+          }
+          const data = positionResp;
           const positions = data
             .filter((p) => parseFloat(p.positionAmt) !== 0)
             .map((p) => {
               const size = parseFloat(p.positionAmt);
+              const coin = p.symbol.replace(/USDT$/, "");
+              const side = size > 0 ? "long" : "short";
+              const key = `${coin}_${side}`;
+              const tpsl = tpslByKey.get(key) || {};
               return {
-                coin: p.symbol.replace(/USDT$/, ""),
-                side: size > 0 ? "long" : "short",
+                coin,
+                side,
                 size: Math.abs(size),
                 entryPx: parseFloat(p.entryPrice),
                 pnl: parseFloat(p.unRealizedProfit),
                 liquidationPx: parseFloat(p.liquidationPrice) || null,
                 leverage: parseInt(p.leverage) || 1,
                 marginMode: p.marginType === "cross" ? "cross" : "isolated",
+                tpPrice: tpsl.tpPrice,
+                slPrice: tpsl.slPrice,
               };
             });
           json(reply, 200, { positions });
@@ -1492,12 +1615,17 @@ const server = http.createServer(async (request, reply) => {
             return;
           }
           const closeQty = posAmt * (closePercent / 100);
+          const quantity = await normalizeBinanceQuantity(base, symbol, closeQty);
+          if (!quantity) {
+            json(reply, 400, { ok: false, error: "Close quantity is below minimum lot size for this contract." });
+            return;
+          }
 
           // 3. Market order with reduceOnly=true + exact quantity (closePosition=true is NOT valid for MARKET type)
           const closeSide = body.side === "long" ? "SELL" : "BUY";
           const result = await binancePost("/fapi/v1/order", {
             symbol, side: closeSide, type: "MARKET",
-            quantity: String(closeQty), reduceOnly: "true",
+            quantity, reduceOnly: "true",
           });
           json(reply, 200, { ok: true, data: result });
           return;
@@ -1507,16 +1635,26 @@ const server = http.createServer(async (request, reply) => {
           const tpslSide = body.side === "long" ? "SELL" : "BUY";
           const results = [];
           if (body.tpPrice) {
+            const normalizedTp = await normalizeBinancePrice(base, symbol, body.tpPrice);
+            if (!normalizedTp) {
+              json(reply, 400, { ok: false, error: "Invalid TP price." });
+              return;
+            }
             const r = await binancePost("/fapi/v1/order", {
               symbol, side: tpslSide, type: "TAKE_PROFIT_MARKET",
-              stopPrice: String(body.tpPrice), closePosition: "true", workingType: "CONTRACT_PRICE",
+              stopPrice: normalizedTp, closePosition: "true", workingType: "CONTRACT_PRICE",
             }).catch((e) => ({ error: String(e) }));
             results.push({ tp: r });
           }
           if (body.slPrice) {
+            const normalizedSl = await normalizeBinancePrice(base, symbol, body.slPrice);
+            if (!normalizedSl) {
+              json(reply, 400, { ok: false, error: "Invalid SL price." });
+              return;
+            }
             const r = await binancePost("/fapi/v1/order", {
               symbol, side: tpslSide, type: "STOP_MARKET",
-              stopPrice: String(body.slPrice), closePosition: "true", workingType: "CONTRACT_PRICE",
+              stopPrice: normalizedSl, closePosition: "true", workingType: "CONTRACT_PRICE",
             }).catch((e) => ({ error: String(e) }));
             results.push({ sl: r });
           }
@@ -1540,34 +1678,58 @@ const server = http.createServer(async (request, reply) => {
           const markPrice = parseFloat(mpData.markPrice || "0");
           if (!markPrice) throw new Error(`Could not fetch mark price for ${symbol}`);
           const qty = (marginAmount * leverage) / markPrice;
-          const quantity = qty >= 100 ? qty.toFixed(0) : qty >= 10 ? qty.toFixed(1) : qty >= 1 ? qty.toFixed(2) : qty.toFixed(3);
+          const quantity = await normalizeBinanceQuantity(base, symbol, qty);
+          if (!quantity) {
+            json(reply, 400, { ok: false, error: "Order size is below minimum lot size for this symbol." });
+            return;
+          }
           const side = body.side === "long" ? "BUY" : "SELL";
           const params = { symbol, side, quantity };
           if (body.orderType === "market") {
             params.type = "MARKET";
           } else if (body.orderType === "limit") {
+            const limitPrice = await normalizeBinancePrice(base, symbol, body.limitPrice);
+            if (!limitPrice) {
+              json(reply, 400, { ok: false, error: "Invalid limit price." });
+              return;
+            }
             params.type = "LIMIT";
-            params.price = String(body.limitPrice);
+            params.price = limitPrice;
             params.timeInForce = "GTC";
           } else {
+            const stopPrice = await normalizeBinancePrice(base, symbol, body.limitPrice);
+            if (!stopPrice) {
+              json(reply, 400, { ok: false, error: "Invalid stop price." });
+              return;
+            }
             params.type = "STOP_MARKET";
-            params.stopPrice = String(body.limitPrice);
+            params.stopPrice = stopPrice;
           }
           const result = await binancePost("/fapi/v1/order", params);
           // Place TP / SL conditional orders if provided
           const tpslSide = body.side === "long" ? "SELL" : "BUY";
           const tpslResults = [];
           if (body.tpPrice) {
+            const normalizedTp = await normalizeBinancePrice(base, symbol, body.tpPrice);
+            if (!normalizedTp) {
+              json(reply, 400, { ok: false, error: "Invalid TP price." });
+              return;
+            }
             const r = await binancePost("/fapi/v1/order", {
               symbol, side: tpslSide, type: "TAKE_PROFIT_MARKET",
-              stopPrice: String(body.tpPrice), closePosition: "true", workingType: "CONTRACT_PRICE",
+              stopPrice: normalizedTp, closePosition: "true", workingType: "CONTRACT_PRICE",
             }).catch((e) => ({ error: String(e) }));
             tpslResults.push({ tp: r });
           }
           if (body.slPrice) {
+            const normalizedSl = await normalizeBinancePrice(base, symbol, body.slPrice);
+            if (!normalizedSl) {
+              json(reply, 400, { ok: false, error: "Invalid SL price." });
+              return;
+            }
             const r = await binancePost("/fapi/v1/order", {
               symbol, side: tpslSide, type: "STOP_MARKET",
-              stopPrice: String(body.slPrice), closePosition: "true", workingType: "CONTRACT_PRICE",
+              stopPrice: normalizedSl, closePosition: "true", workingType: "CONTRACT_PRICE",
             }).catch((e) => ({ error: String(e) }));
             tpslResults.push({ sl: r });
           }
