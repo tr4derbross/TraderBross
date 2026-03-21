@@ -154,13 +154,10 @@ export async function getBybitQuotes() {
 export async function getOkxCandles(symbol, interval, limit, quoteAsset = "USDT") {
   const quote = String(quoteAsset || "USDT").toUpperCase() === "USDC" ? "USDC" : "USDT";
   const raw = String(symbol || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const instId = OKX_SYMBOLS[raw] || `${raw}-${quote}-SWAP`;
-
   const bar = { "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "1H", "4h": "4H", "1d": "1D", "1w": "1W", "1H": "1H", "4H": "4H", "1D": "1D", "1W": "1W" }[interval] || "1D";
   return cache.remember(`candles:okx:${symbol}:${quote}:${interval}:${limit}`, 12000, async () => {
-    try {
-      const payload = await fetchJson(`https://www.okx.com/api/v5/market/history-candles?instId=${instId}&bar=${bar}&limit=${limit}`, { timeoutMs: 3500 });
-      return (payload?.data || [])
+    const parseCandles = (payload) =>
+      (payload?.data || [])
         .map((entry) => ({
           time: Math.floor(Number(entry[0]) / 1000),
           open: Number(entry[1]),
@@ -170,6 +167,26 @@ export async function getOkxCandles(symbol, interval, limit, quoteAsset = "USDT"
           volume: Number(entry[5]),
         }))
         .reverse();
+
+    try {
+      const primaryInstId = OKX_SYMBOLS[raw] || `${raw}-${quote}-SWAP`;
+      const primaryPayload = await fetchJson(
+        `https://www.okx.com/api/v5/market/history-candles?instId=${primaryInstId}&bar=${bar}&limit=${limit}`,
+        { timeoutMs: 3500 },
+      );
+      const primary = parseCandles(primaryPayload);
+      if (primary.length > 0) return primary;
+
+      // If selected quote pair is unavailable, retry with the other major quote.
+      const fallbackQuote = quote === "USDC" ? "USDT" : "USDC";
+      const fallbackInstId = `${raw}-${fallbackQuote}-SWAP`;
+      const fallbackPayload = await fetchJson(
+        `https://www.okx.com/api/v5/market/history-candles?instId=${fallbackInstId}&bar=${bar}&limit=${limit}`,
+        { timeoutMs: 3500 },
+      );
+      const fallback = parseCandles(fallbackPayload);
+      if (fallback.length > 0) return fallback;
+      return [];
     } catch {
       return generateMockCandles(symbol, interval, limit);
     }
@@ -179,13 +196,10 @@ export async function getOkxCandles(symbol, interval, limit, quoteAsset = "USDT"
 export async function getBybitCandles(symbol, interval, limit, quoteAsset = "USDT") {
   const quote = String(quoteAsset || "USDT").toUpperCase() === "USDC" ? "USDC" : "USDT";
   const raw = String(symbol || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const venueSymbol = BYBIT_SYMBOLS[raw] || (raw.endsWith("USDT") || raw.endsWith("USDC") ? raw : `${raw}${quote}`);
-
   const bucket = { "1m": "1", "5m": "5", "15m": "15", "30m": "30", "1h": "60", "4h": "240", "1d": "D", "1w": "W" }[interval] || "D";
   return cache.remember(`candles:bybit:${symbol}:${quote}:${interval}:${limit}`, 12000, async () => {
-    try {
-      const payload = await fetchJson(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${venueSymbol}&interval=${bucket}&limit=${limit}`, { timeoutMs: 3500 });
-      return (payload?.result?.list || [])
+    const parseCandles = (payload) =>
+      (payload?.result?.list || [])
         .map((entry) => ({
           time: Math.floor(Number(entry[0]) / 1000),
           open: Number(entry[1]),
@@ -195,6 +209,24 @@ export async function getBybitCandles(symbol, interval, limit, quoteAsset = "USD
           volume: Number(entry[5]),
         }))
         .reverse();
+    try {
+      const primarySymbol = BYBIT_SYMBOLS[raw] || (raw.endsWith("USDT") || raw.endsWith("USDC") ? raw : `${raw}${quote}`);
+      const primaryPayload = await fetchJson(
+        `https://api.bybit.com/v5/market/kline?category=linear&symbol=${primarySymbol}&interval=${bucket}&limit=${limit}`,
+        { timeoutMs: 3500 },
+      );
+      const primary = parseCandles(primaryPayload);
+      if (primary.length > 0) return primary;
+
+      const fallbackQuote = quote === "USDC" ? "USDT" : "USDC";
+      const fallbackSymbol = `${raw}${fallbackQuote}`;
+      const fallbackPayload = await fetchJson(
+        `https://api.bybit.com/v5/market/kline?category=linear&symbol=${fallbackSymbol}&interval=${bucket}&limit=${limit}`,
+        { timeoutMs: 3500 },
+      );
+      const fallback = parseCandles(fallbackPayload);
+      if (fallback.length > 0) return fallback;
+      return [];
     } catch {
       return generateMockCandles(symbol, interval, limit);
     }

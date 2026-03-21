@@ -62,6 +62,14 @@ import {
   Zap,
 } from "lucide-react";
 
+function normalizeVenueTicker(value: string) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .replace(/(USDT|USDC|USD)$/i, "");
+}
+
+
 /* ─── Funding Stats Bar ─────────────────────────────────────────────────────── */
 function _StatChip({ label, value, valueClass = "text-zinc-400" }: { label: string; value: string; valueClass?: string }) {
   return (
@@ -760,21 +768,23 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         : {}),
     };
   const activeVenueMarketLabel = getVenueAdapter(activeVenueState.venueId).marketDataLabel;
+  const fallbackTradableSymbols = useMemo(
+    () =>
+      (activeVenueState.venueId === "binance" ? wsQuotes.map((quote) => quote.symbol) : AVAILABLE_TICKERS)
+        .map(normalizeVenueTicker)
+        .filter(Boolean),
+    [activeVenueState.venueId, wsQuotes],
+  );
   const tradableSymbols = useMemo(
     () =>
       Array.from(
         new Set(
-          [...venueSymbols, ...wsQuotes.map((quote) => quote.symbol), ...AVAILABLE_TICKERS]
-            .map((value) =>
-              String(value || "")
-                .toUpperCase()
-                .replace(/[^A-Z0-9]/g, "")
-                .replace(/USDT$/i, ""),
-            )
+          (venueSymbols.length > 0 ? venueSymbols : fallbackTradableSymbols)
+            .map((value) => normalizeVenueTicker(value))
             .filter(Boolean),
         ),
       ),
-    [venueSymbols, wsQuotes],
+    [fallbackTradableSymbols, venueSymbols],
   );
   const tradableSet = useMemo(() => new Set(tradableSymbols), [tradableSymbols]);
 
@@ -787,14 +797,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         if (cancelled || !Array.isArray(rows)) return;
         const normalized = Array.from(
           new Set(
-            rows
-              .map((row) =>
-                String(row || "")
-                  .toUpperCase()
-                  .replace(/[^A-Z0-9]/g, "")
-                  .replace(/USDT$/i, ""),
-              )
-              .filter(Boolean),
+            rows.map((row) => normalizeVenueTicker(row)).filter(Boolean),
           ),
         );
         setVenueSymbols(normalized);
@@ -821,11 +824,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const setActiveSymbol = useCallback((symbol: string) => {
     setActiveVenueState((prev) => ({
       ...prev,
-      activeSymbol:
-        String(symbol || "")
-          .toUpperCase()
-          .replace(/[^A-Z0-9]/g, "")
-          .replace(/USDT$/i, "") || "BTC",
+      activeSymbol: normalizeVenueTicker(symbol) || "BTC",
     }));
   }, []);
 
@@ -833,12 +832,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     setSelectedItem(item);
     if (item.ticker.length > 0) {
       const match = item.ticker
-        .map((ticker) =>
-          String(ticker || "")
-            .toUpperCase()
-            .replace(/[^A-Z0-9]/g, "")
-            .replace(/USDT$/i, ""),
-        )
+        .map((ticker) => normalizeVenueTicker(ticker))
         .find((ticker) => tradableSet.has(ticker));
       if (match) {
         setActiveSymbol(match);
@@ -855,7 +849,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     setSelectedItem(item);
     const symbol = String(ticker || "")
       .split("-")[0]
-      .replace(/USDT$/i, "")
+      .replace(/(USDT|USDC|USD)$/i, "")
       .replace(/PERP$/i, "")
       .replace(/[^A-Z0-9]/gi, "")
       .toUpperCase();
