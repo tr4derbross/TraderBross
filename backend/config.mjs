@@ -151,6 +151,10 @@ export function loadConfig() {
         .map((entry) => entry.trim().toUpperCase())
         .filter(Boolean),
     },
+    rateLimit: {
+      redisUrl: process.env.RATE_LIMIT_REDIS_URL || process.env.REDIS_URL || "",
+      prefix: process.env.RATE_LIMIT_PREFIX || "traderbross:ratelimit",
+    },
     security: {
       proxyAuthEnabled: toBoolean(process.env.REQUIRE_PROXY_AUTH, isProductionNodeEnv()),
       proxyAuthHeader: process.env.PROXY_AUTH_HEADER || "x-traderbross-proxy-secret",

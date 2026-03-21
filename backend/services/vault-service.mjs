@@ -1,9 +1,7 @@
 import crypto from "node:crypto";
 
-const vault = new Map();
-
 const TTL_MS = Number(process.env.VAULT_SESSION_TTL_MS || 6 * 60 * 60 * 1000);
-const MAX_ENTRIES = Number(process.env.VAULT_MAX_ENTRIES || 500);
+const revokedTokens = new Map();
 
 function parseKey(raw) {
   const value = String(raw || "").trim();
@@ -30,8 +28,16 @@ function parseKey(raw) {
 
 const encryptionKey = parseKey(process.env.VAULT_ENCRYPTION_KEY) || crypto.randomBytes(32);
 
-function generateToken() {
-  return crypto.randomBytes(24).toString("base64url");
+function b64urlEncode(value) {
+  return Buffer.from(value).toString("base64url");
+}
+
+function b64urlDecode(value) {
+  return Buffer.from(String(value || ""), "base64url");
+}
+
+function generateJti() {
+  return crypto.randomBytes(12).toString("hex");
 }
 
 function tokenHash(token) {
@@ -44,87 +50,66 @@ function encryptPayload(payload) {
   const plaintext = Buffer.from(JSON.stringify(payload));
   const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   const tag = cipher.getAuthTag();
-
-  return {
-    iv: iv.toString("base64"),
-    tag: tag.toString("base64"),
-    data: ciphertext.toString("base64"),
-  };
+  return `v1.${b64urlEncode(iv)}.${b64urlEncode(tag)}.${b64urlEncode(ciphertext)}`;
 }
 
-function decryptPayload(record) {
-  const decipher = crypto.createDecipheriv(
-    "aes-256-gcm",
-    encryptionKey,
-    Buffer.from(record.iv, "base64"),
-  );
-  decipher.setAuthTag(Buffer.from(record.tag, "base64"));
-  const plaintext = Buffer.concat([
-    decipher.update(Buffer.from(record.data, "base64")),
-    decipher.final(),
-  ]);
+function decryptPayload(token) {
+  const parts = String(token || "").split(".");
+  if (parts.length !== 4 || parts[0] !== "v1") return null;
+  const decipher = crypto.createDecipheriv("aes-256-gcm", encryptionKey, b64urlDecode(parts[1]));
+  decipher.setAuthTag(b64urlDecode(parts[2]));
+  const plaintext = Buffer.concat([decipher.update(b64urlDecode(parts[3])), decipher.final()]);
   return JSON.parse(plaintext.toString("utf8"));
 }
 
-function cleanupExpired(now = Date.now()) {
-  for (const [key, value] of vault.entries()) {
-    if (!value || value.expiresAt <= now) {
-      vault.delete(key);
+function cleanupRevoked(now = Date.now()) {
+  for (const [key, expiresAt] of revokedTokens.entries()) {
+    if (!expiresAt || expiresAt <= now) {
+      revokedTokens.delete(key);
     }
   }
 }
 
-function enforceMaxEntries() {
-  if (vault.size <= MAX_ENTRIES) return;
-  const rows = Array.from(vault.entries()).sort((a, b) => a[1].createdAt - b[1].createdAt);
-  const toDelete = Math.max(0, rows.length - MAX_ENTRIES);
-  for (let i = 0; i < toDelete; i += 1) {
-    vault.delete(rows[i][0]);
-  }
-}
-
 export function storeSecret(scope, payload) {
-  cleanupExpired();
-  const token = generateToken();
-  const key = tokenHash(token);
   const createdAt = Date.now();
-
-  vault.set(key, {
+  const expiresAt = createdAt + TTL_MS;
+  const encryptedToken = encryptPayload({
+    v: 1,
     scope,
-    encrypted: encryptPayload(payload),
+    payload,
     createdAt,
-    expiresAt: createdAt + TTL_MS,
+    expiresAt,
+    jti: generateJti(),
   });
-
-  enforceMaxEntries();
-  return token;
+  return encryptedToken;
 }
 
 export function getSecret(token) {
+  cleanupRevoked();
   const key = tokenHash(token);
-  const row = vault.get(key);
-  if (!row) return null;
-
-  if (row.expiresAt <= Date.now()) {
-    vault.delete(key);
+  if (revokedTokens.has(key)) {
     return null;
   }
 
   try {
-    const payload = decryptPayload(row.encrypted);
+    const row = decryptPayload(token);
+    if (!row || row.v !== 1 || !row.scope || !row.payload) return null;
+    if (Number(row.expiresAt || 0) <= Date.now()) return null;
     return {
       scope: row.scope,
-      payload,
+      payload: row.payload,
       createdAt: row.createdAt,
       expiresAt: row.expiresAt,
     };
   } catch {
-    vault.delete(key);
     return null;
   }
 }
 
 export function clearSecret(token) {
   const key = tokenHash(token);
-  return vault.delete(key);
+  const row = getSecret(token);
+  const expiresAt = Number(row?.expiresAt || Date.now() + TTL_MS);
+  revokedTokens.set(key, expiresAt);
+  return true;
 }

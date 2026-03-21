@@ -30,6 +30,7 @@ Scope: MVP launch readiness for terminal/news/trading integrations.
 - [x] Input validation for trading actions (symbol/side/margin/leverage).
 - [x] Sanitized user-facing error messages on exchange failures.
 - [ ] Add WAF/bot rules at edge (Cloudflare/Vercel protection profile).
+- [x] WebSocket origin allowlist validation enabled.
 
 ## 5) Product Transparency (User Trust)
 - [x] News panel includes informational-only label.
@@ -45,6 +46,7 @@ Scope: MVP launch readiness for terminal/news/trading integrations.
 
 ## 7) Pre-Launch Test Gate
 - [ ] End-to-end test pass on staging (connect, save keys, validate, place, close, TP/SL).
+- [x] Automated CI quality gate added (build + backend health + security smoke + terminal API flow).
 - [ ] Load test for sensitive endpoints and websocket concurrency.
 - [x] Manual security smoke test script added (direct backend calls to sensitive routes should fail).
 
