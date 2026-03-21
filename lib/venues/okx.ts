@@ -99,6 +99,8 @@ export const okxAdapter: VenueAdapter = {
           liquidationPx: number | null;
           leverage: number;
           marginMode: "isolated" | "cross";
+          tpPrice?: number;
+          slPrice?: number;
         }>;
       }>("/api/okx", {
         method: "POST",
@@ -114,6 +116,8 @@ export const okxAdapter: VenueAdapter = {
         liquidationPrice: p.liquidationPx,
         leverage: p.leverage,
         marginMode: p.marginMode,
+        tpPrice: p.tpPrice,
+        slPrice: p.slPrice,
       }));
     } catch {
       return [];

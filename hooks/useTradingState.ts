@@ -362,14 +362,18 @@ export function useTradingState(livePrices?: Record<string, number>) {
     [applyFilledOrder, prices]
   );
 
-  const closePosition = useCallback((posId: string) => {
+  const closePosition = useCallback((posId: string, closePercent = 100) => {
     setPositions((prev) => {
       const position = prev.find((item) => item.id === posId);
       if (!position) return prev;
+      const ratio = Math.max(1, Math.min(100, Number(closePercent) || 100)) / 100;
+      const closeAmount = position.amount * ratio;
+      if (!Number.isFinite(closeAmount) || closeAmount <= 0) return prev;
 
-      const pnl = calcPnl(position);
-      const fee = position.amount * position.currentPrice * TAKER_FEE;
-      const returns = position.margin + pnl - fee;
+      const pnl = calcPnl(position) * ratio;
+      const fee = closeAmount * position.currentPrice * TAKER_FEE;
+      const closeMargin = position.margin * ratio;
+      const returns = closeMargin + pnl - fee;
       const realizedReturn = Math.max(returns, 0);
 
       balanceRef.current += realizedReturn;
@@ -382,10 +386,10 @@ export function useTradingState(livePrices?: Record<string, number>) {
           side: position.side === "long" ? "short" : "long",
           type: "market",
           status: "filled",
-          amount: position.amount,
+          amount: closeAmount,
           price: position.currentPrice,
-          total: position.amount * position.currentPrice,
-          margin: position.margin,
+          total: closeAmount * position.currentPrice,
+          margin: closeMargin,
           leverage: position.leverage,
           marginMode: position.marginMode,
           fee,
@@ -396,7 +400,18 @@ export function useTradingState(livePrices?: Record<string, number>) {
         ...currentOrders.slice(0, 49),
       ]);
 
-      return prev.filter((item) => item.id !== posId);
+      if (ratio >= 0.999) {
+        return prev.filter((item) => item.id !== posId);
+      }
+      return prev.map((item) =>
+        item.id === posId
+          ? {
+              ...item,
+              amount: Math.max(0, item.amount - closeAmount),
+              margin: Math.max(0, item.margin - closeMargin),
+            }
+          : item,
+      );
     });
   }, []);
 

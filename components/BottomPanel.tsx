@@ -9,7 +9,7 @@ type Props = {
   orders: Order[];
   balance: number;
   equityHistory: EquityPoint[];
-  onClosePosition: (id: string) => void;
+  onClosePosition: (id: string, closePercent?: number) => void;
   onCancelOrder: (id: string) => void;
   onUpdatePositionTpSl: (posId: string, tpPrice: number | undefined, slPrice: number | undefined) => void;
   drawerMode?: "half" | "full";
@@ -316,6 +316,7 @@ export default function BottomPanel({
   const [tab, setTab] = useState<"positions" | "openorders" | "history" | "pnl">("positions");
   const [editingPosId, setEditingPosId] = useState<string | null>(null);
   const [quickMenuPosId, setQuickMenuPosId] = useState<string | null>(null);
+  const [closeMenuPosId, setCloseMenuPosId] = useState<string | null>(null);
   const [positionSort, setPositionSort] = useState<{
     field: "none" | "pnl" | "roe";
     direction: "desc" | "asc";
@@ -732,7 +733,7 @@ export default function BottomPanel({
 
                       {/* Actions */}
                       <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-2">
+                        <div className="relative flex items-center gap-2">
                           <button
                             onClick={() =>
                               setQuickMenuPosId((current) => {
@@ -752,7 +753,23 @@ export default function BottomPanel({
                             <Plus className="h-3 w-3" />
                           </button>
                           <button
-                            onClick={() => onClosePosition(pos.id)}
+                            onClick={() =>
+                              setCloseMenuPosId((current) => {
+                                if (current === pos.id) return null;
+                                return pos.id;
+                              })
+                            }
+                            className="whitespace-nowrap rounded-md px-2 py-1.5 text-[10px] font-bold transition-all"
+                            style={{
+                              background: closeMenuPosId === pos.id ? "rgba(212,161,31,0.16)" : "rgba(212,161,31,0.08)",
+                              border: `1px solid ${closeMenuPosId === pos.id ? "rgba(212,161,31,0.45)" : "rgba(212,161,31,0.22)"}`,
+                              color: "#d4a11f",
+                            }}
+                          >
+                            Close
+                          </button>
+                          <button
+                            onClick={() => onClosePosition(pos.id, 100)}
                             className="whitespace-nowrap rounded-md px-3 py-1.5 text-[10px] font-bold transition-all"
                             style={{
                               background: "rgba(239,68,68,0.12)",
@@ -768,9 +785,32 @@ export default function BottomPanel({
                               (e.currentTarget as HTMLElement).style.borderColor = "rgba(239,68,68,0.32)";
                             }}
                           >
-                            {isLiveVenue ? "Market Close" : "Close"}
+                            Market Close
                           </button>
                         </div>
+                        {closeMenuPosId === pos.id && (
+                          <div
+                            className="absolute right-0 z-20 mt-1 flex w-[220px] flex-col gap-1 rounded-lg p-2"
+                            style={{ background: "rgba(0,0,0,0.72)", border: "1px solid rgba(212,161,31,0.2)" }}
+                          >
+                            <div className="text-[9px] uppercase tracking-[0.1em] text-zinc-500">Partial Close</div>
+                            <div className="grid grid-cols-4 gap-1">
+                              {[25, 50, 75, 100].map((pct) => (
+                                <button
+                                  key={pct}
+                                  onClick={() => {
+                                    onClosePosition(pos.id, pct);
+                                    setCloseMenuPosId(null);
+                                  }}
+                                  className="rounded-md py-1 text-[9px] font-bold"
+                                  style={{ background: "rgba(212,161,31,0.1)", border: "1px solid rgba(212,161,31,0.24)", color: "#d4a11f" }}
+                                >
+                                  {pct}%
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );

@@ -13,7 +13,7 @@ type Props = {
   orders: Order[];
   balance: number;
   equityHistory: EquityPoint[];
-  onClosePosition: (id: string) => void;
+  onClosePosition: (id: string, closePercent?: number) => void;
   onCancelOrder: (id: string) => void;
   onUpdatePositionTpSl: (posId: string, tpPrice: number | undefined, slPrice: number | undefined) => void;
   isLiveVenue?: boolean;

@@ -22,6 +22,8 @@ export type VenuePosition = {
   liquidationPrice?: number | null;
   leverage?: number;
   marginMode?: "isolated" | "cross";
+  tpPrice?: number;
+  slPrice?: number;
 };
 
 export type VenueConnectionInput = {

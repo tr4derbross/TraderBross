@@ -633,6 +633,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const [venueBalance, setVenueBalance] = useState<VenueBalance | null>(null);
   const [venuePositions, setVenuePositions] = useState<VenuePosition[] | null>(null);
   const [venueRefreshTick, setVenueRefreshTick] = useState(0);
+  const [venueTpSlMap, setVenueTpSlMap] = useState<Record<string, { tpPrice?: number; slPrice?: number }>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -645,6 +646,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       if (!isConnected) {
         setVenueBalance(null);
         setVenuePositions(null);
+        setVenueTpSlMap({});
         return;
       }
 
@@ -659,6 +661,16 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           setVenueBalance(balance);
           // null = not fetched yet (show paper), array = real data (even if empty)
           setVenuePositions(pos);
+          setVenueTpSlMap((prev) => {
+            const next = { ...prev };
+            for (const p of pos) {
+              const key = `${p.symbol}_${p.side}`;
+              if (p.tpPrice || p.slPrice) {
+                next[key] = { tpPrice: p.tpPrice, slPrice: p.slPrice };
+              }
+            }
+            return next;
+          });
         }
       } catch {
         if (!cancelled) {
@@ -708,12 +720,12 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         margin: (p.size * p.entryPrice) / lev,
         marginMode: p.marginMode ?? "isolated",
         liquidationPrice: p.liquidationPrice ?? 0,
-        tpPrice: undefined,
-        slPrice: undefined,
+        tpPrice: venueTpSlMap[`${p.symbol}_${p.side}`]?.tpPrice ?? p.tpPrice ?? undefined,
+        slPrice: venueTpSlMap[`${p.symbol}_${p.side}`]?.slPrice ?? p.slPrice ?? undefined,
         timestamp: new Date(),
       };
     });
-  }, [venuePositions, positions, wsPrices]);
+  }, [venuePositions, positions, wsPrices, venueTpSlMap]);
 
   const handleNewsQuickTrade = (preset: NewsTradePreset, item: NewsItem) => {
     setSelectedItem(item);
@@ -957,6 +969,13 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       }
 
       if (result.ok) {
+        if (tpPrice || slPrice) {
+          const key = `${ticker}_${side}`;
+          setVenueTpSlMap((prev) => ({
+            ...prev,
+            [key]: { tpPrice: tpPrice ?? undefined, slPrice: slPrice ?? undefined },
+          }));
+        }
         // Trigger a positions refresh ~2s after the order is accepted
         setTimeout(() => setVenueRefreshTick((t) => t + 1), 2000);
       }
@@ -970,7 +989,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
   // Close a real venue position (Binance: reduceOnly market order opposite side)
   const handleCloseVenuePosition = useCallback(
-    async (positionId: string) => {
+    async (positionId: string, closePercent = 100) => {
       if (venuePositions) {
         const pos = displayPositions.find((p) => p.id === positionId);
         if (pos) {
@@ -992,6 +1011,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                 type: "closePosition",
                 symbol: pos.ticker,
                 side: pos.side,
+                marginMode: pos.marginMode,
+                closePercent,
                 sessionToken: connection?.sessionToken,
               }),
             });
@@ -1012,7 +1033,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         }
       }
       // Paper trading fallback
-      closePosition(positionId);
+      closePosition(positionId, closePercent);
     },
     [venuePositions, displayPositions, buildActiveVenueConnection, closePosition, activeVenueState.venueId]
   );
@@ -1033,18 +1054,29 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
             updatePositionTpSl(positionId, tpPrice, slPrice);
             return;
           }
-          await fetch(buildApiUrl(orderEndpoint), {
+          const res = await fetch(buildApiUrl(orderEndpoint), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              type: "tpsl",
-              symbol: pos.ticker,
-              side: pos.side,
-              tpPrice: tpPrice ?? null,
-              slPrice: slPrice ?? null,
-              sessionToken: connection?.sessionToken,
-            }),
+              body: JSON.stringify({
+                type: "tpsl",
+                symbol: pos.ticker,
+                side: pos.side,
+                marginMode: pos.marginMode,
+                tpPrice: tpPrice ?? null,
+                slPrice: slPrice ?? null,
+                sessionToken: connection?.sessionToken,
+              }),
           });
+          const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };
+          if (!res.ok || data.ok === false) {
+            window.alert(`TP/SL update failed: ${data.error ?? `HTTP ${res.status}`}`);
+            return;
+          }
+          setVenueTpSlMap((prev) => ({
+            ...prev,
+            [pos.id]: { tpPrice: tpPrice ?? undefined, slPrice: slPrice ?? undefined },
+          }));
+          setTimeout(() => setVenueRefreshTick((t) => t + 1), 1500);
           return;
         }
       }

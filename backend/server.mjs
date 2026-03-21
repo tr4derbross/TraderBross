@@ -716,6 +716,7 @@ const server = http.createServer(async (request, reply) => {
         }
 
         if (body.type === "closePosition" || body.type === "tpsl") {
+          const closePercent = Math.max(1, Math.min(100, Number(body.closePercent) || 100));
           const accountAddress = vaultAddress;
           if (!accountAddress) {
             json(reply, 400, { ok: false, error: "Wallet address is required for this action." });
@@ -732,6 +733,7 @@ const server = http.createServer(async (request, reply) => {
           const posSize = Number(pos.size);
           const closeIsBuy = String(pos.side || "").toLowerCase() === "short";
           if (body.type === "closePosition") {
+            const closeSize = posSize * (closePercent / 100);
             const px = closeIsBuy ? markPrice * 1.03 : markPrice * 0.97;
             const action = {
               type: "order",
@@ -740,7 +742,7 @@ const server = http.createServer(async (request, reply) => {
                   a: asset,
                   b: closeIsBuy,
                   p: toWireDecimal(px),
-                  s: toWireDecimal(posSize),
+                  s: toWireDecimal(closeSize),
                   r: true,
                   t: { limit: { tif: "Ioc" } },
                 },
@@ -1386,6 +1388,7 @@ const server = http.createServer(async (request, reply) => {
           return;
         }
         if (body.type === "closePosition") {
+          const closePercent = Math.max(1, Math.min(100, Number(body.closePercent) || 100));
           // 1. Cancel all open conditional orders (TP/SL) for this symbol first
           try {
             const qs0 = binanceSignedQuery(apiSecret, { symbol });
@@ -1406,12 +1409,13 @@ const server = http.createServer(async (request, reply) => {
             json(reply, 200, { ok: true, data: { msg: "No open position found" } });
             return;
           }
+          const closeQty = posAmt * (closePercent / 100);
 
           // 3. Market order with reduceOnly=true + exact quantity (closePosition=true is NOT valid for MARKET type)
           const closeSide = body.side === "long" ? "SELL" : "BUY";
           const result = await binancePost("/fapi/v1/order", {
             symbol, side: closeSide, type: "MARKET",
-            quantity: String(posAmt), reduceOnly: "true",
+            quantity: String(closeQty), reduceOnly: "true",
           });
           json(reply, 200, { ok: true, data: result });
           return;
@@ -1550,6 +1554,29 @@ const server = http.createServer(async (request, reply) => {
           const data = await requestOkx("GET", "/api/v5/account/positions?instType=SWAP");
           const rows = (Array.isArray(data?.data) ? data.data : [])
             .filter((row) => Math.abs(parseFloat(row.pos || "0")) > 0);
+          const [conditionalAlgos, ocoAlgos] = await Promise.all([
+            requestOkx("GET", "/api/v5/trade/orders-algo-pending?ordType=conditional&instType=SWAP").catch(() => ({ data: [] })),
+            requestOkx("GET", "/api/v5/trade/orders-algo-pending?ordType=oco&instType=SWAP").catch(() => ({ data: [] })),
+          ]);
+          const algoRows = [
+            ...(Array.isArray(conditionalAlgos?.data) ? conditionalAlgos.data : []),
+            ...(Array.isArray(ocoAlgos?.data) ? ocoAlgos.data : []),
+          ];
+          const tpslByKey = new Map();
+          for (const algo of algoRows) {
+            const algoInstId = String(algo?.instId || "");
+            if (!algoInstId) continue;
+            const algoPosSideRaw = String(algo?.posSide || "").toLowerCase();
+            const algoPosSide = algoPosSideRaw === "short" ? "short" : "long";
+            const key = `${algoInstId}_${algoPosSide}`;
+            const current = tpslByKey.get(key) || {};
+            const nextTp = finitePositiveNumber(algo?.tpTriggerPx || algo?.tpOrdPx);
+            const nextSl = finitePositiveNumber(algo?.slTriggerPx || algo?.slOrdPx);
+            tpslByKey.set(key, {
+              tpPrice: current.tpPrice || nextTp,
+              slPrice: current.slPrice || nextSl,
+            });
+          }
           const instIds = Array.from(new Set(rows.map((row) => String(row.instId || "")).filter(Boolean)));
           const contractValueMap = new Map();
           await Promise.all(
@@ -1565,7 +1592,11 @@ const server = http.createServer(async (request, reply) => {
             // OKX reports `pos` in contracts. Convert to base-asset quantity for UI parity.
             const size = contracts * contractValue;
             const symbol = instId.split("-")[0] || "BTC";
-            const side = String(row.posSide || row.direction || "").toLowerCase() === "short" ? "short" : "long";
+            const signedPos = parseFloat(row.pos || "0");
+            const sideRaw = String(row.posSide || row.direction || "").toLowerCase();
+            const side = sideRaw === "short" || (sideRaw !== "long" && signedPos < 0) ? "short" : "long";
+            const tpslKey = `${instId}_${side}`;
+            const algoTpSl = tpslByKey.get(tpslKey);
             return {
               coin: symbol,
               side,
@@ -1575,6 +1606,8 @@ const server = http.createServer(async (request, reply) => {
               liquidationPx: parseFloat(row.liqPx || "0") || null,
               leverage: parseInt(row.lever || "1", 10) || 1,
               marginMode: String(row.mgnMode || "").toLowerCase() === "cross" ? "cross" : "isolated",
+              tpPrice: algoTpSl?.tpPrice || finitePositiveNumber(row.tpTriggerPx || row.tpOrdPx),
+              slPrice: algoTpSl?.slPrice || finitePositiveNumber(row.slTriggerPx || row.slOrdPx),
             };
           });
           json(reply, 200, { positions });
@@ -1651,6 +1684,8 @@ const server = http.createServer(async (request, reply) => {
               liquidationPx: parseFloat(row.liqPrice || "0") || null,
               leverage: parseInt(row.leverage || "1", 10) || 1,
               marginMode: String(row.tradeMode || row.positionIM || "").toLowerCase().includes("cross") ? "cross" : "isolated",
+              tpPrice: finitePositiveNumber(row.takeProfit),
+              slPrice: finitePositiveNumber(row.stopLoss),
             }));
           json(reply, 200, { positions });
           return;
@@ -1720,6 +1755,7 @@ const server = http.createServer(async (request, reply) => {
           return;
         }
         if (body.type === "closePosition") {
+          const closePercent = Math.max(1, Math.min(100, Number(body.closePercent) || 100));
           const side = body.side === "short" ? "Buy" : "Sell";
           const posData = await requestBybit("GET", "/v5/position/list", `category=linear&symbol=${encodeURIComponent(symbol)}`);
           const pos = Array.isArray(posData?.result?.list)
@@ -1730,7 +1766,8 @@ const server = http.createServer(async (request, reply) => {
             json(reply, 200, { ok: true, data: { message: "No open position found." } });
             return;
           }
-          const qty = size >= 100 ? size.toFixed(0) : size >= 1 ? size.toFixed(2) : size.toFixed(3);
+          const closeQty = size * (closePercent / 100);
+          const qty = closeQty >= 100 ? closeQty.toFixed(0) : closeQty >= 1 ? closeQty.toFixed(2) : closeQty.toFixed(3);
           const result = await requestBybit("POST", "/v5/order/create", "", {
             category: "linear",
             symbol,
@@ -1897,20 +1934,28 @@ const server = http.createServer(async (request, reply) => {
           return;
         }
         if (body.type === "closePosition") {
+          const closePercent = Math.max(1, Math.min(100, Number(body.closePercent) || 100));
           const posData = await requestOkx("GET", `/api/v5/account/positions?instType=SWAP&instId=${encodeURIComponent(instId)}`);
-          const row = Array.isArray(posData?.data) ? posData.data[0] : null;
+          const rows = Array.isArray(posData?.data) ? posData.data : [];
+          const row = rows.find((item) => {
+            const itemSide = String(item?.posSide || item?.direction || "").toLowerCase();
+            const signedPos = parseFloat(item?.pos || "0");
+            const normalizedSide = itemSide === "short" || (itemSide !== "long" && signedPos < 0) ? "short" : "long";
+            return normalizedSide === (body.side === "short" ? "short" : "long");
+          }) || rows[0] || null;
           const contracts = Math.abs(parseFloat(row?.pos || "0"));
           if (!contracts) {
             json(reply, 200, { ok: true, data: { message: "No open position found." } });
             return;
           }
           const side = body.side === "short" ? "buy" : "sell";
+          const closeContracts = contracts * (closePercent / 100);
           const result = await requestOkx("POST", "/api/v5/trade/order", {
             instId,
             tdMode: body.marginMode === "cross" ? "cross" : "isolated",
             side,
             ordType: "market",
-            sz: contracts >= 100 ? contracts.toFixed(0) : contracts >= 1 ? contracts.toFixed(2) : contracts.toFixed(3),
+            sz: closeContracts >= 100 ? closeContracts.toFixed(0) : closeContracts >= 1 ? closeContracts.toFixed(2) : closeContracts.toFixed(3),
             reduceOnly: true,
           });
           json(reply, 200, { ok: true, data: result });
@@ -1936,7 +1981,13 @@ const server = http.createServer(async (request, reply) => {
             return;
           }
           const posData = await requestOkx("GET", `/api/v5/account/positions?instType=SWAP&instId=${encodeURIComponent(instId)}`);
-          const row = Array.isArray(posData?.data) ? posData.data[0] : null;
+          const rows = Array.isArray(posData?.data) ? posData.data : [];
+          const row = rows.find((item) => {
+            const itemSide = String(item?.posSide || item?.direction || "").toLowerCase();
+            const signedPos = parseFloat(item?.pos || "0");
+            const normalizedSide = itemSide === "short" || (itemSide !== "long" && signedPos < 0) ? "short" : "long";
+            return normalizedSide === (body.side === "short" ? "short" : "long");
+          }) || rows[0] || null;
           const contracts = Math.abs(parseFloat(row?.pos || "0"));
           if (!contracts) {
             json(reply, 400, { ok: false, error: "No open position found for TP/SL." });
