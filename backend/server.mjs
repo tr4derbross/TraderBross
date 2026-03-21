@@ -335,20 +335,41 @@ async function getVenueSymbols(venueId, quoteAsset = "USDT") {
       const payload = await fetch("https://www.okx.com/api/v5/public/instruments?instType=SWAP", {
         signal: AbortSignal.timeout(6000),
       }).then((res) => res.json());
-      const symbols = (payload?.data || [])
+      const liveRows = (payload?.data || []).filter((row) => row.state === "live");
+      const symbols = liveRows
         .filter((row) => row.state === "live" && String(row.instId || "").includes(`-${quote}-SWAP`))
         .map((row) => String(row.instId || "").split("-")[0]);
-      return uniqueSortedSymbols(symbols);
+      const preferred = uniqueSortedSymbols(symbols);
+      if (preferred.length > 0) return preferred;
+      // Fallback: return all live swaps if quote-specific list is empty.
+      return uniqueSortedSymbols(liveRows.map((row) => String(row.instId || "").split("-")[0]));
     }
 
     if (venue === "bybit") {
-      const payload = await fetch("https://api.bybit.com/v5/market/instruments-info?category=linear&limit=1000", {
-        signal: AbortSignal.timeout(7000),
-      }).then((res) => res.json());
-      const symbols = (payload?.result?.list || [])
+      const allRows = [];
+      let cursor = "";
+      for (let page = 0; page < 4; page += 1) {
+        const query = new URLSearchParams({ category: "linear", limit: "1000" });
+        if (cursor) query.set("cursor", cursor);
+        const payload = await fetch(`https://api.bybit.com/v5/market/instruments-info?${query.toString()}`, {
+          signal: AbortSignal.timeout(7000),
+        }).then((res) => res.json());
+        const rows = Array.isArray(payload?.result?.list) ? payload.result.list : [];
+        allRows.push(...rows);
+        const nextCursor = String(payload?.result?.nextPageCursor || "");
+        if (!nextCursor || rows.length === 0 || nextCursor === cursor) break;
+        cursor = nextCursor;
+      }
+      const symbols = allRows
         .filter((row) => row.status === "Trading" && String(row.symbol || "").endsWith(quote))
         .map((row) => String(row.baseCoin || row.symbol).replace(new RegExp(`${quote}$`, "i"), ""));
-      return uniqueSortedSymbols(symbols);
+      const preferred = uniqueSortedSymbols(symbols);
+      if (preferred.length > 0) return preferred;
+      return uniqueSortedSymbols(
+        allRows
+          .filter((row) => row.status === "Trading")
+          .map((row) => String(row.baseCoin || row.symbol || "").replace(/USDT|USDC$/i, "")),
+      );
     }
 
     if (venue === "hyperliquid") {
@@ -952,7 +973,12 @@ const server = http.createServer(async (request, reply) => {
       const venue = (url.searchParams.get("venue") || "binance").toLowerCase();
       const quote = (url.searchParams.get("quote") || "USDT").toUpperCase();
       try {
-        json(reply, 200, await getVenueSymbols(venue, quote));
+        const symbols = await getVenueSymbols(venue, quote);
+        if (Array.isArray(symbols) && symbols.length > 0) {
+          json(reply, 200, symbols);
+          return;
+        }
+        throw new Error("empty_symbols");
       } catch {
         const fallback = [...CORE_SYMBOLS, ...(buildSnapshot().quotes || []).map((q) => q.symbol)];
         json(reply, 200, uniqueSortedSymbols(fallback));
@@ -961,9 +987,22 @@ const server = http.createServer(async (request, reply) => {
     }
 
     if (request.method === "GET" && url.pathname === "/api/symbols") {
+      const venue = (url.searchParams.get("venue") || "").toLowerCase();
+      const quote = (url.searchParams.get("quote") || "USDT").toUpperCase();
       const snapshot = buildSnapshot();
       const seen = new Set();
-      const merged = [...CORE_SYMBOLS, ...(snapshot.quotes || []).map((item) => item.symbol)];
+      let venueSymbols = [];
+      if (venue) {
+        try {
+          venueSymbols = await getVenueSymbols(venue, quote);
+        } catch {
+          venueSymbols = [];
+        }
+      }
+      const merged = [
+        ...(venueSymbols.length > 0 ? venueSymbols : CORE_SYMBOLS),
+        ...(snapshot.quotes || []).map((item) => item.symbol),
+      ];
       const symbols = [];
       for (const raw of merged) {
         const canonical = canonicalSymbol(raw);

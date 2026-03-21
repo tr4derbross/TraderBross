@@ -390,12 +390,23 @@ async function fetchEmergencyVenueSymbols(venueId: string, quoteAsset: string) {
   }
 
   if (venue === "bybit") {
-    const payload = await fetch("https://api.bybit.com/v5/market/instruments-info?category=linear&limit=1000", {
-      cache: "no-store",
-      signal: AbortSignal.timeout(9000),
-    }).then((res) => res.json());
+    const allRows: any[] = [];
+    let cursor = "";
+    for (let page = 0; page < 4; page += 1) {
+      const query = new URLSearchParams({ category: "linear", limit: "1000" });
+      if (cursor) query.set("cursor", cursor);
+      const payload = await fetch(`https://api.bybit.com/v5/market/instruments-info?${query.toString()}`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(9000),
+      }).then((res) => res.json());
+      const rows = Array.isArray(payload?.result?.list) ? payload.result.list : [];
+      allRows.push(...rows);
+      const nextCursor = String(payload?.result?.nextPageCursor || "");
+      if (!nextCursor || rows.length === 0 || nextCursor === cursor) break;
+      cursor = nextCursor;
+    }
     return normalizeSymbols(
-      (payload?.result?.list || [])
+      allRows
         .filter((row: any) => row?.status === "Trading" && String(row?.symbol || "").endsWith(quote))
         .map((row: any) => String(row?.baseCoin || row?.symbol || "").replace(new RegExp(`${quote}$`, "i"), "")),
     );
@@ -611,7 +622,20 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
           (type === "ohlcv" || type === "" || primary === "prices") &&
           Array.isArray(payload) &&
           payload.length === 0;
-        if (looksEmptyBootstrap || looksEmptyNews || looksEmptyMarket || looksEmptyCandles) {
+        const looksEmptyVenueSymbols =
+          primary === "venues" &&
+          (normalizedPath?.[1] || "").toLowerCase() === "symbols" &&
+          Array.isArray(payload) &&
+          payload.length === 0;
+        const looksEmptySymbols = primary === "symbols" && Array.isArray(payload) && payload.length === 0;
+        if (
+          looksEmptyBootstrap ||
+          looksEmptyNews ||
+          looksEmptyMarket ||
+          looksEmptyCandles ||
+          looksEmptyVenueSymbols ||
+          looksEmptySymbols
+        ) {
           return emergencyResponse(normalizedPath, request);
         }
       } catch {
