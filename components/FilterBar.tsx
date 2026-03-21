@@ -109,7 +109,7 @@ export default function FilterBar({
       </div>
 
       {/* Search + filters row */}
-      <div className="flex items-center gap-1 px-1.5 py-0.5 sm:flex-nowrap sm:gap-2 sm:px-3 sm:py-2">
+      <div className="flex flex-wrap items-center gap-1 px-1.5 py-0.5 sm:flex-nowrap sm:gap-2 sm:px-3 sm:py-2">
         <div className="terminal-input order-1 flex min-w-0 flex-1 items-center gap-1 rounded-md px-2 py-0.5 sm:w-auto sm:flex-1 sm:rounded-lg sm:px-2 sm:py-1">
           <Search className="h-3 w-3 shrink-0 text-zinc-500" />
           <input
