@@ -756,6 +756,10 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const isTablet = viewportWidth >= 768 && viewportWidth < 1280;
   const showDesktopLayout = viewportWidth >= 1280;
   const showBottomPanel = !isMobile;
+  const mobileChartHeight = viewportWidth < 390 ? 142 : viewportWidth < 430 ? 154 : 166;
+  const mobileNewsPaneFlex = viewportWidth < 390 ? "0 0 56%" : "0 0 53%";
+  const mobileTradePaneFlex = viewportWidth < 390 ? "0 0 44%" : "0 0 47%";
+  const tabletRightPanelWidth = Math.max(304, Math.min(360, Math.round(viewportWidth * 0.36)));
   const selectedHeaderPlatform =
     HEADER_PLATFORMS.find((platform) => platform.id === headerPlatform) ?? HEADER_PLATFORMS[0];
   const isHeaderWalletPlatform = selectedHeaderPlatform.type === "wallet";
@@ -1654,7 +1658,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   );
 
   return (
-    <div className="flex flex-col overflow-hidden bg-black" style={{ height: "100dvh" }}>
+    <div className="flex flex-col overflow-hidden bg-black" style={{ minHeight: "100svh", height: "100dvh" }}>
       <div className="panel-header brand-aura soft-divider status-glow relative z-40 flex shrink-0 items-center justify-center overflow-visible border-b px-2 py-0.5 sm:px-4 sm:py-1.5 after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-[linear-gradient(90deg,transparent,rgba(212,161,31,0.55),transparent)]">
         {/* Left: Fear & Greed + page nav */}
         <div className="absolute left-3 top-1/2 z-10 -translate-y-1/2 sm:left-4 flex items-center gap-2">
@@ -1806,14 +1810,14 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
               </div>
               <div className="flex min-h-0 overflow-hidden gap-2" style={{ flex: "0 0 calc(43% - 8px)" }}>
                 <div className="min-h-0 flex-1 overflow-hidden">{renderNewsPanel()}</div>
-                <div className="min-h-0 shrink-0 overflow-hidden" style={{ width: 340 }}>{renderRightPanel()}</div>
+                <div className="min-h-0 shrink-0 overflow-hidden" style={{ width: tabletRightPanelWidth }}>{renderRightPanel()}</div>
               </div>
             </>
           ) : (
             /* Mobile: single page — chart top + news & trade side by side */
             <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
               {/* Chart — compact fixed height */}
-              <div className="shrink-0 overflow-hidden" style={{ height: 162 }}>
+              <div className="shrink-0 overflow-hidden" style={{ height: mobileChartHeight }}>
                 {renderChartPanel()}
               </div>
               {/* News (left) + Trade (right) — both always visible */}
@@ -1821,12 +1825,12 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                 className="flex min-h-0 flex-1 overflow-hidden"
                 style={{ borderTop: "1px solid rgba(212,161,31,0.07)" }}
               >
-                <div className="min-h-0 overflow-hidden" style={{ flex: "0 0 50%" }}>
+                <div className="min-h-0 overflow-hidden" style={{ flex: mobileNewsPaneFlex }}>
                   {renderNewsPanel()}
                 </div>
                 <div
                   className="min-h-0 overflow-hidden"
-                  style={{ flex: "0 0 50%", borderLeft: "1px solid rgba(212,161,31,0.07)" }}
+                  style={{ flex: mobileTradePaneFlex, borderLeft: "1px solid rgba(212,161,31,0.07)" }}
                 >
                   {renderMobileTradePanel()}
                 </div>
@@ -1965,7 +1969,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
             <div className="fixed inset-0 z-[120] bg-transparent" />
             <div
               ref={headerPanelRef}
-              className="panel-shell-alt fixed z-[130] max-h-[calc(100vh-100px)] overflow-y-auto border p-3 shadow-[0_18px_48px_rgba(0,0,0,0.42)]"
+              className="panel-shell-alt fixed z-[130] max-h-[calc(100dvh-100px)] overflow-y-auto border p-3 shadow-[0_18px_48px_rgba(0,0,0,0.42)]"
               style={
                 isMobile
                   ? {

@@ -128,7 +128,7 @@ export default function FilterBar({
         {isNewsSource && (
           <div className="order-2 flex items-center gap-1 sm:w-auto">
             <select
-              className="terminal-input h-7 w-[72px] cursor-pointer rounded-md px-1.5 text-[10px] text-zinc-300 outline-none sm:h-auto sm:w-auto sm:flex-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
+              className="terminal-input h-7 min-w-[74px] max-w-[28vw] cursor-pointer rounded-md px-1.5 text-[10px] text-zinc-300 outline-none sm:h-auto sm:w-auto sm:flex-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
               value={sector}
               onChange={(e) => onSector(e.target.value)}
             >
@@ -140,7 +140,7 @@ export default function FilterBar({
             </select>
 
             <select
-              className="terminal-input h-7 w-[92px] cursor-pointer rounded-md px-1.5 text-[10px] text-zinc-100 outline-none sm:w-auto sm:flex-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
+              className="terminal-input h-7 min-w-[96px] max-w-[36vw] cursor-pointer rounded-md px-1.5 text-[10px] text-zinc-100 outline-none sm:w-auto sm:flex-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
               value={ticker}
               onChange={(e) => onTicker(e.target.value)}
             >

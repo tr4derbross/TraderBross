@@ -790,7 +790,7 @@ export default function BottomPanel({
                         </div>
                         {closeMenuPosId === pos.id && (
                           <div
-                            className="absolute right-0 z-20 mt-1 flex w-[220px] flex-col gap-1 rounded-lg p-2"
+                            className="absolute right-0 z-20 mt-1 flex w-[min(220px,calc(100vw-24px))] flex-col gap-1 rounded-lg p-2"
                             style={{ background: "rgba(0,0,0,0.72)", border: "1px solid rgba(212,161,31,0.2)" }}
                           >
                             <div className="text-[9px] uppercase tracking-[0.1em] text-zinc-500">Partial Close</div>
