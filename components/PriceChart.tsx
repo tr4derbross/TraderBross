@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Maximize2, Minimize2 } from "lucide-react";
-import { AVAILABLE_TICKERS } from "@/lib/mock-data";
+import { AVAILABLE_TICKERS, type NewsItem } from "@/lib/mock-data";
 import type { TradingVenueId } from "@/lib/active-venue";
 import { MarginMode, Order, OrderType, Position, Side } from "@/hooks/useTradingState";
 import { apiFetch } from "@/lib/api-client";
@@ -27,6 +27,8 @@ type PriceData = {
 type Timeframe = "1m" | "5m" | "15m" | "30m" | "1H" | "4H" | "1D" | "1W";
 type ChartType = "candles" | "line";
 type ChartMenu = { x: number; y: number; price: number } | null;
+type MarkerPosition = "aboveBar" | "belowBar";
+type MarkerShape = "circle" | "square" | "arrowUp" | "arrowDown";
 
 type Props = {
   activeVenue: TradingVenueId;
@@ -36,6 +38,8 @@ type Props = {
   marketDataSourceLabel: string;
   liveTickerPrice?: number;
   liveFeedConnected?: boolean;
+  selectedEvent?: NewsItem | null;
+  eventItems?: NewsItem[];
   positions?: Position[];
   orders?: Order[];
   onUpdatePositionTpSl?: (posId: string, tp: number | undefined, sl: number | undefined) => void;
@@ -117,6 +121,8 @@ export default function PriceChart({
   marketDataSourceLabel,
   liveTickerPrice,
   liveFeedConnected = false,
+  selectedEvent = null,
+  eventItems = [],
   positions = [],
   orders = [],
   onUpdatePositionTpSl,
@@ -150,6 +156,8 @@ export default function PriceChart({
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dragTarget, setDragTarget] = useState<"tp" | "sl" | null>(null);
   const [menu, setMenu] = useState<ChartMenu>(null);
+  const [eventFocusArmed, setEventFocusArmed] = useState(false);
+  const lastAutoFocusedEventRef = useRef<string | null>(null);
   const activePosition = positions.find((position) => position.ticker === ticker);
   const openOrders = orders.filter((order) => order.status === "open" && order.ticker === ticker);
   const lastBar = priceData[priceData.length - 1] ?? null;
@@ -158,6 +166,13 @@ export default function PriceChart({
   const isUp = displayBar ? displayBar.close >= displayBar.open : true;
   const change = lastBar && firstBar ? ((lastBar.close - firstBar.close) / firstBar.close) * 100 : null;
   const vol = priceData.reduce((sum, item) => sum + item.volume, 0);
+  const recentRelatedEvent = useMemo(
+    () =>
+      [...eventItems]
+        .filter((item) => item.ticker?.includes(ticker))
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0] ?? null,
+    [eventItems, ticker],
+  );
 
   const clearPriceLine = (lineRef: React.MutableRefObject<unknown>) => {
     if (!mainSeriesRef.current || !lineRef.current) return;
@@ -211,6 +226,97 @@ export default function PriceChart({
     }
   };
 
+  const getTimeframeSeconds = (value: Timeframe) => {
+    switch (value) {
+      case "1m": return 60;
+      case "5m": return 5 * 60;
+      case "15m": return 15 * 60;
+      case "30m": return 30 * 60;
+      case "1H": return 60 * 60;
+      case "4H": return 4 * 60 * 60;
+      case "1D": return 24 * 60 * 60;
+      case "1W": return 7 * 24 * 60 * 60;
+      default: return 5 * 60;
+    }
+  };
+
+  const parseEventTime = (value: NewsItem["timestamp"]) => {
+    const ts = new Date(value).getTime();
+    if (!Number.isFinite(ts)) return null;
+    return Math.floor(ts / 1000);
+  };
+
+  const snapToNearestBar = (eventTimeSec: number) => {
+    if (priceData.length === 0) return null;
+    let nearest = priceData[0].time;
+    let minDiff = Math.abs(nearest - eventTimeSec);
+    for (let i = 1; i < priceData.length; i += 1) {
+      const time = priceData[i].time;
+      const diff = Math.abs(time - eventTimeSec);
+      if (diff < minDiff) {
+        minDiff = diff;
+        nearest = time;
+      }
+    }
+    return nearest;
+  };
+
+  const focusOnEvent = (item: NewsItem | null) => {
+    if (!item || !chartRef.current || priceData.length < 8) return;
+    if (!item.ticker?.includes(ticker)) return;
+    const eventTime = parseEventTime(item.timestamp);
+    if (!eventTime) return;
+    const snapped = snapToNearestBar(eventTime);
+    if (!snapped) return;
+    const tfSec = getTimeframeSeconds(timeframe);
+    const halfWindow = Math.max(tfSec * 28, 60 * 20);
+    try {
+      (chartRef.current as { timeScale: () => { setVisibleRange: (range: { from: number; to: number }) => void } })
+        .timeScale()
+        .setVisibleRange({ from: snapped - halfWindow, to: snapped + halfWindow });
+      setEventFocusArmed(true);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const chartMarkers = useMemo(() => {
+    if (priceData.length === 0) return [];
+    const seen = new Set<string>();
+    const merged = [
+      ...(selectedEvent ? [selectedEvent] : []),
+      ...eventItems.filter((item) => item.ticker?.includes(ticker)),
+    ];
+    const result: Array<{
+      time: number;
+      position: MarkerPosition;
+      color: string;
+      shape: MarkerShape;
+      text: string;
+    }> = [];
+
+    for (const item of merged) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      const parsed = parseEventTime(item.timestamp);
+      if (!parsed) continue;
+      const snapped = snapToNearestBar(parsed);
+      if (!snapped) continue;
+      const isWhale = item.type === "whale";
+      const isSelected = selectedEvent?.id === item.id;
+      result.push({
+        time: snapped,
+        position: isWhale ? "aboveBar" : "belowBar",
+        color: isSelected ? "#f0b90b" : isWhale ? "#f59e0b" : "#60a5fa",
+        shape: isSelected ? "circle" : isWhale ? "arrowDown" : "arrowUp",
+        text: isSelected ? "Selected" : isWhale ? "Whale" : "News",
+      });
+      if (result.length >= 18) break;
+    }
+
+    return result.sort((a, b) => a.time - b.time);
+  }, [eventItems, priceData, selectedEvent, ticker]);
+
   // Track mobile breakpoint
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -249,6 +355,7 @@ export default function PriceChart({
     setMenu(null);
     setDragTarget(null);
     setHoveredBar(null);
+    setEventFocusArmed(false);
   }, [activeVenue, ticker]);
 
   useEffect(() => {
@@ -517,6 +624,24 @@ export default function PriceChart({
   }, [chartReady, chartType, priceData]);
 
   useEffect(() => {
+    if (!chartReady || !mainSeriesRef.current) return;
+    const series = mainSeriesRef.current as { setMarkers?: (markers: unknown[]) => void };
+    if (typeof series.setMarkers !== "function") return;
+    try {
+      series.setMarkers(chartMarkers as unknown[]);
+    } catch {
+      /* ignore */
+    }
+  }, [chartMarkers, chartReady, chartType]);
+
+  useEffect(() => {
+    if (!chartReady || !selectedEvent || !selectedEvent.ticker?.includes(ticker)) return;
+    if (lastAutoFocusedEventRef.current === selectedEvent.id) return;
+    lastAutoFocusedEventRef.current = selectedEvent.id;
+    focusOnEvent(selectedEvent);
+  }, [chartReady, priceData, selectedEvent, ticker, timeframe]);
+
+  useEffect(() => {
     clearPriceLine(entryLineRef);
     clearPriceLine(liqLineRef);
     clearPriceLine(tpLineRef);
@@ -754,6 +879,24 @@ export default function PriceChart({
                 {item}
               </button>
             ))}
+            {selectedEvent?.ticker?.includes(ticker) && (
+              <button
+                onClick={() => focusOnEvent(selectedEvent)}
+                className="rounded-md px-2 py-0.5 text-[11px] font-medium transition-all"
+                style={
+                  eventFocusArmed
+                    ? {
+                        color: "#f1d48f",
+                        background: "linear-gradient(180deg, rgba(212,161,31,0.24), rgba(212,161,31,0.1))",
+                        border: "1px solid rgba(212,161,31,0.28)",
+                      }
+                    : { color: "#6b7280" }
+                }
+                title="Focus chart around selected event"
+              >
+                Event
+              </button>
+            )}
           </div>
 
           {/* Chart type toggle + fullscreen */}
@@ -955,6 +1098,31 @@ export default function PriceChart({
               <span style={{ color: isUp ? "#0ecb81" : "#f6465d" }}>{fmtPrice(displayBar.close)}</span>
               <span style={{ color: "#52525b" }}>Vol</span>
               <span style={{ color: "#71717a" }}>{fmtVol(displayBar.volume)}</span>
+            </div>
+          )}
+
+          {recentRelatedEvent && (
+            <div
+              className="pointer-events-auto absolute right-3 top-3 z-10 max-w-[52%] rounded-lg px-2.5 py-1.5"
+              style={{
+                background: "linear-gradient(180deg, rgba(18,21,30,0.92), rgba(10,12,18,0.9))",
+                border: "1px solid rgba(255,255,255,0.06)",
+                boxShadow: "0 10px 22px rgba(0,0,0,0.25)",
+              }}
+            >
+              <div className="truncate text-[10px] font-semibold text-zinc-100">
+                {recentRelatedEvent.type === "whale" ? "Whale trigger" : "News trigger"}: {recentRelatedEvent.headline}
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <span className="truncate text-[9px] text-zinc-500">{recentRelatedEvent.source}</span>
+                <button
+                  type="button"
+                  onClick={() => focusOnEvent(recentRelatedEvent)}
+                  className="rounded-md border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[9px] font-semibold text-amber-200 transition hover:bg-amber-500/20"
+                >
+                  Focus
+                </button>
+              </div>
             </div>
           )}
 

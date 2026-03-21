@@ -614,6 +614,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     activeVenueState.activeSymbol
   );
   const backendVenueQuotes = useRealtimeSelector((state) => state.venueQuotes);
+  const realtimeNews = useRealtimeSelector((state) => state.news);
+  const realtimeWhales = useRealtimeSelector((state) => state.whales);
   const venueMarketPrices = useMemo<
     Partial<Record<ActiveVenueState["venueId"], Record<string, number>>>
   >(
@@ -812,6 +814,14 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     [fallbackTradableSymbols, venueSymbols],
   );
   const tradableSet = useMemo(() => new Set(tradableSymbols), [tradableSymbols]);
+  const chartEventItems = useMemo(
+    () =>
+      [...realtimeNews, ...realtimeWhales]
+        .filter((item) => item.ticker?.includes(activeVenueState.activeSymbol))
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 40),
+    [activeVenueState.activeSymbol, realtimeNews, realtimeWhales],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -1453,6 +1463,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
             : undefined
         }
         liveFeedConnected={activeVenueFeedState === "connected"}
+        selectedEvent={selectedItem}
+        eventItems={chartEventItems}
         positions={displayPositions}
         orders={orders}
         onUpdatePositionTpSl={updatePositionTpSl}
