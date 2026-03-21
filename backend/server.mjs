@@ -1502,8 +1502,10 @@ const server = http.createServer(async (request, reply) => {
         }
         json(reply, 400, { ok: false, error: "Unknown action type" });
       } catch (err) {
+        const message = err instanceof Error ? err.message : "OKX order request failed.";
         logger.warn("okx.order.failed", { type: body.type, instId, error: String(err) });
-        json(reply, 500, { ok: false, error: "OKX order request failed." });
+        const isClientIssue = /(insufficient|invalid|minimum|size|margin|leverage|position|instrument|parameter|order)/i.test(message);
+        json(reply, isClientIssue ? 400 : 500, { ok: false, error: message || "OKX order request failed." });
       }
       return;
     }
