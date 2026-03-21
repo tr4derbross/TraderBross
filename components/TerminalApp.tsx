@@ -295,6 +295,12 @@ const MOBILE_ROUTE_TABS: Array<{ href: string; label: string; active?: boolean }
   { href: "/terminal", label: "Terminal", active: true },
 ];
 
+const MOBILE_WORKSPACE_TABS: Array<{ id: WorkspaceTab; label: string }> = [
+  { id: "news", label: "News" },
+  { id: "chart", label: "Chart" },
+  { id: "tools", label: "Trade" },
+];
+
 const EMPTY_HEADER_CEX_CREDENTIALS: HeaderCexCredentialMap = {
   okx: { apiKey: "", apiSecret: "", passphrase: "" },
   bybit: { apiKey: "", apiSecret: "", passphrase: "" },
@@ -759,6 +765,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const mobileChartHeight = viewportWidth < 390 ? 142 : viewportWidth < 430 ? 154 : 166;
   const mobileNewsPaneFlex = viewportWidth < 390 ? "0 0 56%" : "0 0 53%";
   const mobileTradePaneFlex = viewportWidth < 390 ? "0 0 44%" : "0 0 47%";
+  const useMobileFocusMode = isMobile && viewportWidth < 430;
   const tabletRightPanelWidth = Math.max(304, Math.min(360, Math.round(viewportWidth * 0.36)));
   const selectedHeaderPlatform =
     HEADER_PLATFORMS.find((platform) => platform.id === headerPlatform) ?? HEADER_PLATFORMS[0];
@@ -1814,27 +1821,57 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
               </div>
             </>
           ) : (
-            /* Mobile: single page — chart top + news & trade side by side */
             <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
-              {/* Chart — compact fixed height */}
-              <div className="shrink-0 overflow-hidden" style={{ height: mobileChartHeight }}>
-                {renderChartPanel()}
-              </div>
-              {/* News (left) + Trade (right) — both always visible */}
-              <div
-                className="flex min-h-0 flex-1 overflow-hidden"
-                style={{ borderTop: "1px solid rgba(212,161,31,0.07)" }}
-              >
-                <div className="min-h-0 overflow-hidden" style={{ flex: mobileNewsPaneFlex }}>
-                  {renderNewsPanel()}
-                </div>
-                <div
-                  className="min-h-0 overflow-hidden"
-                  style={{ flex: mobileTradePaneFlex, borderLeft: "1px solid rgba(212,161,31,0.07)" }}
-                >
-                  {renderMobileTradePanel()}
-                </div>
-              </div>
+              {useMobileFocusMode ? (
+                <>
+                  <div
+                    className="shrink-0 border-b px-1.5 py-1"
+                    style={{ borderColor: "rgba(212,161,31,0.08)", background: "rgba(7,7,8,0.94)" }}
+                  >
+                    <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {MOBILE_WORKSPACE_TABS.map((tab) => (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setMobileWorkspaceTab(tab.id)}
+                          className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] transition-colors ${
+                            mobileWorkspaceTab === tab.id
+                              ? "border-[rgba(212,161,31,0.35)] bg-[rgba(212,161,31,0.12)] text-amber-100"
+                              : "border-white/10 bg-white/[0.03] text-zinc-400 hover:border-[rgba(212,161,31,0.2)] hover:text-zinc-200"
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-hidden" style={{ borderTop: "1px solid rgba(212,161,31,0.07)" }}>
+                    {mobileWorkspaceTab === "news" && <div className="h-full min-h-0 overflow-hidden">{renderNewsPanel()}</div>}
+                    {mobileWorkspaceTab === "chart" && <div className="h-full min-h-0 overflow-hidden">{renderChartPanel()}</div>}
+                    {mobileWorkspaceTab === "tools" && <div className="h-full min-h-0 overflow-hidden">{renderMobileTradePanel()}</div>}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="shrink-0 overflow-hidden" style={{ height: mobileChartHeight }}>
+                    {renderChartPanel()}
+                  </div>
+                  <div
+                    className="flex min-h-0 flex-1 overflow-hidden"
+                    style={{ borderTop: "1px solid rgba(212,161,31,0.07)" }}
+                  >
+                    <div className="min-h-0 overflow-hidden" style={{ flex: mobileNewsPaneFlex }}>
+                      {renderNewsPanel()}
+                    </div>
+                    <div
+                      className="min-h-0 overflow-hidden"
+                      style={{ flex: mobileTradePaneFlex, borderLeft: "1px solid rgba(212,161,31,0.07)" }}
+                    >
+                      {renderMobileTradePanel()}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -1958,7 +1995,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
               {wsConnected ? "Live" : "Reconnecting"}
             </span>
           </div>
-          <span className="text-[8px] font-semibold tracking-[0.14em] uppercase" style={{ color: "#2d2d2d" }}>TraderBross</span>
+          <span className="text-[8px] font-semibold tracking-[0.14em] uppercase" style={{ color: "#4b5563" }}>TraderBross</span>
         </div>
       )}
 
@@ -2373,4 +2410,5 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     </div>
   );
 }
+
 
