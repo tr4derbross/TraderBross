@@ -34,6 +34,10 @@ const SENSITIVE_ROUTES = new Set([
   "/api/venues/validate",
   "/api/binance",
   "/api/binance/order",
+  "/api/okx",
+  "/api/okx/order",
+  "/api/bybit",
+  "/api/bybit/order",
   "/api/hyperliquid/order",
 ]);
 
@@ -62,6 +66,36 @@ function binanceSignedQuery(secret, params = {}) {
   const qs = new URLSearchParams({ ...params, timestamp: Date.now().toString(), recvWindow: "5000" }).toString();
   const sig = crypto.createHmac("sha256", secret).update(qs).digest("hex");
   return `${qs}&signature=${sig}`;
+}
+
+function okxSign({ secret, passphrase, apiKey, method, requestPath, body = "" }) {
+  const timestamp = new Date().toISOString();
+  const prehash = `${timestamp}${String(method || "GET").toUpperCase()}${requestPath}${body}`;
+  const signature = crypto.createHmac("sha256", secret).update(prehash).digest("base64");
+  return {
+    "OK-ACCESS-KEY": apiKey,
+    "OK-ACCESS-SIGN": signature,
+    "OK-ACCESS-TIMESTAMP": timestamp,
+    "OK-ACCESS-PASSPHRASE": passphrase,
+    "Content-Type": "application/json",
+  };
+}
+
+function bybitSign({ secret, apiKey, method, query = "", body = "" }) {
+  const timestamp = Date.now().toString();
+  const recvWindow = "5000";
+  const payload = String(method || "GET").toUpperCase() === "GET"
+    ? `${timestamp}${apiKey}${recvWindow}${query}`
+    : `${timestamp}${apiKey}${recvWindow}${body}`;
+  const signature = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+  return {
+    "X-BAPI-API-KEY": apiKey,
+    "X-BAPI-SIGN": signature,
+    "X-BAPI-SIGN-TYPE": "2",
+    "X-BAPI-TIMESTAMP": timestamp,
+    "X-BAPI-RECV-WINDOW": recvWindow,
+    "Content-Type": "application/json",
+  };
 }
 
 function canonicalTickerParam(value, fallback = "BTC") {
@@ -786,35 +820,96 @@ const server = http.createServer(async (request, reply) => {
         json(reply, 401, { ok: false, message: "Session expired. Re-save your credentials." });
         return;
       }
-      if (scope !== "binance") {
-        json(reply, 200, {
-          ok: false,
-          message: `${scope.toUpperCase()} validation endpoint is not enabled yet in backend routing.`,
-        });
-        return;
-      }
-      const apiKey = entry?.payload?.apiKey || "";
-      const apiSecret = entry?.payload?.apiSecret || "";
-      const testnet = entry?.payload?.testnet || false;
-      const base = testnet ? "https://testnet.binancefuture.com" : "https://fapi.binance.com";
-      if (!apiKey || !apiSecret) {
-        json(reply, 401, { ok: false, message: "Session expired. Re-save your credentials." });
-        return;
-      }
       try {
-        const qs = binanceSignedQuery(apiSecret);
-        const res = await fetch(`${base}/fapi/v2/balance?${qs}`, { headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(8000) });
-        const data = await res.json();
-        if (!res.ok) {
-          json(reply, 200, { ok: false, message: data.msg || `Binance error ${res.status}` });
+        if (scope === "binance") {
+          const apiKey = entry?.payload?.apiKey || "";
+          const apiSecret = entry?.payload?.apiSecret || "";
+          const testnet = entry?.payload?.testnet || false;
+          const base = testnet ? "https://testnet.binancefuture.com" : "https://fapi.binance.com";
+          if (!apiKey || !apiSecret) {
+            json(reply, 401, { ok: false, message: "Session expired. Re-save your credentials." });
+            return;
+          }
+          const qs = binanceSignedQuery(apiSecret);
+          const res = await fetch(`${base}/fapi/v2/balance?${qs}`, { headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(8000) });
+          const data = await res.json();
+          if (!res.ok) {
+            json(reply, 200, { ok: false, message: data.msg || `Binance error ${res.status}` });
+            return;
+          }
+          const usdt = Array.isArray(data) ? data.find((b) => b.asset === "USDT") : null;
+          json(reply, 200, { ok: true, message: `Connected${usdt ? ` · USDT balance: ${parseFloat(usdt.availableBalance || "0").toFixed(2)}` : ""}` });
           return;
         }
-        const usdt = Array.isArray(data) ? data.find((b) => b.asset === "USDT") : null;
-        json(reply, 200, { ok: true, message: `Connected${usdt ? ` · USDT balance: ${parseFloat(usdt.availableBalance || "0").toFixed(2)}` : ""}` });
+
+        if (scope === "okx") {
+          const apiKey = entry?.payload?.apiKey || "";
+          const apiSecret = entry?.payload?.apiSecret || "";
+          const passphrase = entry?.payload?.passphrase || "";
+          if (!apiKey || !apiSecret || !passphrase) {
+            json(reply, 401, { ok: false, message: "Session expired. Re-save your credentials." });
+            return;
+          }
+          const path = "/api/v5/account/balance?ccy=USDT";
+          const headers = okxSign({
+            secret: apiSecret,
+            passphrase,
+            apiKey,
+            method: "GET",
+            requestPath: path,
+          });
+          const res = await fetch(`https://www.okx.com${path}`, { headers, signal: AbortSignal.timeout(8000) });
+          const data = await res.json();
+          if (!res.ok || data?.code !== "0") {
+            json(reply, 200, { ok: false, message: data?.msg || `OKX error ${res.status}` });
+            return;
+          }
+          const details = Array.isArray(data?.data?.[0]?.details) ? data.data[0].details : [];
+          const usdt = details.find((row) => row.ccy === "USDT");
+          json(reply, 200, {
+            ok: true,
+            message: `Connected${usdt ? ` · USDT available: ${parseFloat(usdt.availEq || usdt.cashBal || "0").toFixed(2)}` : ""}`,
+          });
+          return;
+        }
+
+        if (scope === "bybit") {
+          const apiKey = entry?.payload?.apiKey || "";
+          const apiSecret = entry?.payload?.apiSecret || "";
+          if (!apiKey || !apiSecret) {
+            json(reply, 401, { ok: false, message: "Session expired. Re-save your credentials." });
+            return;
+          }
+          const query = "accountType=UNIFIED";
+          const headers = bybitSign({
+            secret: apiSecret,
+            apiKey,
+            method: "GET",
+            query,
+          });
+          const res = await fetch(`https://api.bybit.com/v5/account/wallet-balance?${query}`, {
+            headers,
+            signal: AbortSignal.timeout(8000),
+          });
+          const data = await res.json();
+          if (!res.ok || Number(data?.retCode) !== 0) {
+            json(reply, 200, { ok: false, message: data?.retMsg || `Bybit error ${res.status}` });
+            return;
+          }
+          const coins = Array.isArray(data?.result?.list?.[0]?.coin) ? data.result.list[0].coin : [];
+          const usdt = coins.find((row) => row.coin === "USDT");
+          json(reply, 200, {
+            ok: true,
+            message: `Connected${usdt ? ` · USDT available: ${parseFloat(usdt.walletBalance || "0").toFixed(2)}` : ""}`,
+          });
+          return;
+        }
       } catch (err) {
-        logger.warn("venues.validate.failed", { error: String(err) });
+        logger.warn("venues.validate.failed", { venue: scope, error: String(err) });
         json(reply, 200, { ok: false, message: "Validation request failed. Please try again." });
+        return;
       }
+      json(reply, 400, { ok: false, message: "Unsupported venue." });
       return;
     }
 
@@ -1033,6 +1128,337 @@ const server = http.createServer(async (request, reply) => {
       } catch (err) {
         logger.warn("binance.order.failed", { type: body.type, symbol, error: String(err) });
         json(reply, 500, { ok: false, error: "Order request failed." });
+      }
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/okx") {
+      const body = await readJson(request);
+      const entry = getSecret(String(body.sessionToken || ""));
+      if (!entry || entry.scope !== "okx") {
+        json(reply, 401, { error: "Session expired. Re-save your credentials." });
+        return;
+      }
+      const apiKey = entry.payload?.apiKey || "";
+      const apiSecret = entry.payload?.apiSecret || "";
+      const passphrase = entry.payload?.passphrase || "";
+      if (!apiKey || !apiSecret || !passphrase) {
+        json(reply, 401, { error: "Session expired. Re-save your credentials." });
+        return;
+      }
+      const requestOkx = async (method, requestPath, payload = null) => {
+        const bodyStr = payload ? JSON.stringify(payload) : "";
+        const headers = okxSign({
+          secret: apiSecret,
+          passphrase,
+          apiKey,
+          method,
+          requestPath,
+          body: bodyStr,
+        });
+        const res = await fetch(`https://www.okx.com${requestPath}`, {
+          method,
+          headers,
+          body: bodyStr || undefined,
+          signal: AbortSignal.timeout(10_000),
+        });
+        const data = await res.json();
+        if (!res.ok || data?.code !== "0") {
+          throw new Error(data?.msg || `OKX error ${res.status}`);
+        }
+        return data;
+      };
+      try {
+        if (body.type === "balance") {
+          const data = await requestOkx("GET", "/api/v5/account/balance?ccy=USDT");
+          const details = Array.isArray(data?.data?.[0]?.details) ? data.data[0].details : [];
+          const usdt = details.find((row) => row.ccy === "USDT");
+          const total = parseFloat(usdt?.eq || usdt?.cashBal || "0");
+          const available = parseFloat(usdt?.availEq || usdt?.cashBal || "0");
+          json(reply, 200, { total, available, currency: "USDT" });
+          return;
+        }
+        if (body.type === "positions") {
+          const data = await requestOkx("GET", "/api/v5/account/positions?instType=SWAP");
+          const positions = (Array.isArray(data?.data) ? data.data : [])
+            .filter((row) => Math.abs(parseFloat(row.pos || "0")) > 0)
+            .map((row) => {
+              const size = Math.abs(parseFloat(row.pos || "0"));
+              const symbol = String(row.instId || "").split("-")[0] || "BTC";
+              const side = String(row.posSide || row.direction || "").toLowerCase() === "short" ? "short" : "long";
+              return {
+                coin: symbol,
+                side,
+                size,
+                entryPx: parseFloat(row.avgPx || "0"),
+                pnl: parseFloat(row.upl || "0"),
+                liquidationPx: parseFloat(row.liqPx || "0") || null,
+                leverage: parseInt(row.lever || "1", 10) || 1,
+                marginMode: String(row.mgnMode || "").toLowerCase() === "cross" ? "cross" : "isolated",
+              };
+            });
+          json(reply, 200, { positions });
+          return;
+        }
+        json(reply, 400, { error: "Unknown type" });
+      } catch (err) {
+        logger.warn("okx.data.failed", { type: body.type, error: String(err) });
+        json(reply, 500, { error: "OKX request failed." });
+      }
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/bybit") {
+      const body = await readJson(request);
+      const entry = getSecret(String(body.sessionToken || ""));
+      if (!entry || entry.scope !== "bybit") {
+        json(reply, 401, { error: "Session expired. Re-save your credentials." });
+        return;
+      }
+      const apiKey = entry.payload?.apiKey || "";
+      const apiSecret = entry.payload?.apiSecret || "";
+      if (!apiKey || !apiSecret) {
+        json(reply, 401, { error: "Session expired. Re-save your credentials." });
+        return;
+      }
+      const requestBybit = async (method, path, query = "", payload = null) => {
+        const bodyStr = payload ? JSON.stringify(payload) : "";
+        const headers = bybitSign({
+          secret: apiSecret,
+          apiKey,
+          method,
+          query,
+          body: bodyStr,
+        });
+        const url = `https://api.bybit.com${path}${query ? `?${query}` : ""}`;
+        const res = await fetch(url, {
+          method,
+          headers,
+          body: bodyStr || undefined,
+          signal: AbortSignal.timeout(10_000),
+        });
+        const data = await res.json();
+        if (!res.ok || Number(data?.retCode) !== 0) {
+          throw new Error(data?.retMsg || `Bybit error ${res.status}`);
+        }
+        return data;
+      };
+      try {
+        if (body.type === "balance") {
+          const data = await requestBybit("GET", "/v5/account/wallet-balance", "accountType=UNIFIED");
+          const coins = Array.isArray(data?.result?.list?.[0]?.coin) ? data.result.list[0].coin : [];
+          const usdt = coins.find((row) => row.coin === "USDT");
+          json(reply, 200, {
+            total: parseFloat(usdt?.equity || usdt?.walletBalance || "0"),
+            available: parseFloat(usdt?.walletBalance || "0"),
+            currency: "USDT",
+          });
+          return;
+        }
+        if (body.type === "positions") {
+          const data = await requestBybit("GET", "/v5/position/list", "category=linear&settleCoin=USDT");
+          const rows = Array.isArray(data?.result?.list) ? data.result.list : [];
+          const positions = rows
+            .filter((row) => Math.abs(parseFloat(row.size || "0")) > 0)
+            .map((row) => ({
+              coin: String(row.symbol || "").replace(/USDT$/i, ""),
+              side: String(row.side || "").toLowerCase() === "sell" ? "short" : "long",
+              size: Math.abs(parseFloat(row.size || "0")),
+              entryPx: parseFloat(row.avgPrice || "0"),
+              pnl: parseFloat(row.unrealisedPnl || "0"),
+              liquidationPx: parseFloat(row.liqPrice || "0") || null,
+              leverage: parseInt(row.leverage || "1", 10) || 1,
+              marginMode: String(row.tradeMode || row.positionIM || "").toLowerCase().includes("cross") ? "cross" : "isolated",
+            }));
+          json(reply, 200, { positions });
+          return;
+        }
+        json(reply, 400, { error: "Unknown type" });
+      } catch (err) {
+        logger.warn("bybit.data.failed", { type: body.type, error: String(err) });
+        json(reply, 500, { error: "Bybit request failed." });
+      }
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/bybit/order") {
+      const body = await readJson(request);
+      const entry = getSecret(String(body.sessionToken || ""));
+      if (!entry || entry.scope !== "bybit") {
+        json(reply, 401, { ok: false, error: "Session expired. Re-save your credentials." });
+        return;
+      }
+      const apiKey = entry.payload?.apiKey || "";
+      const apiSecret = entry.payload?.apiSecret || "";
+      if (!apiKey || !apiSecret) {
+        json(reply, 401, { ok: false, error: "Session expired. Re-save your credentials." });
+        return;
+      }
+      const symbol = normalizeTradeSymbol(body.symbol, body.quoteAsset || "USDT");
+      const requestBybit = async (method, path, query = "", payload = null) => {
+        const bodyStr = payload ? JSON.stringify(payload) : "";
+        const headers = bybitSign({
+          secret: apiSecret,
+          apiKey,
+          method,
+          query,
+          body: bodyStr,
+        });
+        const url = `https://api.bybit.com${path}${query ? `?${query}` : ""}`;
+        const res = await fetch(url, { method, headers, body: bodyStr || undefined, signal: AbortSignal.timeout(10_000) });
+        const data = await res.json();
+        if (!res.ok || Number(data?.retCode) !== 0) throw new Error(data?.retMsg || `Bybit error ${res.status}`);
+        return data;
+      };
+      try {
+        if (body.type === "leverage") {
+          const leverage = String(Math.max(1, Math.min(100, Math.round(Number(body.leverage) || 1))));
+          await requestBybit("POST", "/v5/position/set-leverage", "", {
+            category: "linear",
+            symbol,
+            buyLeverage: leverage,
+            sellLeverage: leverage,
+          });
+          json(reply, 200, { ok: true });
+          return;
+        }
+        if (body.type === "marginType") {
+          json(reply, 200, { ok: true });
+          return;
+        }
+        if (body.type === "cancel") {
+          await requestBybit("POST", "/v5/order/cancel", "", {
+            category: "linear",
+            symbol,
+            orderId: String(body.orderId || ""),
+          });
+          json(reply, 200, { ok: true });
+          return;
+        }
+        if (body.type === "order") {
+          const mp = await fetch(`https://api.bybit.com/v5/market/tickers?category=linear&symbol=${symbol}`, {
+            signal: AbortSignal.timeout(5000),
+          }).then((r) => r.json());
+          const markPrice = parseFloat(mp?.result?.list?.[0]?.markPrice || "0");
+          const marginAmount = finitePositiveNumber(body.marginAmount);
+          const leverage = Math.max(1, Math.min(100, Math.round(Number(body.leverage) || 1)));
+          if (!markPrice || !marginAmount) {
+            json(reply, 400, { ok: false, error: "Invalid margin amount or mark price." });
+            return;
+          }
+          const qty = (marginAmount * leverage) / markPrice;
+          const qtyStr = qty >= 100 ? qty.toFixed(0) : qty >= 1 ? qty.toFixed(2) : qty.toFixed(3);
+          const side = body.side === "short" ? "Sell" : "Buy";
+          const payload = {
+            category: "linear",
+            symbol,
+            side,
+            orderType: body.orderType === "limit" ? "Limit" : "Market",
+            qty: qtyStr,
+            ...(body.orderType === "limit" && body.limitPrice ? { price: String(body.limitPrice), timeInForce: "GTC" } : {}),
+          };
+          const result = await requestBybit("POST", "/v5/order/create", "", payload);
+          json(reply, 200, { ok: true, data: result });
+          return;
+        }
+        json(reply, 400, { ok: false, error: "Unknown action type" });
+      } catch (err) {
+        logger.warn("bybit.order.failed", { type: body.type, symbol, error: String(err) });
+        json(reply, 500, { ok: false, error: "Bybit order request failed." });
+      }
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/okx/order") {
+      const body = await readJson(request);
+      const entry = getSecret(String(body.sessionToken || ""));
+      if (!entry || entry.scope !== "okx") {
+        json(reply, 401, { ok: false, error: "Session expired. Re-save your credentials." });
+        return;
+      }
+      const apiKey = entry.payload?.apiKey || "";
+      const apiSecret = entry.payload?.apiSecret || "";
+      const passphrase = entry.payload?.passphrase || "";
+      if (!apiKey || !apiSecret || !passphrase) {
+        json(reply, 401, { ok: false, error: "Session expired. Re-save your credentials." });
+        return;
+      }
+      const instId = `${canonicalTickerParam(body.symbol, "BTC")}-USDT-SWAP`;
+      const requestOkx = async (method, requestPath, payload = null) => {
+        const bodyStr = payload ? JSON.stringify(payload) : "";
+        const headers = okxSign({
+          secret: apiSecret,
+          passphrase,
+          apiKey,
+          method,
+          requestPath,
+          body: bodyStr,
+        });
+        const res = await fetch(`https://www.okx.com${requestPath}`, {
+          method,
+          headers,
+          body: bodyStr || undefined,
+          signal: AbortSignal.timeout(10_000),
+        });
+        const data = await res.json();
+        if (!res.ok || data?.code !== "0") throw new Error(data?.msg || `OKX error ${res.status}`);
+        return data;
+      };
+      try {
+        if (body.type === "leverage") {
+          const leverage = String(Math.max(1, Math.min(100, Math.round(Number(body.leverage) || 1))));
+          await requestOkx("POST", "/api/v5/account/set-leverage", {
+            instId,
+            lever: leverage,
+            mgnMode: body.marginMode === "cross" ? "cross" : "isolated",
+          });
+          json(reply, 200, { ok: true });
+          return;
+        }
+        if (body.type === "marginType") {
+          json(reply, 200, { ok: true });
+          return;
+        }
+        if (body.type === "cancel") {
+          await requestOkx("POST", "/api/v5/trade/cancel-order", {
+            instId,
+            ordId: String(body.orderId || ""),
+          });
+          json(reply, 200, { ok: true });
+          return;
+        }
+        if (body.type === "order") {
+          const ticker = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${encodeURIComponent(instId)}`, {
+            signal: AbortSignal.timeout(5000),
+          }).then((r) => r.json());
+          const markPrice = parseFloat(ticker?.data?.[0]?.last || "0");
+          const marginAmount = finitePositiveNumber(body.marginAmount);
+          const leverage = Math.max(1, Math.min(100, Math.round(Number(body.leverage) || 1)));
+          if (!markPrice || !marginAmount) {
+            json(reply, 400, { ok: false, error: "Invalid margin amount or mark price." });
+            return;
+          }
+          const inst = await fetch(`https://www.okx.com/api/v5/public/instruments?instType=SWAP&instId=${encodeURIComponent(instId)}`, {
+            signal: AbortSignal.timeout(5000),
+          }).then((r) => r.json());
+          const ctVal = parseFloat(inst?.data?.[0]?.ctVal || "1");
+          const rawSz = (marginAmount * leverage) / Math.max(1e-9, markPrice * ctVal);
+          const sz = rawSz >= 100 ? rawSz.toFixed(0) : rawSz >= 1 ? rawSz.toFixed(2) : rawSz.toFixed(3);
+          const result = await requestOkx("POST", "/api/v5/trade/order", {
+            instId,
+            tdMode: body.marginMode === "cross" ? "cross" : "isolated",
+            side: body.side === "short" ? "sell" : "buy",
+            ordType: body.orderType === "limit" ? "limit" : "market",
+            sz,
+            ...(body.orderType === "limit" && body.limitPrice ? { px: String(body.limitPrice) } : {}),
+          });
+          json(reply, 200, { ok: true, data: result });
+          return;
+        }
+        json(reply, 400, { ok: false, error: "Unknown action type" });
+      } catch (err) {
+        logger.warn("okx.order.failed", { type: body.type, instId, error: String(err) });
+        json(reply, 500, { ok: false, error: "OKX order request failed." });
       }
       return;
     }
