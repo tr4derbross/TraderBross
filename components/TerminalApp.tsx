@@ -975,8 +975,17 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         const pos = displayPositions.find((p) => p.id === positionId);
         if (pos) {
           const connection = buildActiveVenueConnection();
+          const venueId = activeVenueState.venueId;
+          const orderEndpoint =
+            venueId === "binance" || venueId === "okx" || venueId === "bybit" || venueId === "hyperliquid"
+              ? `/api/${venueId}/order`
+              : null;
+          if (!orderEndpoint) {
+            closePosition(positionId);
+            return;
+          }
           try {
-            const res = await fetch(buildApiUrl("/api/binance/order"), {
+            const res = await fetch(buildApiUrl(orderEndpoint), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -988,8 +997,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
             });
             const data = await res.json() as { ok?: boolean; error?: string };
             if (!data.ok) {
-              // Show error in browser console + alert so user knows what happened
-              console.error("[ClosePosition] Binance error:", data.error);
+              console.error(`[ClosePosition] ${venueId} error:`, data.error);
               window.alert(`Close position failed: ${data.error ?? "Unknown error"}`);
               return;
             }
@@ -1006,7 +1014,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       // Paper trading fallback
       closePosition(positionId);
     },
-    [venuePositions, displayPositions, buildActiveVenueConnection, closePosition]
+    [venuePositions, displayPositions, buildActiveVenueConnection, closePosition, activeVenueState.venueId]
   );
 
   // Set TP/SL on a live Binance position
@@ -1016,7 +1024,16 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         const pos = displayPositions.find((p) => p.id === positionId);
         if (pos) {
           const connection = buildActiveVenueConnection();
-          await fetch(buildApiUrl("/api/binance/order"), {
+          const venueId = activeVenueState.venueId;
+          const orderEndpoint =
+            venueId === "binance" || venueId === "okx" || venueId === "bybit" || venueId === "hyperliquid"
+              ? `/api/${venueId}/order`
+              : null;
+          if (!orderEndpoint) {
+            updatePositionTpSl(positionId, tpPrice, slPrice);
+            return;
+          }
+          await fetch(buildApiUrl(orderEndpoint), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -1034,7 +1051,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       // Paper trading fallback
       updatePositionTpSl(positionId, tpPrice, slPrice);
     },
-    [venuePositions, displayPositions, buildActiveVenueConnection, updatePositionTpSl]
+    [venuePositions, displayPositions, buildActiveVenueConnection, updatePositionTpSl, activeVenueState.venueId]
   );
 
   const disconnectHeaderWallet = useCallback(async () => {

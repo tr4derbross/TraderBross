@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 import http from "node:http";
 import { URL } from "node:url";
 import { WebSocketServer } from "ws";
+import { ethers } from "ethers";
+import { encode as msgpackEncode } from "@msgpack/msgpack";
 import { loadConfig } from "./config.mjs";
 import { createLogger } from "./logger.mjs";
 import { getProviderLabel, streamChat, classifySentiment } from "./services/ai-service.mjs";
@@ -191,6 +193,103 @@ function finitePositiveNumber(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
   return parsed;
+}
+
+function toWireDecimal(value, precision = 8) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "0";
+  const fixed = num.toFixed(precision);
+  const trimmed = fixed.replace(/\.?0+$/, "");
+  return trimmed === "" || trimmed === "-0" ? "0" : trimmed;
+}
+
+function concatBytes(parts) {
+  const total = parts.reduce((sum, part) => sum + part.length, 0);
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    merged.set(part, offset);
+    offset += part.length;
+  }
+  return merged;
+}
+
+function hyperAddressToBytes(address) {
+  return ethers.getBytes(address);
+}
+
+function hyperActionHash(action, vaultAddress, nonce, expiresAfter) {
+  const nonceBytes = new Uint8Array(8);
+  new DataView(nonceBytes.buffer).setBigUint64(0, BigInt(nonce), false);
+  const parts = [msgpackEncode(action), nonceBytes];
+  if (vaultAddress) {
+    parts.push(Uint8Array.from([1]));
+    parts.push(hyperAddressToBytes(vaultAddress));
+  } else {
+    parts.push(Uint8Array.from([0]));
+  }
+  if (expiresAfter != null) {
+    const expBytes = new Uint8Array(8);
+    new DataView(expBytes.buffer).setBigUint64(0, BigInt(expiresAfter), false);
+    parts.push(Uint8Array.from([0]));
+    parts.push(expBytes);
+  }
+  return ethers.keccak256(concatBytes(parts));
+}
+
+async function signHyperL1Action({ privateKey, action, nonce, vaultAddress, expiresAfter = null, isMainnet = true }) {
+  const wallet = new ethers.Wallet(privateKey);
+  const connectionId = hyperActionHash(action, vaultAddress, nonce, expiresAfter);
+  const domain = {
+    chainId: 1337,
+    name: "Exchange",
+    version: "1",
+    verifyingContract: "0x0000000000000000000000000000000000000000",
+  };
+  const types = {
+    Agent: [
+      { name: "source", type: "string" },
+      { name: "connectionId", type: "bytes32" },
+    ],
+  };
+  const rawSignature = await wallet.signTypedData(domain, types, {
+    source: isMainnet ? "a" : "b",
+    connectionId,
+  });
+  const signature = ethers.Signature.from(rawSignature);
+  return { r: signature.r, s: signature.s, v: signature.v };
+}
+
+async function getHyperMeta() {
+  return endpointCache.remember("hyper:meta", 60_000, async () => {
+    const payload = await fetch("https://api.hyperliquid.xyz/info", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "meta" }),
+      signal: AbortSignal.timeout(5000),
+    }).then((res) => res.json());
+    return Array.isArray(payload?.universe) ? payload.universe : [];
+  });
+}
+
+async function getHyperAssetIndex(symbol) {
+  const universe = await getHyperMeta();
+  const target = canonicalTickerParam(symbol, "BTC");
+  const idx = universe.findIndex((row) => canonicalTickerParam(row?.name, "") === target);
+  return idx >= 0 ? idx : null;
+}
+
+async function getHyperMarkPrice(symbol) {
+  const target = canonicalTickerParam(symbol, "BTC");
+  const payload = await fetch("https://api.hyperliquid.xyz/info", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ type: "allMids" }),
+    signal: AbortSignal.timeout(5000),
+  }).then((res) => res.json());
+  const raw = payload?.[target];
+  const parsed = Number(raw || 0);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 async function getOkxContractValue(instId) {
@@ -533,7 +632,247 @@ const server = http.createServer(async (request, reply) => {
     }
 
     if (request.method === "POST" && url.pathname === "/api/hyperliquid/order") {
-      json(reply, 200, { ok: false, error: "Backend order routing is not enabled in this refactor yet." });
+      const body = await readJson(request);
+      const entry = getSecret(String(body.sessionToken || ""));
+      if (!entry || entry.scope !== "hyperliquid") {
+        json(reply, 401, { ok: false, error: "Session expired. Re-save your credentials." });
+        return;
+      }
+      const privateKey = String(entry.payload?.privateKey || "");
+      const vaultAddress = String(entry.payload?.walletAddress || "").trim() || undefined;
+      if (!privateKey) {
+        json(reply, 401, { ok: false, error: "Session expired. Re-save your credentials." });
+        return;
+      }
+
+      const postExchange = async (action, expiresAfter = null) => {
+        const nonce = Date.now();
+        const signature = await signHyperL1Action({
+          privateKey,
+          action,
+          nonce,
+          vaultAddress,
+          expiresAfter,
+          isMainnet: true,
+        });
+        const payload = {
+          action,
+          nonce,
+          signature,
+          ...(vaultAddress ? { vaultAddress } : {}),
+          ...(expiresAfter != null ? { expiresAfter } : {}),
+        };
+        const res = await fetch("https://api.hyperliquid.xyz/exchange", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(8_000),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || `Hyperliquid error ${res.status}`);
+        const status = String(data?.status || "").toLowerCase();
+        if (status && status !== "ok") {
+          throw new Error(data?.response || data?.error || "Hyperliquid rejected the action.");
+        }
+        return data;
+      };
+
+      try {
+        const symbol = canonicalTickerParam(body.symbol, "BTC");
+        const asset = await getHyperAssetIndex(symbol);
+        if (asset == null) {
+          json(reply, 400, { ok: false, error: `Unsupported Hyperliquid symbol: ${symbol}` });
+          return;
+        }
+
+        if (body.type === "cancel") {
+          const oid = Number(body.orderId || 0);
+          if (!Number.isFinite(oid) || oid <= 0) {
+            json(reply, 400, { ok: false, error: "Invalid orderId." });
+            return;
+          }
+          const result = await postExchange({ type: "cancel", cancels: [{ a: asset, o: oid }] });
+          json(reply, 200, { ok: true, data: result });
+          return;
+        }
+
+        if (body.type === "leverage") {
+          const leverage = Math.max(1, Math.min(50, Math.round(Number(body.leverage) || 1)));
+          const isCross = String(body.marginMode || "").toLowerCase() === "cross";
+          const result = await postExchange({ type: "updateLeverage", asset, isCross, leverage });
+          json(reply, 200, { ok: true, data: result });
+          return;
+        }
+
+        if (body.type === "marginMode") {
+          json(reply, 200, { ok: true });
+          return;
+        }
+
+        const markPrice = await getHyperMarkPrice(symbol);
+        if (!markPrice) {
+          json(reply, 400, { ok: false, error: "Could not fetch Hyperliquid mark price." });
+          return;
+        }
+
+        if (body.type === "closePosition" || body.type === "tpsl") {
+          const accountAddress = vaultAddress;
+          if (!accountAddress) {
+            json(reply, 400, { ok: false, error: "Wallet address is required for this action." });
+            return;
+          }
+          const account = await getHyperliquidAccount(accountAddress);
+          const pos = Array.isArray(account?.positions)
+            ? account.positions.find((row) => canonicalTickerParam(row.coin, "") === symbol)
+            : null;
+          if (!pos || !finitePositiveNumber(pos.size)) {
+            json(reply, 200, { ok: true, data: { message: "No open position found." } });
+            return;
+          }
+          const posSize = Number(pos.size);
+          const closeIsBuy = String(pos.side || "").toLowerCase() === "short";
+          if (body.type === "closePosition") {
+            const px = closeIsBuy ? markPrice * 1.03 : markPrice * 0.97;
+            const action = {
+              type: "order",
+              orders: [
+                {
+                  a: asset,
+                  b: closeIsBuy,
+                  p: toWireDecimal(px),
+                  s: toWireDecimal(posSize),
+                  r: true,
+                  t: { limit: { tif: "Ioc" } },
+                },
+              ],
+              grouping: "na",
+            };
+            const result = await postExchange(action);
+            json(reply, 200, { ok: true, data: result });
+            return;
+          }
+          const tp = finitePositiveNumber(body.tpPrice);
+          const sl = finitePositiveNumber(body.slPrice);
+          if (!tp && !sl) {
+            json(reply, 400, { ok: false, error: "Provide TP and/or SL price." });
+            return;
+          }
+          if (tp && (!closeIsBuy ? tp <= markPrice : tp >= markPrice)) {
+            json(reply, 400, { ok: false, error: "TP must be above mark for long and below mark for short." });
+            return;
+          }
+          if (sl && (!closeIsBuy ? sl >= markPrice : sl <= markPrice)) {
+            json(reply, 400, { ok: false, error: "SL must be below mark for long and above mark for short." });
+            return;
+          }
+          const orders = [];
+          if (tp) {
+            orders.push({
+              a: asset,
+              b: closeIsBuy,
+              p: toWireDecimal(tp),
+              s: toWireDecimal(posSize),
+              r: true,
+              t: { trigger: { isMarket: true, triggerPx: toWireDecimal(tp), tpsl: "tp" } },
+            });
+          }
+          if (sl) {
+            orders.push({
+              a: asset,
+              b: closeIsBuy,
+              p: toWireDecimal(sl),
+              s: toWireDecimal(posSize),
+              r: true,
+              t: { trigger: { isMarket: true, triggerPx: toWireDecimal(sl), tpsl: "sl" } },
+            });
+          }
+          const result = await postExchange({ type: "order", orders, grouping: "positionTpsl" });
+          json(reply, 200, { ok: true, data: result });
+          return;
+        }
+
+        if (body.type === "order") {
+          const marginAmount = finitePositiveNumber(body.marginAmount);
+          const leverage = Math.max(1, Math.min(50, Math.round(Number(body.leverage) || 1)));
+          if (!marginAmount) {
+            json(reply, 400, { ok: false, error: "Invalid margin amount." });
+            return;
+          }
+          const size = (marginAmount * leverage) / Math.max(1e-9, markPrice);
+          const isBuy = String(body.side || "long").toLowerCase() !== "short";
+          const tp = finitePositiveNumber(body.tpPrice);
+          const sl = finitePositiveNumber(body.slPrice);
+          if (tp && (isBuy ? tp <= markPrice : tp >= markPrice)) {
+            json(reply, 400, { ok: false, error: "TP must be above mark for long and below mark for short." });
+            return;
+          }
+          if (sl && (isBuy ? sl >= markPrice : sl <= markPrice)) {
+            json(reply, 400, { ok: false, error: "SL must be below mark for long and above mark for short." });
+            return;
+          }
+          let entryOrderType;
+          let px;
+          if (body.orderType === "limit") {
+            const lp = finitePositiveNumber(body.limitPrice);
+            if (!lp) {
+              json(reply, 400, { ok: false, error: "Invalid limit price." });
+              return;
+            }
+            entryOrderType = { limit: { tif: "Gtc" } };
+            px = lp;
+          } else {
+            // Hyperliquid market route is an aggressive IOC limit.
+            entryOrderType = { limit: { tif: "Ioc" } };
+            px = isBuy ? markPrice * 1.03 : markPrice * 0.97;
+          }
+          const orders = [
+            {
+              a: asset,
+              b: isBuy,
+              p: toWireDecimal(px),
+              s: toWireDecimal(size),
+              r: false,
+              t: entryOrderType,
+            },
+          ];
+          if (tp || sl) {
+            const closeIsBuy = !isBuy;
+            if (tp) {
+              orders.push({
+                a: asset,
+                b: closeIsBuy,
+                p: toWireDecimal(tp),
+                s: toWireDecimal(size),
+                r: true,
+                t: { trigger: { isMarket: true, triggerPx: toWireDecimal(tp), tpsl: "tp" } },
+              });
+            }
+            if (sl) {
+              orders.push({
+                a: asset,
+                b: closeIsBuy,
+                p: toWireDecimal(sl),
+                s: toWireDecimal(size),
+                r: true,
+                t: { trigger: { isMarket: true, triggerPx: toWireDecimal(sl), tpsl: "sl" } },
+              });
+            }
+          }
+          const result = await postExchange({
+            type: "order",
+            orders,
+            grouping: tp || sl ? "normalTpsl" : "na",
+          });
+          json(reply, 200, { ok: true, data: result });
+          return;
+        }
+
+        json(reply, 400, { ok: false, error: "Unknown action type" });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Hyperliquid order request failed.";
+        logger.warn("hyperliquid.order.failed", { type: body.type, error: String(err) });
+        json(reply, 500, { ok: false, error: message || "Hyperliquid order request failed." });
+      }
       return;
     }
 
@@ -1380,6 +1719,73 @@ const server = http.createServer(async (request, reply) => {
           json(reply, 200, { ok: true });
           return;
         }
+        if (body.type === "closePosition") {
+          const side = body.side === "short" ? "Buy" : "Sell";
+          const posData = await requestBybit("GET", "/v5/position/list", `category=linear&symbol=${encodeURIComponent(symbol)}`);
+          const pos = Array.isArray(posData?.result?.list)
+            ? posData.result.list.find((row) => String(row.symbol || "").toUpperCase() === symbol)
+            : null;
+          const size = Math.abs(parseFloat(pos?.size || "0"));
+          if (!size) {
+            json(reply, 200, { ok: true, data: { message: "No open position found." } });
+            return;
+          }
+          const qty = size >= 100 ? size.toFixed(0) : size >= 1 ? size.toFixed(2) : size.toFixed(3);
+          const result = await requestBybit("POST", "/v5/order/create", "", {
+            category: "linear",
+            symbol,
+            side,
+            orderType: "Market",
+            qty,
+            reduceOnly: true,
+            closeOnTrigger: true,
+          });
+          json(reply, 200, { ok: true, data: result });
+          return;
+        }
+        if (body.type === "tpsl") {
+          const tp = finitePositiveNumber(body.tpPrice);
+          const sl = finitePositiveNumber(body.slPrice);
+          if (!tp && !sl) {
+            json(reply, 400, { ok: false, error: "Provide TP and/or SL price." });
+            return;
+          }
+          const markPrice = parseFloat((await fetch(`${base}/v5/market/tickers?category=linear&symbol=${symbol}`, {
+            signal: AbortSignal.timeout(5000),
+          }).then((r) => r.json()))?.result?.list?.[0]?.markPrice || "0");
+          const isShort = body.side === "short";
+          if (tp && (!isShort ? tp <= markPrice : tp >= markPrice)) {
+            json(reply, 400, { ok: false, error: "TP must be above mark for long and below mark for short." });
+            return;
+          }
+          if (sl && (!isShort ? sl >= markPrice : sl <= markPrice)) {
+            json(reply, 400, { ok: false, error: "SL must be below mark for long and above mark for short." });
+            return;
+          }
+          let result;
+          try {
+            result = await requestBybit("POST", "/v5/position/trading-stop", "", {
+              category: "linear",
+              symbol,
+              tpslMode: "Full",
+              positionIdx: isShort ? 2 : 1,
+              ...(tp ? { takeProfit: String(tp), tpTriggerBy: "LastPrice" } : {}),
+              ...(sl ? { stopLoss: String(sl), slTriggerBy: "LastPrice" } : {}),
+            });
+          } catch {
+            // One-way mode fallback.
+            result = await requestBybit("POST", "/v5/position/trading-stop", "", {
+              category: "linear",
+              symbol,
+              tpslMode: "Full",
+              positionIdx: 0,
+              ...(tp ? { takeProfit: String(tp), tpTriggerBy: "LastPrice" } : {}),
+              ...(sl ? { stopLoss: String(sl), slTriggerBy: "LastPrice" } : {}),
+            });
+          }
+          json(reply, 200, { ok: true, data: result });
+          return;
+        }
         if (body.type === "order") {
           const mp = await fetch(`${base}/v5/market/tickers?category=linear&symbol=${symbol}`, {
             signal: AbortSignal.timeout(5000),
@@ -1488,6 +1894,65 @@ const server = http.createServer(async (request, reply) => {
             ordId: String(body.orderId || ""),
           });
           json(reply, 200, { ok: true });
+          return;
+        }
+        if (body.type === "closePosition") {
+          const posData = await requestOkx("GET", `/api/v5/account/positions?instType=SWAP&instId=${encodeURIComponent(instId)}`);
+          const row = Array.isArray(posData?.data) ? posData.data[0] : null;
+          const contracts = Math.abs(parseFloat(row?.pos || "0"));
+          if (!contracts) {
+            json(reply, 200, { ok: true, data: { message: "No open position found." } });
+            return;
+          }
+          const side = body.side === "short" ? "buy" : "sell";
+          const result = await requestOkx("POST", "/api/v5/trade/order", {
+            instId,
+            tdMode: body.marginMode === "cross" ? "cross" : "isolated",
+            side,
+            ordType: "market",
+            sz: contracts >= 100 ? contracts.toFixed(0) : contracts >= 1 ? contracts.toFixed(2) : contracts.toFixed(3),
+            reduceOnly: true,
+          });
+          json(reply, 200, { ok: true, data: result });
+          return;
+        }
+        if (body.type === "tpsl") {
+          const tp = finitePositiveNumber(body.tpPrice);
+          const sl = finitePositiveNumber(body.slPrice);
+          if (!tp && !sl) {
+            json(reply, 400, { ok: false, error: "Provide TP and/or SL price." });
+            return;
+          }
+          const markPrice = parseFloat((await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${encodeURIComponent(instId)}`, {
+            signal: AbortSignal.timeout(5000),
+          }).then((r) => r.json()))?.data?.[0]?.last || "0");
+          const isShort = body.side === "short";
+          if (tp && (!isShort ? tp <= markPrice : tp >= markPrice)) {
+            json(reply, 400, { ok: false, error: "TP must be above mark for long and below mark for short." });
+            return;
+          }
+          if (sl && (!isShort ? sl >= markPrice : sl <= markPrice)) {
+            json(reply, 400, { ok: false, error: "SL must be below mark for long and above mark for short." });
+            return;
+          }
+          const posData = await requestOkx("GET", `/api/v5/account/positions?instType=SWAP&instId=${encodeURIComponent(instId)}`);
+          const row = Array.isArray(posData?.data) ? posData.data[0] : null;
+          const contracts = Math.abs(parseFloat(row?.pos || "0"));
+          if (!contracts) {
+            json(reply, 400, { ok: false, error: "No open position found for TP/SL." });
+            return;
+          }
+          const side = isShort ? "buy" : "sell";
+          const result = await requestOkx("POST", "/api/v5/trade/order-algo", {
+            instId,
+            tdMode: body.marginMode === "cross" ? "cross" : "isolated",
+            side,
+            ordType: tp && sl ? "oco" : "conditional",
+            sz: contracts >= 100 ? contracts.toFixed(0) : contracts >= 1 ? contracts.toFixed(2) : contracts.toFixed(3),
+            ...(tp ? { tpTriggerPx: String(tp), tpOrdPx: "-1" } : {}),
+            ...(sl ? { slTriggerPx: String(sl), slOrdPx: "-1" } : {}),
+          });
+          json(reply, 200, { ok: true, data: result });
           return;
         }
         if (body.type === "order") {
