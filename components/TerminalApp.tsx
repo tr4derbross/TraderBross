@@ -790,24 +790,29 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
   useEffect(() => {
     let cancelled = false;
-    void apiFetch<string[]>(
-      `/api/venues/symbols?venue=${encodeURIComponent(activeVenueState.venueId)}&quote=${encodeURIComponent(quoteAsset)}`,
-    )
-      .then((rows) => {
-        if (cancelled || !Array.isArray(rows)) return;
-        const normalized = Array.from(
-          new Set(
-            rows.map((row) => normalizeVenueTicker(row)).filter(Boolean),
-          ),
+    const loadVenueSymbols = async () => {
+      try {
+        const rows = await apiFetch<string[]>(
+          `/api/venues/symbols?venue=${encodeURIComponent(activeVenueState.venueId)}&quote=${encodeURIComponent(quoteAsset)}`,
         );
-        setVenueSymbols(normalized);
-      })
-      .catch(() => {
-        if (!cancelled) setVenueSymbols([]);
-      });
+        if (cancelled || !Array.isArray(rows)) return;
+        const normalized = Array.from(new Set(rows.map((row) => normalizeVenueTicker(row)).filter(Boolean)));
+        if (normalized.length > 0) {
+          setVenueSymbols(normalized);
+        }
+      } catch {
+        // Preserve previous symbols on transient failures.
+      }
+    };
+
+    void loadVenueSymbols();
+    const retryId = setInterval(() => {
+      void loadVenueSymbols();
+    }, 45_000);
 
     return () => {
       cancelled = true;
+      clearInterval(retryId);
     };
   }, [activeVenueState.venueId, quoteAsset]);
 
