@@ -41,16 +41,21 @@ const subscribeTicker: VenueAdapter["subscribeTicker"] = (symbol, onTick) => {
 };
 
 async function binanceOrderPost(body: Record<string, unknown>) {
-  const res = await fetch(buildApiUrl("/api/binance/order"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json() as { ok?: boolean; error?: string; data?: unknown };
-  if (!res.ok || !data.ok) {
-    return { ok: false as const, message: data.error ?? `HTTP ${res.status}` };
+  try {
+    const res = await fetch(buildApiUrl("/api/binance/order"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(12_000),
+      body: JSON.stringify(body),
+    });
+    const data = await res.json() as { ok?: boolean; error?: string; data?: unknown };
+    if (!res.ok || !data.ok) {
+      return { ok: false as const, message: data.error ?? `HTTP ${res.status}` };
+    }
+    return { ok: true as const, message: "Order submitted to Binance Futures." };
+  } catch (error) {
+    return { ok: false as const, message: error instanceof Error ? error.message : "Binance request timeout." };
   }
-  return { ok: true as const, message: "Order submitted to Binance Futures." };
 }
 
 async function binanceDataPost<T>(type: string, sessionToken: string): Promise<T> {
