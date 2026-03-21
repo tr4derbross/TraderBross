@@ -153,6 +153,7 @@ export default function PriceChart({
   const [chartReady, setChartReady] = useState(false);
   const [chartError, setChartError] = useState<string | null>(null);
   const [isLoadingPrices, setIsLoadingPrices] = useState(true);
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dragTarget, setDragTarget] = useState<"tp" | "sl" | null>(null);
   const [menu, setMenu] = useState<ChartMenu>(null);
@@ -519,23 +520,9 @@ export default function PriceChart({
       setChartReady(false);
     };
   }, [chartType]);
-
   useEffect(() => {
     let active = true;
     const { interval, limit } = TF_CONFIG[timeframe];
-    setIsLoadingPrices(true);
-    setChartError(null);
-
-    // 10-second timeout — if data hasn't loaded, show explicit error
-    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-    loadTimeoutRef.current = setTimeout(() => {
-      if (active) {
-        if (process.env.NODE_ENV !== "production") { console.warn("[PriceChart] chart data timeout for", ticker, timeframe); }
-        setIsLoadingPrices(false);
-        setChartError("Chart data unavailable. Check your connection or try refreshing.");
-      }
-    }, 10_000);
-
     const endpoint =
       activeVenue === "okx"
         ? `/api/okx?type=ohlcv&ticker=${ticker}&quote=${quoteAsset}&interval=${interval}&limit=${limit}`
@@ -545,33 +532,57 @@ export default function PriceChart({
             ? `/api/hyperliquid?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
             : activeVenue === "dydx"
               ? `/api/dydx?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
-            : `/api/prices?ticker=${ticker}&quote=${quoteAsset}&interval=${interval}&limit=${limit}`;
+              : `/api/prices?ticker=${ticker}&quote=${quoteAsset}&interval=${interval}&limit=${limit}`;
 
-    if (process.env.NODE_ENV !== "production") { console.log("[PriceChart] fetching candles:", endpoint); }
-    apiFetch<PriceData[]>(endpoint)
-      .then((payload: PriceData[]) => {
+    const fetchCandles = async (mode: "initial" | "refresh") => {
+      if (!active) return;
+      if (mode === "initial") setIsLoadingPrices(true);
+      setChartError(null);
+
+      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = setTimeout(() => {
+        if (!active) return;
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[PriceChart] chart data timeout for", ticker, timeframe);
+        }
+        setIsLoadingPrices(false);
+        setChartError("Chart data unavailable. Check your connection or try refreshing.");
+      }, 10_000);
+
+      try {
+        if (process.env.NODE_ENV !== "production") {
+          console.log("[PriceChart] fetching candles:", endpoint);
+        }
+        const payload = await apiFetch<PriceData[]>(endpoint);
         if (!active) return;
         if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-        setPriceData(Array.isArray(payload) ? payload : []);
-        setIsLoadingPrices(false);
-        if (!Array.isArray(payload) || payload.length === 0) {
-          if (process.env.NODE_ENV !== "production") { console.warn("[PriceChart] empty candle response for", ticker); }
+        if (Array.isArray(payload)) {
+          setPriceData(payload);
+          setChartError(payload.length > 0 ? null : "No candles returned for this symbol/timeframe.");
+        } else {
+          setChartError("Chart response format is invalid.");
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         if (!active) return;
         if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
         console.error("[PriceChart] fetch error for", ticker, err);
-        setPriceData([]);
-        setIsLoadingPrices(false);
         setChartError("Chart data unavailable. Check your connection or try refreshing.");
-      });
+      } finally {
+        if (active) setIsLoadingPrices(false);
+      }
+    };
+
+    void fetchCandles("initial");
+    const pollId = window.setInterval(() => {
+      void fetchCandles("refresh");
+    }, 25_000);
 
     return () => {
       active = false;
+      window.clearInterval(pollId);
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     };
-  }, [activeVenue, quoteAsset, ticker, timeframe]);
+  }, [activeVenue, quoteAsset, ticker, timeframe, refreshNonce]);
 
   useEffect(() => {
     if (!liveTickerPrice || !Number.isFinite(liveTickerPrice)) return;
@@ -589,6 +600,9 @@ export default function PriceChart({
       return next;
     });
   }, [liveTickerPrice]);
+
+  const hasChartData = priceData.length > 0;
+  const shouldShowBlockingState = !chartReady || (!isLoadingPrices && !hasChartData);
 
   useEffect(() => {
     if (!chartReady || !mainSeriesRef.current || !volumeSeriesRef.current || !chartRef.current) return;
@@ -1254,7 +1268,7 @@ export default function PriceChart({
             }}
           />
 
-          {(!chartReady || chartError || (!isLoadingPrices && priceData.length === 0)) && (
+          {shouldShowBlockingState && (
             <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center">
               <div className="pointer-events-auto rounded-2xl border border-white/8 bg-[#0b0f16]/92 px-5 py-4 text-center shadow-2xl backdrop-blur-xl">
                 <div className="text-sm font-semibold text-zinc-100">
@@ -1267,9 +1281,13 @@ export default function PriceChart({
                     ? `${ticker} ${TF_CONFIG[timeframe].label} candles are loading.`
                     : `No candles returned for ${ticker}.`}
                 </div>
-                {(chartError || (!isLoadingPrices && priceData.length === 0)) && (
+                {(chartError || (!isLoadingPrices && !hasChartData)) && (
                   <button
-                    onClick={() => { setChartError(null); setIsLoadingPrices(true); }}
+                    onClick={() => {
+                      setChartError(null);
+                      setIsLoadingPrices(true);
+                      setRefreshNonce((prev) => prev + 1);
+                    }}
                     className="mt-3 rounded-md border border-zinc-700/50 bg-zinc-800/60 px-3 py-1 text-[11px] text-zinc-300 transition hover:bg-zinc-700/60"
                   >
                     ⟳ Retry
