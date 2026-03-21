@@ -451,6 +451,35 @@ function buildSnapshot() {
   return terminalData.getSnapshot();
 }
 
+function sliceRecent(items, limit) {
+  if (!Array.isArray(items)) return [];
+  return items.slice(0, Math.max(1, Number(limit) || 1));
+}
+
+function buildLiteSnapshot(snapshot) {
+  const news = sliceRecent(snapshot.news, 40);
+  const social = sliceRecent(snapshot.social, 48);
+  const whales = sliceRecent(snapshot.whales, 24);
+  const whaleEvents = sliceRecent(snapshot.whaleEvents, 24);
+  const liquidations = sliceRecent(snapshot.liquidations, 40);
+  const discovery = sliceRecent(snapshot.discovery, 50);
+  const newsSnapshotItems = sliceRecent(snapshot.newsSnapshot?.items, 80);
+  return {
+    ...snapshot,
+    news,
+    social,
+    whales,
+    whaleEvents,
+    liquidations,
+    discovery,
+    newsSnapshot: {
+      ...(snapshot.newsSnapshot || {}),
+      items: newsSnapshotItems,
+      count: snapshot.newsSnapshot?.count ?? newsSnapshotItems.length,
+    },
+  };
+}
+
 const server = http.createServer(async (request, reply) => {
   withCors(request, reply);
 
@@ -528,13 +557,15 @@ const server = http.createServer(async (request, reply) => {
     }
 
     if (request.method === "GET" && url.pathname === "/api/bootstrap") {
+      const mode = (url.searchParams.get("mode") || "").toLowerCase();
       const snapshot = buildSnapshot();
       if ((snapshot.quotes?.length || 0) === 0 && snapshot.connectionState !== "connected") {
         await terminalData.refreshAll().catch((error) => {
           logger.warn("data.snapshot.refresh_failed", { error: String(error) });
         });
       }
-      json(reply, 200, buildSnapshot());
+      const latest = buildSnapshot();
+      json(reply, 200, mode === "lite" ? buildLiteSnapshot(latest) : latest);
       return;
     }
 
@@ -2129,7 +2160,7 @@ server.on("upgrade", (request, socket, head) => {
 
 websocketServer.on("connection", (socket) => {
   clients.add(socket);
-  sendToClient(socket, { type: "snapshot", payload: buildSnapshot(), timestamp: new Date().toISOString() });
+  sendToClient(socket, { type: "snapshot", payload: buildLiteSnapshot(buildSnapshot()), timestamp: new Date().toISOString() });
 
   // Handle client messages (ping keepalive)
   socket.on("message", (raw) => {
