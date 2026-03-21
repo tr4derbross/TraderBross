@@ -20,6 +20,20 @@ function resolveBackendBaseUrl() {
   return DEFAULT_LOCAL_BACKEND;
 }
 
+function resolveBackendCandidates() {
+  const preferred = resolveBackendBaseUrl();
+  const candidates = [preferred];
+
+  if (preferred !== DEFAULT_PROD_BACKEND) {
+    candidates.push(DEFAULT_PROD_BACKEND);
+  }
+  if (process.env.NODE_ENV !== "production" && preferred !== DEFAULT_LOCAL_BACKEND) {
+    candidates.push(DEFAULT_LOCAL_BACKEND);
+  }
+
+  return Array.from(new Set(candidates.map((value) => trimSlash(value))));
+}
+
 function cloneHeaders(request: NextRequest) {
   const headers = new Headers(request.headers);
   headers.delete("host");
@@ -522,16 +536,12 @@ async function emergencyResponse(path: string[], request: NextRequest) {
 }
 
 async function proxy(request: NextRequest, method: string, path: string[]) {
-  const backendBase = resolveBackendBaseUrl();
   const normalizedPath = Array.isArray(path) ? path.filter(Boolean) : [];
   const upstreamPath =
     normalizedPath.length === 1 && normalizedPath[0] === "health"
       ? "/health"
       : `/api/${normalizedPath.join("/")}`;
-  const upstreamUrl = new URL(`${backendBase}${upstreamPath}`);
-  request.nextUrl.searchParams.forEach((value, key) => {
-    upstreamUrl.searchParams.append(key, value);
-  });
+  const backendCandidates = resolveBackendCandidates();
 
   const init: RequestInit = {
     method,
@@ -549,12 +559,36 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
     init.body = await request.arrayBuffer();
   }
 
-  let upstream: Response;
-  try {
-    upstream = await fetch(upstreamUrl.toString(), init);
-  } catch {
+  let upstream: Response | null = null;
+  let lastError: unknown = null;
+
+  for (const backendBase of backendCandidates) {
+    const upstreamUrl = new URL(`${backendBase}${upstreamPath}`);
+    request.nextUrl.searchParams.forEach((value, key) => {
+      upstreamUrl.searchParams.append(key, value);
+    });
+
+    try {
+      upstream = await fetch(upstreamUrl.toString(), init);
+      if (upstream.ok || method === "GET" || method === "HEAD") {
+        break;
+      }
+      // For POST/DELETE, retry another backend candidate if we hit 5xx.
+      if (upstream.status < 500) {
+        break;
+      }
+    } catch (error) {
+      lastError = error;
+      continue;
+    }
+  }
+
+  if (!upstream) {
     if (method === "GET") return emergencyResponse(normalizedPath, request);
-    return json({ error: "upstream_unavailable" }, 502);
+    const fallbackMessage = normalizedPath[0] === "okx" || normalizedPath[0] === "bybit"
+      ? "Trade backend temporarily unavailable. Please retry in a few seconds."
+      : "upstream_unavailable";
+    return json({ error: fallbackMessage, detail: String(lastError || "") }, 503);
   }
   if (method === "GET" && upstream.status >= 500) {
     return emergencyResponse(normalizedPath, request);
