@@ -61,6 +61,22 @@ export default function FilterBar({
   counts,
   liqLabel,
 }: Props) {
+  const isNewsSource = sourceFilter === "all" || sourceFilter === "news" || sourceFilter === "social";
+  const hasActiveFilters =
+    keyword.trim().length > 0 ||
+    sector !== "All" ||
+    ticker.length > 0 ||
+    importanceFilter !== "all" ||
+    sentimentFilter !== "all";
+
+  const resetFilters = () => {
+    onKeyword("");
+    onSector("All");
+    onTicker("");
+    onImportance("all");
+    onSentiment("all");
+  };
+
   return (
     <div className="flex flex-col border-b border-[rgba(212,161,31,0.1)] bg-[linear-gradient(180deg,rgba(20,17,13,0.96),rgba(11,10,10,0.94))]">
       {/* Source tabs */}
@@ -109,7 +125,7 @@ export default function FilterBar({
           )}
         </div>
 
-        {(sourceFilter === "all" || sourceFilter === "news" || sourceFilter === "social") && (
+        {isNewsSource && (
           <div className="order-2 flex items-center gap-1 sm:w-auto">
             <select
               className="terminal-input h-7 w-[72px] cursor-pointer rounded-md px-1.5 text-[10px] text-zinc-300 outline-none sm:h-auto sm:w-auto sm:flex-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
@@ -124,7 +140,7 @@ export default function FilterBar({
             </select>
 
             <select
-              className="terminal-input hidden h-7 w-[106px] cursor-pointer rounded-md px-1.5 text-[10px] text-zinc-100 outline-none sm:block sm:h-auto sm:w-auto sm:flex-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
+              className="terminal-input h-7 w-[92px] cursor-pointer rounded-md px-1.5 text-[10px] text-zinc-100 outline-none sm:w-auto sm:flex-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
               value={ticker}
               onChange={(e) => onTicker(e.target.value)}
             >
@@ -138,6 +154,17 @@ export default function FilterBar({
               ))}
             </select>
           </div>
+        )}
+
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="order-4 shrink-0 rounded-md border border-zinc-700/70 bg-zinc-900/80 px-2 py-1 text-[9px] font-semibold text-zinc-300 transition hover:border-amber-500/30 hover:text-amber-100 sm:rounded-lg sm:text-[10px]"
+            title="Reset filters"
+          >
+            Reset
+          </button>
         )}
 
         <div className="order-3 hidden w-full flex-wrap items-center gap-1 sm:flex sm:w-auto">

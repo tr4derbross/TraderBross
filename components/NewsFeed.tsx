@@ -41,6 +41,7 @@ export default function NewsFeed({
   // Pulsing dot state for special tabs
   const [whalePulse, setWhalePulse] = useState(false);
   const [liqdPulse, setLiqdPulse] = useState(false);
+  const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
 
   // Liquidation stats for dynamic tab label
   const [liqStats, setLiqStats] = useState<{ totalUSD: number; longUSD: number; shortUSD: number; count: number } | null>(null);
@@ -70,7 +71,21 @@ export default function NewsFeed({
       }
     }
     prevLengthRef.current = news.length;
+    if (news.length > 0) setLastRefreshAt(new Date());
   }, [news.length]);
+
+  const handleRefresh = () => {
+    refreshNews();
+    setLastRefreshAt(new Date());
+  };
+
+  const resetNewsFilters = () => {
+    setSector("All");
+    setTicker("");
+    setKeyword("");
+    setImportanceFilter("all");
+    setSentimentFilter("all");
+  };
 
   // Handle whale pulse — auto-clear after 3s
   const handleWhalePulse = () => {
@@ -175,13 +190,18 @@ export default function NewsFeed({
           {!isSpecialFeed && (
             <button
               type="button"
-              onClick={refreshNews}
+              onClick={handleRefresh}
               className="brand-badge inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] sm:px-2 sm:text-[10px] transition hover:border-[rgba(212,161,31,0.24)] hover:text-amber-100"
               title="Refresh feed"
             >
               <RefreshCw className={`w-2.5 h-2.5 sm:w-3 sm:h-3 ${loading ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
+          )}
+          {!isSpecialFeed && lastRefreshAt && (
+            <span className="hidden lg:inline text-[9px] text-zinc-600">
+              updated {lastRefreshAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+            </span>
           )}
           {!isSpecialFeed && <span className="hidden sm:inline">{news.length} items</span>}
         </div>
@@ -220,13 +240,29 @@ export default function NewsFeed({
           {loading ? (
             <NewsFeedSkeleton />
           ) : news.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-32 gap-2 text-zinc-600 text-xs">
-              <span>No items matching filters</span>
+            <div className="flex h-40 flex-col items-center justify-center gap-2 text-xs text-zinc-600">
+              <span>No items matching current filters</span>
               {sourceFilter === "social" && (
                 <span className="text-[10px] text-zinc-700 text-center px-4">
                   Configure NITTER_BASE_URL or SOCIAL_RSS_URLS in .env.local for live tweets
                 </span>
               )}
+              <div className="mt-1 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={resetNewsFilters}
+                  className="rounded-md border border-zinc-700/80 bg-zinc-900/70 px-2 py-1 text-[10px] text-zinc-300 transition hover:border-amber-500/30 hover:text-amber-100"
+                >
+                  Reset filters
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRefresh}
+                  className="rounded-md border border-zinc-700/80 bg-zinc-900/70 px-2 py-1 text-[10px] text-zinc-300 transition hover:border-amber-500/30 hover:text-amber-100"
+                >
+                  Refresh
+                </button>
+              </div>
             </div>
           ) : (
             <ErrorBoundary label="News Feed" fullHeight={false}>
