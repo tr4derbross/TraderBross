@@ -227,6 +227,7 @@ type HeaderCexCredentials = {
 
 type HeaderCexCredentialMap = Record<Extract<HeaderPlatform, "okx" | "bybit" | "binance">, HeaderCexCredentials>;
 type HeaderCexPlatform = keyof HeaderCexCredentialMap;
+type HeaderCexTestnetMap = Record<HeaderCexPlatform, boolean>;
 type NewsTradeIntent = NewsTradePreset & { sourceItemId: string };
 
 const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
@@ -281,6 +282,12 @@ const EMPTY_HEADER_CEX_CREDENTIALS: HeaderCexCredentialMap = {
   okx: { apiKey: "", apiSecret: "", passphrase: "" },
   bybit: { apiKey: "", apiSecret: "", passphrase: "" },
   binance: { apiKey: "", apiSecret: "", passphrase: "" },
+};
+
+const DEFAULT_CEX_TESTNET_MODE: HeaderCexTestnetMap = {
+  okx: false,
+  bybit: false,
+  binance: false,
 };
 
 function maskCredentialPreview(value: string) {
@@ -381,7 +388,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   );
   /** Server-side vault session tokens — stored in sessionStorage, NOT localStorage */
   const [vaultTokens, setVaultTokens] = useState<Partial<Record<HeaderCexPlatform, string>>>({});
-  const [binanceTestnet, setBinanceTestnet] = useState(false);
+  const [cexTestnetMode, setCexTestnetMode] = useState<HeaderCexTestnetMap>(DEFAULT_CEX_TESTNET_MODE);
   const [newsTradeIntent, setNewsTradeIntent] = useState<NewsTradeIntent | null>(null);
   const [venueSymbols, setVenueSymbols] = useState<string[]>([]);
   const [quoteAsset, setQuoteAsset] = useState<"USDT" | "USDC">("USDT");
@@ -730,6 +737,9 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     : null;
   const selectedHeaderCredentials =
     selectedHeaderCexPlatform ? headerCexCredentials[selectedHeaderCexPlatform] : null;
+  const selectedCexTestnetMode = selectedHeaderCexPlatform
+    ? cexTestnetMode[selectedHeaderCexPlatform]
+    : false;
   const walletAvailability = useMemo(() => {
     if (!selectedHeaderPlatform.wallets?.length) {
       return {} as Record<SupportedWalletLabel, boolean>;
@@ -1173,7 +1183,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           apiKey: creds.apiKey.trim(),
           apiSecret: creds.apiSecret.trim(),
           passphrase: creds.passphrase.trim() || undefined,
-          testnet: cexPlatform === "binance" ? binanceTestnet : undefined,
+          testnet: cexTestnetMode[cexPlatform] || undefined,
         }),
       });
 
@@ -1199,7 +1209,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       setHeaderActionMessage("Network error — could not reach the credential vault.");
       setHeaderConnection({ status: "failed", platform: headerPlatform, error: "Vault unreachable." });
     }
-  }, [binanceTestnet, headerCexCredentials, headerPlatform, selectedHeaderPlatform]);
+  }, [cexTestnetMode, headerCexCredentials, headerPlatform, selectedHeaderPlatform]);
 
   const removeHeaderCexCredentials = useCallback(() => {
     if (selectedHeaderPlatform.type !== "cex") return;
@@ -1259,6 +1269,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
             apiKey: creds.apiKey.trim(),
             apiSecret: creds.apiSecret.trim(),
             passphrase: creds.passphrase.trim() || undefined,
+            testnet: cexTestnetMode[selectedHeaderCexPlatform] || undefined,
           }),
         });
         if (storeData.ok && storeData.sessionToken) {
@@ -1308,6 +1319,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     selectedHeaderCredentials,
     selectedHeaderCexPlatform,
     selectedHeaderPlatform.label,
+    cexTestnetMode,
     vaultTokens,
   ]);
 
@@ -2182,15 +2194,22 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                       </label>
                     </div>
 
-                    {selectedHeaderPlatform.id === "binance" && (
+                    {selectedHeaderCexPlatform && (
                       <label className="mt-2.5 flex cursor-pointer items-center gap-2">
                         <input
                           type="checkbox"
-                          checked={binanceTestnet}
-                          onChange={(e) => setBinanceTestnet(e.target.checked)}
+                          checked={selectedCexTestnetMode}
+                          onChange={(e) =>
+                            setCexTestnetMode((prev) => ({
+                              ...prev,
+                              [selectedHeaderCexPlatform]: e.target.checked,
+                            }))
+                          }
                           className="h-3.5 w-3.5 accent-amber-400"
                         />
-                        <span className="text-[10px] text-amber-400/80">Testnet mode</span>
+                        <span className="text-[10px] text-amber-400/80">
+                          {selectedHeaderCexPlatform === "okx" ? "Demo / Testnet mode" : "Testnet mode"}
+                        </span>
                       </label>
                     )}
 
