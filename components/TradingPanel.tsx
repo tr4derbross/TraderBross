@@ -233,6 +233,7 @@ export default function TradingPanel({
   }, [maxLeverage]);
 
   const currentPrice = prices[ticker] ?? venueFallbackMark ?? getBasePrice(ticker);
+  const isUsingFallbackMark = prices[ticker] == null && venueFallbackMark != null;
   const execPrice =
     ticketType === "limit" || ticketType === "stop" ? parseFloat(limitPrice) || currentPrice : currentPrice;
   const margin = parseFloat(marginUSD) || 0;
@@ -466,6 +467,16 @@ export default function TradingPanel({
           <div className="shrink-0 text-right sm:ml-1">
             <div className="text-[7px] uppercase tracking-widest text-zinc-600 sm:text-[9px]">Mark</div>
             <div className="text-[11px] font-bold tabular-nums text-zinc-100 sm:text-[18px]">${fmt(currentPrice)}</div>
+            <div className="mt-0.5 flex items-center justify-end gap-1">
+              <span className="rounded border border-zinc-700/60 bg-zinc-900/70 px-1 py-[1px] text-[8px] uppercase tracking-[0.08em] text-zinc-500">
+                {marketDataSourceLabel}
+              </span>
+              {isUsingFallbackMark && (
+                <span className="rounded border border-amber-500/30 bg-amber-500/10 px-1 py-[1px] text-[8px] uppercase tracking-[0.08em] text-amber-300">
+                  Fallback
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
