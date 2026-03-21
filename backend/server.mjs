@@ -1018,7 +1018,7 @@ const server = http.createServer(async (request, reply) => {
       try {
         const binancePost = async (path, params) => {
           const qs = binanceSignedQuery(apiSecret, params);
-          const res = await fetch(`${base}${path}?${qs}`, { method: "POST", headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(10000) });
+          const res = await fetch(`${base}${path}?${qs}`, { method: "POST", headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(8000) });
           const data = await res.json();
           if (!res.ok && data.code !== -4046) throw new Error(data.msg || `Binance error ${res.status}`);
           return data;
@@ -1151,8 +1151,10 @@ const server = http.createServer(async (request, reply) => {
         }
         json(reply, 400, { ok: false, error: "Unknown action type" });
       } catch (err) {
+        const message = err instanceof Error ? err.message : "Binance order request failed.";
         logger.warn("binance.order.failed", { type: body.type, symbol, error: String(err) });
-        json(reply, 500, { ok: false, error: "Order request failed." });
+        const isClientIssue = /(insufficient|invalid|minimum|size|margin|leverage|position|instrument|parameter|order)/i.test(message);
+        json(reply, isClientIssue ? 400 : 500, { ok: false, error: message || "Order request failed." });
       }
       return;
     }
@@ -1262,7 +1264,7 @@ const server = http.createServer(async (request, reply) => {
         json(reply, 401, { error: "Session expired. Re-save your credentials." });
         return;
       }
-      const requestBybit = async (method, path, query = "", payload = null) => {
+        const requestBybit = async (method, path, query = "", payload = null) => {
         const bodyStr = payload ? JSON.stringify(payload) : "";
         const headers = bybitSign({
           secret: apiSecret,
@@ -1348,7 +1350,7 @@ const server = http.createServer(async (request, reply) => {
           body: bodyStr,
         });
         const url = `${base}${path}${query ? `?${query}` : ""}`;
-        const res = await fetch(url, { method, headers, body: bodyStr || undefined, signal: AbortSignal.timeout(10_000) });
+        const res = await fetch(url, { method, headers, body: bodyStr || undefined, signal: AbortSignal.timeout(8_000) });
         const data = await res.json();
         if (!res.ok || Number(data?.retCode) !== 0) throw new Error(data?.retMsg || `Bybit error ${res.status}`);
         return data;
@@ -1392,6 +1394,17 @@ const server = http.createServer(async (request, reply) => {
           const qty = (marginAmount * leverage) / markPrice;
           const qtyStr = qty >= 100 ? qty.toFixed(0) : qty >= 1 ? qty.toFixed(2) : qty.toFixed(3);
           const side = body.side === "short" ? "Sell" : "Buy";
+          const tp = finitePositiveNumber(body.tpPrice);
+          const sl = finitePositiveNumber(body.slPrice);
+          const isShort = side === "Sell";
+          if (tp && (!isShort ? tp <= markPrice : tp >= markPrice)) {
+            json(reply, 400, { ok: false, error: "TP must be above mark for long and below mark for short." });
+            return;
+          }
+          if (sl && (!isShort ? sl >= markPrice : sl <= markPrice)) {
+            json(reply, 400, { ok: false, error: "SL must be below mark for long and above mark for short." });
+            return;
+          }
           const payload = {
             category: "linear",
             symbol,
@@ -1399,6 +1412,9 @@ const server = http.createServer(async (request, reply) => {
             orderType: body.orderType === "limit" ? "Limit" : "Market",
             qty: qtyStr,
             ...(body.orderType === "limit" && body.limitPrice ? { price: String(body.limitPrice), timeInForce: "GTC" } : {}),
+            ...(tp ? { takeProfit: String(tp), tpTriggerBy: "LastPrice" } : {}),
+            ...(sl ? { stopLoss: String(sl), slTriggerBy: "LastPrice" } : {}),
+            ...((tp || sl) ? { tpslMode: "Full" } : {}),
           };
           const result = await requestBybit("POST", "/v5/order/create", "", payload);
           json(reply, 200, { ok: true, data: result });
@@ -1406,8 +1422,10 @@ const server = http.createServer(async (request, reply) => {
         }
         json(reply, 400, { ok: false, error: "Unknown action type" });
       } catch (err) {
+        const message = err instanceof Error ? err.message : "Bybit order request failed.";
         logger.warn("bybit.order.failed", { type: body.type, symbol, error: String(err) });
-        json(reply, 500, { ok: false, error: "Bybit order request failed." });
+        const isClientIssue = /(insufficient|invalid|minimum|size|margin|leverage|position|instrument|parameter|order)/i.test(message);
+        json(reply, isClientIssue ? 400 : 500, { ok: false, error: message || "Bybit order request failed." });
       }
       return;
     }
