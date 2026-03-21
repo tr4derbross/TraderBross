@@ -427,9 +427,10 @@ export default function BottomPanel({
               <tr style={{ background: "rgba(0,0,0,0.45)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                 <TH>Symbol</TH>
                 <TH>Size</TH>
-                <TH>Entry Price</TH>
                 <TH>Mark Price</TH>
+                <TH>Entry Price</TH>
                 <TH>Liq. Price</TH>
+                <TH>Risk</TH>
                 <TH>Margin</TH>
                 <TH right>
                   <button
@@ -469,12 +470,12 @@ export default function BottomPanel({
                   </button>
                 </TH>
                 <TH>TP / SL</TH>
-                <TH></TH>
+                <TH>Actions</TH>
               </tr>
             </thead>
             <tbody>
               {positions.length === 0 ? (
-                <EmptyRow cols={9} label="No open positions" />
+                <EmptyRow cols={10} label="No open positions" />
               ) : (
                 sortedPositions.map((pos, idx) => {
                   const pnl     = calcPnl(pos);
@@ -519,6 +520,7 @@ export default function BottomPanel({
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold text-[#f5efe1]">{pos.ticker}</span>
                             <span className="text-zinc-600">USDT</span>
+                            <span className="text-[9px] uppercase tracking-wide text-zinc-700">Perp</span>
                           </div>
                           <div className="flex items-center gap-1">
                             <span
@@ -553,11 +555,11 @@ export default function BottomPanel({
                         <div className="tabular-nums text-[10px] text-zinc-500">${notional.toFixed(2)}</div>
                       </td>
 
-                      {/* Entry */}
-                      <td className="px-3 py-2.5 tabular-nums text-zinc-300">${fmt(pos.entryPrice)}</td>
-
                       {/* Mark */}
                       <td className="px-3 py-2.5 tabular-nums font-semibold text-white">${fmt(pos.currentPrice)}</td>
+
+                      {/* Entry */}
+                      <td className="px-3 py-2.5 tabular-nums text-zinc-300">${fmt(pos.entryPrice)}</td>
 
                       {/* Liq */}
                       <td className="px-3 py-2.5">
@@ -590,6 +592,36 @@ export default function BottomPanel({
                         </div>
                       </td>
 
+                      {/* Risk */}
+                      <td className="px-3 py-2.5">
+                        <div
+                          className="inline-flex rounded px-1.5 py-[2px] text-[9px] font-bold uppercase tracking-wide"
+                          style={{
+                            background:
+                              liqRiskLevel === "critical"
+                                ? "rgba(248,113,113,0.14)"
+                                : liqRiskLevel === "warning"
+                                  ? "rgba(245,158,11,0.1)"
+                                  : "rgba(52,211,153,0.1)",
+                            border:
+                              liqRiskLevel === "critical"
+                                ? "1px solid rgba(248,113,113,0.32)"
+                                : liqRiskLevel === "warning"
+                                  ? "1px solid rgba(245,158,11,0.25)"
+                                  : "1px solid rgba(52,211,153,0.22)",
+                            color:
+                              liqRiskLevel === "critical"
+                                ? "#f87171"
+                                : liqRiskLevel === "warning"
+                                  ? "#f59e0b"
+                                  : "#34d399",
+                          }}
+                        >
+                          {liqRiskLevel === "critical" ? "High" : liqRiskLevel === "warning" ? "Mid" : "Low"}
+                        </div>
+                        <div className="mt-0.5 text-[9px] tabular-nums text-zinc-600">{liqDistancePct.toFixed(2)}%</div>
+                      </td>
+
                       {/* Margin */}
                       <td className="px-3 py-2.5">
                         <div className="tabular-nums text-zinc-300">${pos.margin.toFixed(2)}</div>
@@ -608,33 +640,13 @@ export default function BottomPanel({
 
                       {/* TP / SL */}
                       <td className="px-3 py-2.5" style={{ minWidth: 160 }}>
-                        <div className="flex items-center gap-1.5">
-                          <div className="flex flex-col gap-0.5 text-[10px]">
-                            <span className="tabular-nums" style={{ color: pos.tpPrice ? "#34d399" : "#3f3f46" }}>
-                              TP: {pos.tpPrice ? `$${fmt(pos.tpPrice)}` : "—"}
-                            </span>
-                            <span className="tabular-nums" style={{ color: pos.slPrice ? "#f87171" : "#3f3f46" }}>
-                              SL: {pos.slPrice ? `$${fmt(pos.slPrice)}` : "—"}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() =>
-                              setQuickMenuPosId((current) => {
-                                if (current === pos.id) return null;
-                                setEditingPosId(null);
-                                return pos.id;
-                              })
-                            }
-                            className="ml-auto flex h-6 w-6 items-center justify-center rounded-md transition"
-                            style={{
-                              background: quickMenuPosId === pos.id ? "rgba(212,161,31,0.15)" : "rgba(255,255,255,0.04)",
-                              border: `1px solid ${quickMenuPosId === pos.id ? "rgba(212,161,31,0.35)" : "rgba(255,255,255,0.08)"}`,
-                              color: quickMenuPosId === pos.id ? "#d4a11f" : "#52525b",
-                            }}
-                            title="Set TP / SL"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
+                        <div className="flex flex-col gap-0.5 text-[10px]">
+                          <span className="tabular-nums" style={{ color: pos.tpPrice ? "#34d399" : "#3f3f46" }}>
+                            TP: {pos.tpPrice ? `$${fmt(pos.tpPrice)}` : "—"}
+                          </span>
+                          <span className="tabular-nums" style={{ color: pos.slPrice ? "#f87171" : "#3f3f46" }}>
+                            SL: {pos.slPrice ? `$${fmt(pos.slPrice)}` : "—"}
+                          </span>
                         </div>
 
                         {quickMenuPosId === pos.id && (
@@ -718,27 +730,47 @@ export default function BottomPanel({
                         )}
                       </td>
 
-                      {/* Close */}
+                      {/* Actions */}
                       <td className="px-3 py-2.5">
-                        <button
-                          onClick={() => onClosePosition(pos.id)}
-                          className="whitespace-nowrap rounded-md px-3 py-1.5 text-[10px] font-bold transition-all"
-                          style={{
-                            background: "rgba(239,68,68,0.12)",
-                            border: "1px solid rgba(239,68,68,0.32)",
-                            color: "#f87171",
-                          }}
-                          onMouseEnter={(e) => {
-                            (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.26)";
-                            (e.currentTarget as HTMLElement).style.borderColor = "rgba(239,68,68,0.55)";
-                          }}
-                          onMouseLeave={(e) => {
-                            (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.12)";
-                            (e.currentTarget as HTMLElement).style.borderColor = "rgba(239,68,68,0.32)";
-                          }}
-                        >
-                          {isLiveVenue ? "Market Close" : "Close"}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() =>
+                              setQuickMenuPosId((current) => {
+                                if (current === pos.id) return null;
+                                setEditingPosId(null);
+                                return pos.id;
+                              })
+                            }
+                            className="flex h-6 w-6 items-center justify-center rounded-md transition"
+                            style={{
+                              background: quickMenuPosId === pos.id ? "rgba(212,161,31,0.15)" : "rgba(255,255,255,0.04)",
+                              border: `1px solid ${quickMenuPosId === pos.id ? "rgba(212,161,31,0.35)" : "rgba(255,255,255,0.08)"}`,
+                              color: quickMenuPosId === pos.id ? "#d4a11f" : "#52525b",
+                            }}
+                            title="Set TP / SL"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={() => onClosePosition(pos.id)}
+                            className="whitespace-nowrap rounded-md px-3 py-1.5 text-[10px] font-bold transition-all"
+                            style={{
+                              background: "rgba(239,68,68,0.12)",
+                              border: "1px solid rgba(239,68,68,0.32)",
+                              color: "#f87171",
+                            }}
+                            onMouseEnter={(e) => {
+                              (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.26)";
+                              (e.currentTarget as HTMLElement).style.borderColor = "rgba(239,68,68,0.55)";
+                            }}
+                            onMouseLeave={(e) => {
+                              (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.12)";
+                              (e.currentTarget as HTMLElement).style.borderColor = "rgba(239,68,68,0.32)";
+                            }}
+                          >
+                            {isLiveVenue ? "Market Close" : "Close"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
