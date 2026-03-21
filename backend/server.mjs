@@ -846,6 +846,7 @@ const server = http.createServer(async (request, reply) => {
           const apiKey = entry?.payload?.apiKey || "";
           const apiSecret = entry?.payload?.apiSecret || "";
           const passphrase = entry?.payload?.passphrase || "";
+          const testnet = Boolean(entry?.payload?.testnet);
           if (!apiKey || !apiSecret || !passphrase) {
             json(reply, 401, { ok: false, message: "Session expired. Re-save your credentials." });
             return;
@@ -858,6 +859,7 @@ const server = http.createServer(async (request, reply) => {
             method: "GET",
             requestPath: path,
           });
+          if (testnet) headers["x-simulated-trading"] = "1";
           const res = await fetch(`https://www.okx.com${path}`, { headers, signal: AbortSignal.timeout(8000) });
           const data = await res.json();
           if (!res.ok || data?.code !== "0") {
@@ -876,6 +878,8 @@ const server = http.createServer(async (request, reply) => {
         if (scope === "bybit") {
           const apiKey = entry?.payload?.apiKey || "";
           const apiSecret = entry?.payload?.apiSecret || "";
+          const testnet = Boolean(entry?.payload?.testnet);
+          const base = testnet ? "https://api-testnet.bybit.com" : "https://api.bybit.com";
           if (!apiKey || !apiSecret) {
             json(reply, 401, { ok: false, message: "Session expired. Re-save your credentials." });
             return;
@@ -887,7 +891,7 @@ const server = http.createServer(async (request, reply) => {
             method: "GET",
             query,
           });
-          const res = await fetch(`https://api.bybit.com/v5/account/wallet-balance?${query}`, {
+          const res = await fetch(`${base}/v5/account/wallet-balance?${query}`, {
             headers,
             signal: AbortSignal.timeout(8000),
           });
@@ -1142,6 +1146,7 @@ const server = http.createServer(async (request, reply) => {
       const apiKey = entry.payload?.apiKey || "";
       const apiSecret = entry.payload?.apiSecret || "";
       const passphrase = entry.payload?.passphrase || "";
+      const testnet = Boolean(entry.payload?.testnet);
       if (!apiKey || !apiSecret || !passphrase) {
         json(reply, 401, { error: "Session expired. Re-save your credentials." });
         return;
@@ -1156,6 +1161,7 @@ const server = http.createServer(async (request, reply) => {
           requestPath,
           body: bodyStr,
         });
+        if (testnet) headers["x-simulated-trading"] = "1";
         const res = await fetch(`https://www.okx.com${requestPath}`, {
           method,
           headers,
@@ -1217,6 +1223,8 @@ const server = http.createServer(async (request, reply) => {
       }
       const apiKey = entry.payload?.apiKey || "";
       const apiSecret = entry.payload?.apiSecret || "";
+      const testnet = Boolean(entry.payload?.testnet);
+      const base = testnet ? "https://api-testnet.bybit.com" : "https://api.bybit.com";
       if (!apiKey || !apiSecret) {
         json(reply, 401, { error: "Session expired. Re-save your credentials." });
         return;
@@ -1230,7 +1238,7 @@ const server = http.createServer(async (request, reply) => {
           query,
           body: bodyStr,
         });
-        const url = `https://api.bybit.com${path}${query ? `?${query}` : ""}`;
+        const url = `${base}${path}${query ? `?${query}` : ""}`;
         const res = await fetch(url, {
           method,
           headers,
@@ -1290,6 +1298,8 @@ const server = http.createServer(async (request, reply) => {
       }
       const apiKey = entry.payload?.apiKey || "";
       const apiSecret = entry.payload?.apiSecret || "";
+      const testnet = Boolean(entry.payload?.testnet);
+      const base = testnet ? "https://api-testnet.bybit.com" : "https://api.bybit.com";
       if (!apiKey || !apiSecret) {
         json(reply, 401, { ok: false, error: "Session expired. Re-save your credentials." });
         return;
@@ -1304,7 +1314,7 @@ const server = http.createServer(async (request, reply) => {
           query,
           body: bodyStr,
         });
-        const url = `https://api.bybit.com${path}${query ? `?${query}` : ""}`;
+        const url = `${base}${path}${query ? `?${query}` : ""}`;
         const res = await fetch(url, { method, headers, body: bodyStr || undefined, signal: AbortSignal.timeout(10_000) });
         const data = await res.json();
         if (!res.ok || Number(data?.retCode) !== 0) throw new Error(data?.retMsg || `Bybit error ${res.status}`);
@@ -1336,7 +1346,7 @@ const server = http.createServer(async (request, reply) => {
           return;
         }
         if (body.type === "order") {
-          const mp = await fetch(`https://api.bybit.com/v5/market/tickers?category=linear&symbol=${symbol}`, {
+          const mp = await fetch(`${base}/v5/market/tickers?category=linear&symbol=${symbol}`, {
             signal: AbortSignal.timeout(5000),
           }).then((r) => r.json());
           const markPrice = parseFloat(mp?.result?.list?.[0]?.markPrice || "0");
@@ -1379,6 +1389,7 @@ const server = http.createServer(async (request, reply) => {
       const apiKey = entry.payload?.apiKey || "";
       const apiSecret = entry.payload?.apiSecret || "";
       const passphrase = entry.payload?.passphrase || "";
+      const testnet = Boolean(entry.payload?.testnet);
       if (!apiKey || !apiSecret || !passphrase) {
         json(reply, 401, { ok: false, error: "Session expired. Re-save your credentials." });
         return;
@@ -1394,6 +1405,7 @@ const server = http.createServer(async (request, reply) => {
           requestPath,
           body: bodyStr,
         });
+        if (testnet) headers["x-simulated-trading"] = "1";
         const res = await fetch(`https://www.okx.com${requestPath}`, {
           method,
           headers,
