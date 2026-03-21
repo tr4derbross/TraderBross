@@ -47,6 +47,13 @@ function toMs(value) {
   return Number.isFinite(ts) ? ts : 0;
 }
 
+function maxTimestamp(values = []) {
+  return values.reduce((max, value) => {
+    const ts = toMs(value);
+    return ts > max ? ts : max;
+  }, 0);
+}
+
 export function createTerminalDataService({ config, logger }) {
   const cache = new TtlCache();
   const limiter = new SlidingWindowRateLimiter({ limit: 120, windowMs: 60_000 });
@@ -752,13 +759,35 @@ export function createTerminalDataService({ config, logger }) {
     const now = Date.now();
     const newestNewsTs = state.news.length > 0 ? toMs(state.news[0]?.timestamp) : 0;
     const newestSocialTs = state.social.length > 0 ? toMs(state.social[0]?.timestamp) : 0;
+    const newsFetchedTs = maxTimestamp([
+      newsSourceHealth.rss?.lastSuccessAt,
+      newsSourceHealth.json?.lastSuccessAt,
+      newsSourceHealth.tree?.lastSuccessAt,
+      newsSourceHealth.ninja?.lastSuccessAt,
+    ]);
+    const socialFetchedTs = maxTimestamp([
+      newsSourceHealth.social_rss?.lastSuccessAt,
+      newsSourceHealth.tree?.lastSuccessAt,
+      newsSourceHealth.ninja?.lastSuccessAt,
+    ]);
     const newsAgeSec = newestNewsTs > 0 ? Math.max(0, Math.round((now - newestNewsTs) / 1000)) : null;
     const socialAgeSec = newestSocialTs > 0 ? Math.max(0, Math.round((now - newestSocialTs) / 1000)) : null;
-    const newsFresh = newsAgeSec != null && newsAgeSec <= 180;
-    const socialFresh = socialAgeSec != null && socialAgeSec <= 180;
+    const newsFetchAgeSec = newsFetchedTs > 0 ? Math.max(0, Math.round((now - newsFetchedTs) / 1000)) : null;
+    const socialFetchAgeSec = socialFetchedTs > 0 ? Math.max(0, Math.round((now - socialFetchedTs) / 1000)) : null;
+    const newsFreshWindowSec = Math.max(180, Number(ttl.newsFreshWindowSec) || 900);
+    const socialFreshWindowSec = Math.max(180, Number(ttl.socialFreshWindowSec) || 900);
+    const fetchHeartbeatSec = Math.max(180, Math.round((Number(ttl.newsFeedMs) || 45_000) * 3 / 1000));
+    const newsFresh =
+      (newsAgeSec != null && newsAgeSec <= newsFreshWindowSec) ||
+      (newsFetchAgeSec != null && newsFetchAgeSec <= fetchHeartbeatSec);
+    const socialFresh =
+      (socialAgeSec != null && socialAgeSec <= socialFreshWindowSec) ||
+      (socialFetchAgeSec != null && socialFetchAgeSec <= fetchHeartbeatSec);
     return {
       newsAgeSec,
       socialAgeSec,
+      newsFetchAgeSec,
+      socialFetchAgeSec,
       newsFresh,
       socialFresh,
       stale: !(newsFresh || socialFresh),
