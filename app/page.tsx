@@ -127,22 +127,22 @@ export default function LandingPage() {
             variants={fadeUp}
             className="font-mono text-[10px] tracking-[0.2em] text-[#F2B705] uppercase"
           >
-            News-First Trading Workflow
+            Real-Time Crypto Intelligence
           </motion.p>
 
           <motion.h1
             variants={fadeUp}
             className="text-4xl font-bold leading-tight tracking-tight text-[#FFFFFF] sm:text-5xl md:text-6xl"
           >
-            Trade the news<br />faster.
+            Crypto Terminal for<br />News + AI Signals
           </motion.h1>
 
           <motion.p
             variants={fadeUp}
             className="max-w-lg text-base text-[#A0A0A0] sm:text-lg"
           >
-            A professional crypto terminal that surfaces breaking news before the
-            price moves — with AI analysis and one-click trading.
+            Track breaking crypto news, get instant AI context, and execute trades
+            from one terminal before momentum shifts.
           </motion.p>
 
           <motion.div
@@ -161,7 +161,7 @@ export default function LandingPage() {
               rel="noreferrer"
               className="flex items-center gap-2 rounded-lg border border-[rgba(242,183,5,0.2)] px-6 py-3 text-[13px] font-medium text-[#A0A0A0] transition-colors hover:border-[rgba(242,183,5,0.4)] hover:text-[#FFFFFF]"
             >
-              <Send size={14} /> Join Telegram
+              <Send size={14} /> Get Live Alerts
             </a>
           </motion.div>
 
