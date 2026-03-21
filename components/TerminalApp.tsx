@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { NewsItem, AVAILABLE_TICKERS } from "@/lib/mock-data";
 import { useAlerts } from "@/hooks/useAlerts";
 import { useBinanceWs } from "@/hooks/useBinanceWs";
@@ -284,6 +285,14 @@ const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
     description: "Binance Futures — real order placement via HMAC-SHA256 signed requests. API keys are encrypted server-side (AES-256). Never grant withdrawal permissions on keys used here.",
     primaryAction: "Save API Keys",
   },
+];
+
+const MOBILE_ROUTE_TABS: Array<{ href: string; label: string; active?: boolean }> = [
+  { href: "/", label: "Home" },
+  { href: "/news", label: "News" },
+  { href: "/screener", label: "Screener" },
+  { href: "/calendar", label: "Calendar" },
+  { href: "/terminal", label: "Terminal", active: true },
 ];
 
 const EMPTY_HEADER_CEX_CREDENTIALS: HeaderCexCredentialMap = {
@@ -1734,6 +1743,29 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       </div>
 
       {/* ── Market Info Bar (desktop only) ── */}
+      {isMobile && (
+        <div
+          className="shrink-0 border-b px-1.5 py-1"
+          style={{ borderColor: "rgba(212,161,31,0.08)", background: "rgba(7,7,8,0.94)" }}
+        >
+          <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {MOBILE_ROUTE_TABS.map((tab) => (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] transition-colors ${
+                  tab.active
+                    ? "border-[rgba(212,161,31,0.35)] bg-[rgba(212,161,31,0.12)] text-amber-100"
+                    : "border-white/10 bg-white/[0.03] text-zinc-400 hover:border-[rgba(212,161,31,0.2)] hover:text-zinc-200"
+                }`}
+              >
+                {tab.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {!isMobile && (
         <div className="px-2 pt-1.5">
           <div className="panel-shell soft-divider overflow-hidden rounded-xl border terminal-glow-pulse">
