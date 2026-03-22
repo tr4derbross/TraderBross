@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 const DEFAULT_LOCAL_BACKEND = "http://127.0.0.1:4001";
 const DEFAULT_PROD_BACKEND = "https://traderbross-production.up.railway.app";
 const EMERGENCY_CACHE_TTL_MS = 45_000;
+const MUTATION_PROXY_TIMEOUT_MS = 30_000;
 const emergencyCache = new Map<string, { expiresAt: number; value: unknown }>();
 
 function trimSlash(value: string) {
@@ -590,7 +591,7 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
     headers: cloneHeaders(request),
     redirect: "manual",
     cache: "no-store",
-    signal: AbortSignal.timeout(method === "GET" || method === "HEAD" ? 6000 : 10000),
+    signal: AbortSignal.timeout(method === "GET" || method === "HEAD" ? 6000 : MUTATION_PROXY_TIMEOUT_MS),
   };
   const headers = init.headers as Headers;
   headers.set("x-traderbross-proxy", "1");
