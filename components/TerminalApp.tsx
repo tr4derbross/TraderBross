@@ -299,11 +299,13 @@ const MOBILE_ROUTE_TABS: Array<{ href: string; label: string; active?: boolean }
   { href: "/terminal", label: "Terminal", active: true },
 ];
 
-const EMPTY_HEADER_CEX_CREDENTIALS: HeaderCexCredentialMap = {
-  okx: { apiKey: "", apiSecret: "", passphrase: "" },
-  bybit: { apiKey: "", apiSecret: "", passphrase: "" },
-  binance: { apiKey: "", apiSecret: "", passphrase: "" },
-};
+function createEmptyHeaderCexCredentials(): HeaderCexCredentialMap {
+  return {
+    okx: { apiKey: "", apiSecret: "", passphrase: "" },
+    bybit: { apiKey: "", apiSecret: "", passphrase: "" },
+    binance: { apiKey: "", apiSecret: "", passphrase: "" },
+  };
+}
 
 const DEFAULT_CEX_TESTNET_MODE: HeaderCexTestnetMap = {
   okx: false,
@@ -412,7 +414,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   });
   const [headerActionMessage, setHeaderActionMessage] = useState("");
   const [headerCexCredentials, setHeaderCexCredentials] = useState<HeaderCexCredentialMap>(
-    EMPTY_HEADER_CEX_CREDENTIALS
+    () => createEmptyHeaderCexCredentials()
   );
   /** Server-side vault session tokens — stored in sessionStorage, NOT localStorage */
   const [vaultTokens, setVaultTokens] = useState<Partial<Record<HeaderCexPlatform, string>>>({});
@@ -941,7 +943,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   useEffect(() => {
     if (!headerConnectOpen) return;
     // Security/UX: never prefill raw API secrets when opening the modal.
-    setHeaderCexCredentials(EMPTY_HEADER_CEX_CREDENTIALS);
+    setHeaderCexCredentials(createEmptyHeaderCexCredentials());
   }, [headerConnectOpen]);
 
   const handleSelectItem = useCallback((item: NewsItem) => {
@@ -1186,7 +1188,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           }
           setVenueTpSlMap((prev) => ({
             ...prev,
-            [pos.id]: { tpPrice: tpPrice ?? undefined, slPrice: slPrice ?? undefined },
+            [`${pos.ticker}_${pos.side}`]: { tpPrice: tpPrice ?? undefined, slPrice: slPrice ?? undefined },
           }));
           setTimeout(() => setVenueRefreshTick((t) => t + 1), 1500);
           return;
@@ -1363,7 +1365,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         // Clear raw credentials from React state — they're secured server-side now
         setHeaderCexCredentials((prev) => ({
           ...prev,
-          [cexPlatform]: EMPTY_HEADER_CEX_CREDENTIALS[cexPlatform],
+          [cexPlatform]: { apiKey: "", apiSecret: "", passphrase: "" },
         }));
         setHeaderConnection({ status: "saved_locally", platform: headerPlatform });
         setHeaderActionMessage(`${selectedHeaderPlatform.label} credentials secured in server vault.`);
@@ -1371,9 +1373,15 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         setHeaderActionMessage(data.message ?? "Failed to store credentials.");
         setHeaderConnection({ status: "failed", platform: headerPlatform, error: data.message });
       }
-    } catch {
-      setHeaderActionMessage("Network error — could not reach the credential vault.");
-      setHeaderConnection({ status: "failed", platform: headerPlatform, error: "Vault unreachable." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Vault unreachable.";
+      const isProxy403 = message.includes("403");
+      setHeaderActionMessage(
+        isProxy403
+          ? "Vault rejected request (403). Check PROXY_SHARED_SECRET and proxy marker settings."
+          : "Network error — could not reach the credential vault."
+      );
+      setHeaderConnection({ status: "failed", platform: headerPlatform, error: message });
     }
   }, [cexTestnetMode, headerCexCredentials, headerPlatform, selectedHeaderPlatform]);
 
@@ -1396,7 +1404,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     // Clear raw credentials from state
     setHeaderCexCredentials((prev) => ({
       ...prev,
-      [cexPlatform]: EMPTY_HEADER_CEX_CREDENTIALS[cexPlatform],
+      [cexPlatform]: { apiKey: "", apiSecret: "", passphrase: "" },
     }));
     setHeaderActionMessage(`${selectedHeaderPlatform.label} credentials removed.`);
     setHeaderConnection({ status: "not_configured", platform: headerPlatform });
@@ -1442,7 +1450,10 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           effectiveToken = storeData.sessionToken;
           try { sessionStorage.setItem(`traderbross.vault-token.${selectedHeaderCexPlatform}.v1`, effectiveToken); } catch { /* ignore */ }
           setVaultTokens((prev) => ({ ...prev, [selectedHeaderCexPlatform]: effectiveToken! }));
-          setHeaderCexCredentials((prev) => ({ ...prev, [selectedHeaderCexPlatform]: EMPTY_HEADER_CEX_CREDENTIALS[selectedHeaderCexPlatform] }));
+          setHeaderCexCredentials((prev) => ({
+            ...prev,
+            [selectedHeaderCexPlatform]: { apiKey: "", apiSecret: "", passphrase: "" },
+          }));
         } else {
           setHeaderActionMessage(storeData.message ?? "Failed to secure credentials.");
           setHeaderConnection({ status: "failed", platform: headerPlatform, error: storeData.message });
@@ -2290,6 +2301,12 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                         <input
                           type="text"
                           value={selectedHeaderCredentials?.apiKey ?? ""}
+                          autoComplete="off"
+                          autoCorrect="off"
+                          autoCapitalize="off"
+                          spellCheck={false}
+                          name={`cex-${selectedHeaderCexPlatform}-id`}
+                          data-lpignore="true"
                           onChange={(event) =>
                             setHeaderCexCredentials((prev) => ({
                               ...prev,
@@ -2311,6 +2328,12 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                         <input
                           type="password"
                           value={selectedHeaderCredentials?.apiSecret ?? ""}
+                          autoComplete="new-password"
+                          autoCorrect="off"
+                          autoCapitalize="off"
+                          spellCheck={false}
+                          name={`cex-${selectedHeaderCexPlatform}-secret`}
+                          data-lpignore="true"
                           onChange={(event) =>
                             setHeaderCexCredentials((prev) => ({
                               ...prev,
@@ -2332,6 +2355,12 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                         <input
                           type="password"
                           value={selectedHeaderCredentials?.passphrase ?? ""}
+                          autoComplete="new-password"
+                          autoCorrect="off"
+                          autoCapitalize="off"
+                          spellCheck={false}
+                          name={`cex-${selectedHeaderCexPlatform}-pass`}
+                          data-lpignore="true"
                           onChange={(event) =>
                             setHeaderCexCredentials((prev) => ({
                               ...prev,
@@ -2395,16 +2424,15 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                     </div>
 
                     <div className="mt-3 rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0c0f13] px-3 py-2.5 text-[10px] text-zinc-400">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-zinc-500">Saved Key</span>
-                        <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-1 text-[9px] text-[#f3ead7]">
-                          {maskCredentialPreview(selectedHeaderCredentials?.apiKey ?? "")}
-                        </span>
-                        <span className="text-zinc-500">Secret</span>
-                        <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-1 text-[9px] text-[#f3ead7]">
-                          {maskCredentialPreview(selectedHeaderCredentials?.apiSecret ?? "")}
-                        </span>
-                      </div>
+                      {selectedHeaderCexPlatform &&
+                      vaultTokens[selectedHeaderCexPlatform as HeaderCexPlatform] ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-zinc-500">Vault session</span>
+                          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[9px] text-emerald-300">
+                            Active
+                          </span>
+                        </div>
+                      ) : null}
                       <div className="mt-2 text-[10px] text-zinc-400">
                         {headerActionMessage || (
                           vaultTokens[selectedHeaderCexPlatform as HeaderCexPlatform]

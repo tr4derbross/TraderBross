@@ -137,8 +137,16 @@ async function enforceRateLimit(reply, key, limit, windowMs) {
 }
 
 function trustedProxyRequest(request) {
+  const origin = String(request.headers.origin || "").trim().replace(/\/+$/, "");
   const marker = String(request.headers["x-traderbross-proxy"] || "");
   if (config.security.requireProxyMarker && marker !== "1") {
+    if (
+      config.security.allowSensitiveOriginBypass &&
+      origin &&
+      config.frontendOrigins.includes(origin)
+    ) {
+      return true;
+    }
     return false;
   }
 
@@ -602,6 +610,8 @@ const server = http.createServer(async (request, reply) => {
       logger.warn("backend.request.blocked_untrusted_proxy", {
         path: url.pathname,
         ip: clientIp,
+        origin: String(request.headers.origin || ""),
+        has_proxy_marker: String(request.headers["x-traderbross-proxy"] || "") === "1",
       });
       json(reply, 403, { error: "Forbidden" });
       return;
@@ -1617,6 +1627,24 @@ const server = http.createServer(async (request, reply) => {
           if (!res.ok) throw new Error(data.msg || `Binance error ${res.status}`);
           return data;
         };
+        const cancelExistingBinanceTpSl = async () => {
+          const qs = binanceSignedQuery(apiSecret, { symbol });
+          const res = await fetch(`${base}/fapi/v1/openOrders?${qs}`, {
+            headers: { "X-MBX-APIKEY": apiKey },
+            signal: AbortSignal.timeout(6000),
+          });
+          const data = await res.json();
+          if (!res.ok || !Array.isArray(data)) return;
+          const protectiveOrders = data.filter((row) => {
+            const ordType = String(row?.type || "").toUpperCase();
+            return ordType === "STOP_MARKET" || ordType === "TAKE_PROFIT_MARKET";
+          });
+          await Promise.all(
+            protectiveOrders.map((row) =>
+              binanceDelete("/fapi/v1/order", { symbol, orderId: String(row.orderId) }).catch(() => null)
+            ),
+          );
+        };
         if (body.type === "leverage") {
           const leverage = Math.max(1, Math.min(125, Math.round(Number(body.leverage) || 1)));
           await binancePost("/fapi/v1/leverage", { symbol, leverage: String(leverage) });
@@ -1674,18 +1702,24 @@ const server = http.createServer(async (request, reply) => {
         if (body.type === "tpsl") {
           // Place TP and/or SL conditional orders with closePosition=true
           const tpslSide = body.side === "long" ? "SELL" : "BUY";
+          await cancelExistingBinanceTpSl();
           const results = [];
+          const errors = [];
           if (body.tpPrice) {
             const normalizedTp = await normalizeBinancePrice(base, symbol, body.tpPrice);
             if (!normalizedTp) {
               json(reply, 400, { ok: false, error: "Invalid TP price." });
               return;
             }
-            const r = await binancePost("/fapi/v1/order", {
-              symbol, side: tpslSide, type: "TAKE_PROFIT_MARKET",
-              stopPrice: normalizedTp, closePosition: "true", workingType: "CONTRACT_PRICE",
-            }).catch((e) => ({ error: String(e) }));
-            results.push({ tp: r });
+            try {
+              const r = await binancePost("/fapi/v1/order", {
+                symbol, side: tpslSide, type: "TAKE_PROFIT_MARKET",
+                stopPrice: normalizedTp, closePosition: "true", workingType: "CONTRACT_PRICE",
+              });
+              results.push({ tp: r });
+            } catch (e) {
+              errors.push(`TP failed: ${String(e)}`);
+            }
           }
           if (body.slPrice) {
             const normalizedSl = await normalizeBinancePrice(base, symbol, body.slPrice);
@@ -1693,11 +1727,19 @@ const server = http.createServer(async (request, reply) => {
               json(reply, 400, { ok: false, error: "Invalid SL price." });
               return;
             }
-            const r = await binancePost("/fapi/v1/order", {
-              symbol, side: tpslSide, type: "STOP_MARKET",
-              stopPrice: normalizedSl, closePosition: "true", workingType: "CONTRACT_PRICE",
-            }).catch((e) => ({ error: String(e) }));
-            results.push({ sl: r });
+            try {
+              const r = await binancePost("/fapi/v1/order", {
+                symbol, side: tpslSide, type: "STOP_MARKET",
+                stopPrice: normalizedSl, closePosition: "true", workingType: "CONTRACT_PRICE",
+              });
+              results.push({ sl: r });
+            } catch (e) {
+              errors.push(`SL failed: ${String(e)}`);
+            }
+          }
+          if (errors.length > 0) {
+            json(reply, 400, { ok: false, error: errors.join(" | "), data: results });
+            return;
           }
           json(reply, 200, { ok: true, data: results });
           return;
@@ -1750,17 +1792,22 @@ const server = http.createServer(async (request, reply) => {
           // Place TP / SL conditional orders if provided
           const tpslSide = body.side === "long" ? "SELL" : "BUY";
           const tpslResults = [];
+          const tpslErrors = [];
           if (body.tpPrice) {
             const normalizedTp = await normalizeBinancePrice(base, symbol, body.tpPrice);
             if (!normalizedTp) {
               json(reply, 400, { ok: false, error: "Invalid TP price." });
               return;
             }
-            const r = await binancePost("/fapi/v1/order", {
-              symbol, side: tpslSide, type: "TAKE_PROFIT_MARKET",
-              stopPrice: normalizedTp, closePosition: "true", workingType: "CONTRACT_PRICE",
-            }).catch((e) => ({ error: String(e) }));
-            tpslResults.push({ tp: r });
+            try {
+              const r = await binancePost("/fapi/v1/order", {
+                symbol, side: tpslSide, type: "TAKE_PROFIT_MARKET",
+                stopPrice: normalizedTp, closePosition: "true", workingType: "CONTRACT_PRICE",
+              });
+              tpslResults.push({ tp: r });
+            } catch (e) {
+              tpslErrors.push(`TP failed: ${String(e)}`);
+            }
           }
           if (body.slPrice) {
             const normalizedSl = await normalizeBinancePrice(base, symbol, body.slPrice);
@@ -1768,11 +1815,19 @@ const server = http.createServer(async (request, reply) => {
               json(reply, 400, { ok: false, error: "Invalid SL price." });
               return;
             }
-            const r = await binancePost("/fapi/v1/order", {
-              symbol, side: tpslSide, type: "STOP_MARKET",
-              stopPrice: normalizedSl, closePosition: "true", workingType: "CONTRACT_PRICE",
-            }).catch((e) => ({ error: String(e) }));
-            tpslResults.push({ sl: r });
+            try {
+              const r = await binancePost("/fapi/v1/order", {
+                symbol, side: tpslSide, type: "STOP_MARKET",
+                stopPrice: normalizedSl, closePosition: "true", workingType: "CONTRACT_PRICE",
+              });
+              tpslResults.push({ sl: r });
+            } catch (e) {
+              tpslErrors.push(`SL failed: ${String(e)}`);
+            }
+          }
+          if (tpslErrors.length > 0) {
+            json(reply, 400, { ok: false, error: tpslErrors.join(" | "), data: result, tpsl: tpslResults });
+            return;
           }
           json(reply, 200, { ok: true, data: result, tpsl: tpslResults });
           return;

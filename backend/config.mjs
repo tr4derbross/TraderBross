@@ -190,6 +190,7 @@ export function loadConfig() {
       proxyAuthHeader: process.env.PROXY_AUTH_HEADER || "x-traderbross-proxy-secret",
       proxyAuthSecret: process.env.PROXY_SHARED_SECRET || "",
       requireProxyMarker: toBoolean(process.env.REQUIRE_PROXY_MARKER, true),
+      allowSensitiveOriginBypass: toBoolean(process.env.ALLOW_SENSITIVE_ORIGIN_BYPASS, false),
     },
   };
   return applyFreeTierOverrides(baseConfig, process.env);

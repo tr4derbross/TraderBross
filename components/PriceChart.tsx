@@ -156,6 +156,7 @@ export default function PriceChart({
   const [refreshNonce, setRefreshNonce] = useState(0);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dragTarget, setDragTarget] = useState<"tp" | "sl" | null>(null);
+  const [dragPreviewPrice, setDragPreviewPrice] = useState<number | null>(null);
   const [menu, setMenu] = useState<ChartMenu>(null);
   const [eventFocusArmed, setEventFocusArmed] = useState(false);
   const lastAutoFocusedEventRef = useRef<string | null>(null);
@@ -163,6 +164,14 @@ export default function PriceChart({
   const hoverRafRef = useRef<number | null>(null);
   const pendingHoverRef = useRef<PriceData | null>(null);
   const activePosition = positions.find((position) => position.ticker === ticker);
+  const effectiveTpPrice =
+    dragTarget === "tp" && dragPreviewPrice && dragPreviewPrice > 0
+      ? dragPreviewPrice
+      : activePosition?.tpPrice;
+  const effectiveSlPrice =
+    dragTarget === "sl" && dragPreviewPrice && dragPreviewPrice > 0
+      ? dragPreviewPrice
+      : activePosition?.slPrice;
   const openOrders = orders.filter((order) => order.status === "open" && order.ticker === ticker);
   const lastBar = priceData[priceData.length - 1] ?? null;
   const firstBar = priceData[0] ?? null;
@@ -358,6 +367,7 @@ export default function PriceChart({
   useEffect(() => {
     setMenu(null);
     setDragTarget(null);
+    setDragPreviewPrice(null);
     setHoveredBar(null);
     setEventFocusArmed(false);
     hasFittedRef.current = false;
@@ -713,28 +723,28 @@ export default function PriceChart({
       title: `Liq $${fmtPrice(activePosition.liquidationPrice)}`,
     });
 
-    if (activePosition.tpPrice) {
+    if (effectiveTpPrice) {
       tpLineRef.current = series.createPriceLine({
-        price: activePosition.tpPrice,
+        price: effectiveTpPrice,
         color: "#0ecb81",
         lineWidth: 2,
         lineStyle: 0,
         axisLabelVisible: true,
-        title: `TP $${fmtPrice(activePosition.tpPrice)}`,
+        title: `TP $${fmtPrice(effectiveTpPrice)}`,
       });
     }
 
-    if (activePosition.slPrice) {
+    if (effectiveSlPrice) {
       slLineRef.current = series.createPriceLine({
-        price: activePosition.slPrice,
+        price: effectiveSlPrice,
         color: "#f6465d",
         lineWidth: 2,
         lineStyle: 0,
         axisLabelVisible: true,
-        title: `SL $${fmtPrice(activePosition.slPrice)}`,
+        title: `SL $${fmtPrice(effectiveSlPrice)}`,
       });
     }
-  }, [activePosition, chartReady, chartType]);
+  }, [activePosition, chartReady, chartType, effectiveTpPrice, effectiveSlPrice]);
 
   useEffect(() => {
     clearOpenOrderLines();
@@ -787,16 +797,12 @@ export default function PriceChart({
           return;
         }
         container.style.cursor = "ns-resize";
-        onUpdatePositionTpSl(
-          activePosition.id,
-          dragTarget === "tp" ? draggedPrice : activePosition.tpPrice,
-          dragTarget === "sl" ? draggedPrice : activePosition.slPrice,
-        );
+        setDragPreviewPrice(draggedPrice);
         return;
       }
 
-      const tpY = activePosition.tpPrice ? priceToCoordinate(activePosition.tpPrice) : null;
-      const slY = activePosition.slPrice ? priceToCoordinate(activePosition.slPrice) : null;
+      const tpY = effectiveTpPrice ? priceToCoordinate(effectiveTpPrice) : null;
+      const slY = effectiveSlPrice ? priceToCoordinate(effectiveSlPrice) : null;
       const nearTp = tpY !== null && Math.abs(y - tpY) < hitZone;
       const nearSl = slY !== null && Math.abs(y - slY) < hitZone;
       container.style.cursor = nearTp || nearSl ? "ns-resize" : "";
@@ -806,23 +812,33 @@ export default function PriceChart({
       if (event.button !== 0) return;
       const rect = container.getBoundingClientRect();
       const y = event.clientY - rect.top;
-      const tpY = activePosition.tpPrice ? priceToCoordinate(activePosition.tpPrice) : null;
-      const slY = activePosition.slPrice ? priceToCoordinate(activePosition.slPrice) : null;
+      const tpY = effectiveTpPrice ? priceToCoordinate(effectiveTpPrice) : null;
+      const slY = effectiveSlPrice ? priceToCoordinate(effectiveSlPrice) : null;
 
       if (tpY !== null && Math.abs(y - tpY) < hitZone) {
         setDragTarget("tp");
+        setDragPreviewPrice(effectiveTpPrice ?? activePosition.entryPrice);
         event.preventDefault();
         return;
       }
 
       if (slY !== null && Math.abs(y - slY) < hitZone) {
         setDragTarget("sl");
+        setDragPreviewPrice(effectiveSlPrice ?? activePosition.entryPrice);
         event.preventDefault();
       }
     };
 
     const onMouseUp = () => {
+      if (dragTarget && dragPreviewPrice && dragPreviewPrice > 0) {
+        onUpdatePositionTpSl(
+          activePosition.id,
+          dragTarget === "tp" ? dragPreviewPrice : activePosition.tpPrice,
+          dragTarget === "sl" ? dragPreviewPrice : activePosition.slPrice,
+        );
+      }
       setDragTarget(null);
+      setDragPreviewPrice(null);
       container.style.cursor = "";
     };
 
@@ -836,7 +852,7 @@ export default function PriceChart({
       window.removeEventListener("mouseup", onMouseUp);
       container.style.cursor = "";
     };
-  }, [activePosition, dragTarget, onUpdatePositionTpSl]);
+  }, [activePosition, dragTarget, dragPreviewPrice, onUpdatePositionTpSl, effectiveTpPrice, effectiveSlPrice]);
 
   const toggleFullscreen = async () => {
     if (typeof document === "undefined") return;
@@ -868,6 +884,11 @@ export default function PriceChart({
   const startProtectionDrag = (target: "tp" | "sl") => {
     if (!activePosition) return;
     setDragTarget(target);
+    setDragPreviewPrice(
+      target === "tp"
+        ? (effectiveTpPrice ?? activePosition.entryPrice)
+        : (effectiveSlPrice ?? activePosition.entryPrice)
+    );
   };
 
   return (
@@ -1228,8 +1249,8 @@ export default function PriceChart({
           {chartReady && activePosition && (() => {
             const entryY = priceToCoordinate(activePosition.entryPrice);
             if (entryY === null) return null;
-            const tp = activePosition.tpPrice;
-            const sl = activePosition.slPrice;
+            const tp = effectiveTpPrice;
+            const sl = effectiveSlPrice;
             const tpY = tp ? priceToCoordinate(tp) : null;
             const slY = sl ? priceToCoordinate(sl) : null;
             const rr =
