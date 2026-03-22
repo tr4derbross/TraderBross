@@ -251,15 +251,23 @@ async function getBinanceSymbolSpec(baseUrl, symbol) {
   const lotFilter = Array.isArray(row.filters)
     ? row.filters.find((f) => f?.filterType === "LOT_SIZE")
     : null;
+  const marketLotFilter = Array.isArray(row.filters)
+    ? row.filters.find((f) => f?.filterType === "MARKET_LOT_SIZE")
+    : null;
   const priceFilter = Array.isArray(row.filters)
     ? row.filters.find((f) => f?.filterType === "PRICE_FILTER")
     : null;
   const stepSize = Number(lotFilter?.stepSize || "0");
   const minQty = Number(lotFilter?.minQty || "0");
+  const lotMaxQty = Number(lotFilter?.maxQty || "0");
+  const marketMaxQty = Number(marketLotFilter?.maxQty || "0");
   const tickSize = Number(priceFilter?.tickSize || "0");
+  const maxCandidates = [lotMaxQty, marketMaxQty].filter((v) => Number.isFinite(v) && v > 0);
+  const maxQty = maxCandidates.length > 0 ? Math.min(...maxCandidates) : null;
   return {
     stepSize: Number.isFinite(stepSize) && stepSize > 0 ? stepSize : null,
     minQty: Number.isFinite(minQty) && minQty > 0 ? minQty : null,
+    maxQty,
     tickSize: Number.isFinite(tickSize) && tickSize > 0 ? tickSize : null,
     qtyPrecision: Number(row?.quantityPrecision || 3),
     pricePrecision: Number(row?.pricePrecision || 6),
@@ -268,8 +276,9 @@ async function getBinanceSymbolSpec(baseUrl, symbol) {
 
 async function normalizeBinanceQuantity(baseUrl, symbol, value) {
   const spec = await getBinanceSymbolSpec(baseUrl, symbol);
-  const qty = Number(value);
+  let qty = Number(value);
   if (!Number.isFinite(qty) || qty <= 0) return null;
+  if (spec?.maxQty && qty > spec.maxQty) qty = spec.maxQty;
   if (!spec?.stepSize) return toWireDecimal(qty, 6);
   const precision = Math.max(spec.qtyPrecision || 0, decimalPlacesFromStep(spec.stepSize));
   const floored = floorToStep(qty, spec.stepSize, precision);
