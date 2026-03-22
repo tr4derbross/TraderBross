@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import http from "node:http";
 import { URL } from "node:url";
-import { WebSocketServer } from "ws";
+import WebSocket, { WebSocketServer } from "ws";
 import { ethers } from "ethers";
 import { encode as msgpackEncode } from "@msgpack/msgpack";
 import { loadConfig } from "./config.mjs";
