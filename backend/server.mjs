@@ -536,7 +536,10 @@ async function readJson(request) {
   if (chunks.length === 0) {
     return {};
   }
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  const raw = Buffer.concat(chunks).toString("utf8");
+  const normalized = String(raw || "").trim().replace(/^\uFEFF/, "");
+  if (!normalized) return {};
+  return JSON.parse(normalized);
 }
 
 function sendToClient(socket, payload) {
@@ -1345,7 +1348,18 @@ const server = http.createServer(async (request, reply) => {
     }
 
     if (request.method === "POST" && url.pathname === "/api/chat") {
-      const body = await readJson(request);
+      let body = {};
+      try {
+        body = await readJson(request);
+      } catch (parseError) {
+        logger.warn("ai.chat.invalid_json", {
+          error: String(parseError),
+        });
+        body = {
+          messages: [{ role: "user", content: "Analyze current crypto market context." }],
+          context: {},
+        };
+      }
       const clientIp = getClientIp(request);
       const consumerKey = getChatConsumerKey(request, clientIp);
       const requestId = crypto.randomUUID();
