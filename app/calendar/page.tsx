@@ -539,7 +539,7 @@ export default function CalendarPage() {
               <p className="text-[11px] text-[#3A3A3A]">
                 Check back soon or{" "}
                 <a
-                  href="https://t.me/traderbross"
+                  href="https://t.me/+gmvsMPoWofA2ZjY0"
                   target="_blank"
                   rel="noreferrer"
                   className="text-[#F2B705]/70 transition hover:text-[#F2B705] underline underline-offset-2"

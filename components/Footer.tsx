@@ -29,7 +29,7 @@ export default function Footer() {
                 <Twitter size={13} /> {dict.nav.twitter}
               </a>
               <a
-                href="https://t.me/traderbross"
+                href="https://t.me/+gmvsMPoWofA2ZjY0"
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center gap-1.5 text-[11px] text-[#6B6B6B] transition-colors hover:text-[#F2B705]"
