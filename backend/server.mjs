@@ -6,7 +6,6 @@ import { ethers } from "ethers";
 import { encode as msgpackEncode } from "@msgpack/msgpack";
 import { loadConfig } from "./config.mjs";
 import { createLogger } from "./logger.mjs";
-import { getProviderLabel, streamChat, classifySentiment } from "./services/ai-service.mjs";
 import { getCalendarEvents } from "./services/calendar-service.mjs";
 import { getDydxAccount, getDydxCandles, getDydxMarkets } from "./services/dydx-service.mjs";
 import { getHyperliquidAccount, getHyperliquidCandles, getHyperliquidMarket } from "./services/hyperliquid-service.mjs";
@@ -127,14 +126,6 @@ function getClientIp(request) {
     request.socket?.remoteAddress ||
     "unknown";
   return String(raw).split(",")[0].trim();
-}
-
-function getChatConsumerKey(request, clientIp) {
-  const session = String(request.headers["x-traderbross-session"] || "").trim();
-  if (/^[a-zA-Z0-9._:-]{8,120}$/.test(session)) {
-    return `session:${session}`;
-  }
-  return `ip:${clientIp || "unknown"}`;
 }
 
 async function enforceRateLimit(reply, key, limit, windowMs) {
@@ -308,14 +299,6 @@ function buildHttpCacheKey(pathname, searchParams) {
   });
   const encoded = pairs.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join("&");
   return encoded ? `${pathname}?${encoded}` : pathname;
-}
-
-function getPrimaryAiProvider(config) {
-  if (!config?.ai?.allowExternal) return "mock";
-  if (config.groqApiKey) return "groq";
-  if (config.geminiApiKey) return "gemini";
-  if (config.openrouterApiKey) return "openrouter";
-  return "mock";
 }
 
 function hyperAddressToBytes(address) {
