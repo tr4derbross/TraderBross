@@ -3,20 +3,6 @@
 
 export interface HLSig { r: string; s: string; v: number }
 
-/**
- * TraderBross builder fee configuration.
- * Set NEXT_PUBLIC_HL_BUILDER_ADDRESS in your .env to your registered HL builder address.
- * Fee unit: tenths of a basis point. 1 = 0.1 bps = 0.001% per trade (max 100 = 10 bps).
- */
-const BUILDER_ADDRESS = process.env.NEXT_PUBLIC_HL_BUILDER_ADDRESS ?? "";
-const BUILDER_FEE     = Number(process.env.NEXT_PUBLIC_HL_BUILDER_FEE ?? "1"); // default 0.1 bps
-
-/** Returns builder field only when address is configured. */
-function builderField() {
-  if (!BUILDER_ADDRESS) return undefined;
-  return { b: BUILDER_ADDRESS, f: BUILDER_FEE };
-}
-
 export async function signHLAction(
   action: object,
   nonce: number,
@@ -86,7 +72,6 @@ export function buildMarketOrder(
       t: { limit: { tif: "Ioc" } }, // IOC ≈ market
     }],
     grouping: "na",
-    ...(builderField() && { builder: builderField() }),
   };
 }
 
@@ -107,6 +92,5 @@ export function buildLimitOrder(
       t: { limit: { tif: "Gtc" } }, // GTC for limit
     }],
     grouping: "na",
-    ...(builderField() && { builder: builderField() }),
   };
 }
