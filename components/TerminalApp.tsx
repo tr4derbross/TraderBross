@@ -240,7 +240,6 @@ type HeaderCexTestnetMap = Record<HeaderCexPlatform, boolean>;
 type NewsTradeIntent = NewsTradePreset & { sourceItemId: string };
 type SecureStoredCexState = {
   version: 1;
-  credentials: HeaderCexCredentialMap;
   testnetMode: HeaderCexTestnetMap;
 };
 
@@ -560,10 +559,9 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     if (!secureCexStateReady) return;
     void secureCexStorageRef.current.setItem(SECURE_CEX_STORAGE_KEY, {
       version: 1,
-      credentials: headerCexCredentials,
       testnetMode: cexTestnetMode,
     });
-  }, [cexTestnetMode, headerCexCredentials, secureCexStateReady]);
+  }, [cexTestnetMode, secureCexStateReady]);
 
   // NOTE: Raw CEX credentials are intentionally NOT persisted to localStorage.
   // Credentials are stored encrypted in device-local storage (AES-GCM) and can be
@@ -928,9 +926,6 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     const loadSecureCexState = async () => {
       const stored = await secureCexStorageRef.current.getItem(SECURE_CEX_STORAGE_KEY);
       if (cancelled) return;
-      if (stored?.credentials) {
-        setHeaderCexCredentials(stored.credentials);
-      }
       if (stored?.testnetMode) {
         setCexTestnetMode(stored.testnetMode);
       }
@@ -942,6 +937,12 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       cancelled = true;
     };
   }, [secureStorageScope]);
+
+  useEffect(() => {
+    if (!headerConnectOpen) return;
+    // Security/UX: never prefill raw API secrets when opening the modal.
+    setHeaderCexCredentials(EMPTY_HEADER_CEX_CREDENTIALS);
+  }, [headerConnectOpen]);
 
   const handleSelectItem = useCallback((item: NewsItem) => {
     setSelectedItem(item);
