@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, IBM_Plex_Mono } from "next/font/google";
+import { LanguageProvider } from "@/components/i18n/LanguageProvider";
+import LanguageDock from "@/components/i18n/LanguageDock";
 import "./globals.css";
 
 const inter = Inter({
@@ -38,7 +40,10 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${ibmPlexMono.variable} font-sans bg-black text-[var(--text-primary)] antialiased`}
       >
-        {children}
+        <LanguageProvider>
+          <LanguageDock />
+          {children}
+        </LanguageProvider>
       </body>
     </html>
   );
