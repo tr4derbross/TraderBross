@@ -1523,8 +1523,8 @@ const server = http.createServer(async (request, reply) => {
             })(),
             (async () => {
               try {
-                const qs = binanceSignedQuery(apiSecret);
-                const res = await fetch(`${base}/fapi/v1/openOrders?${qs}`, {
+                const qs = binanceSignedQuery(apiSecret, { algoType: "CONDITIONAL" });
+                const res = await fetch(`${base}/fapi/v1/openAlgoOrders?${qs}`, {
                   headers: { "X-MBX-APIKEY": apiKey },
                   signal: AbortSignal.timeout(5000),
                 });
@@ -1537,7 +1537,7 @@ const server = http.createServer(async (request, reply) => {
           ]);
           const tpslByKey = new Map();
           for (const order of openOrders) {
-            const ordType = String(order?.type || "").toUpperCase();
+            const ordType = String(order?.orderType || order?.type || "").toUpperCase();
             if (ordType !== "STOP_MARKET" && ordType !== "TAKE_PROFIT_MARKET") continue;
             const orderSymbol = String(order?.symbol || "");
             if (!orderSymbol.endsWith("USDT") && !orderSymbol.endsWith("USDC")) continue;
@@ -1546,7 +1546,7 @@ const server = http.createServer(async (request, reply) => {
             const positionSide = closeSide === "SELL" ? "long" : "short";
             const key = `${baseCoin}_${positionSide}`;
             const current = tpslByKey.get(key) || {};
-            const trigger = finitePositiveNumber(order?.stopPrice);
+            const trigger = finitePositiveNumber(order?.triggerPrice || order?.stopPrice);
             if (!trigger) continue;
             if (ordType === "TAKE_PROFIT_MARKET" && !current.tpPrice) {
               current.tpPrice = trigger;
@@ -1627,23 +1627,24 @@ const server = http.createServer(async (request, reply) => {
           if (!res.ok) throw new Error(data.msg || `Binance error ${res.status}`);
           return data;
         };
-        const cancelExistingBinanceTpSl = async () => {
-          const qs = binanceSignedQuery(apiSecret, { symbol });
-          const res = await fetch(`${base}/fapi/v1/openOrders?${qs}`, {
+        const binanceAlgoPost = async (params) => {
+          const qs = binanceSignedQuery(apiSecret, params);
+          const res = await fetch(`${base}/fapi/v1/algoOrder?${qs}`, {
+            method: "POST",
             headers: { "X-MBX-APIKEY": apiKey },
-            signal: AbortSignal.timeout(6000),
+            signal: AbortSignal.timeout(8000),
           });
           const data = await res.json();
-          if (!res.ok || !Array.isArray(data)) return;
-          const protectiveOrders = data.filter((row) => {
-            const ordType = String(row?.type || "").toUpperCase();
-            return ordType === "STOP_MARKET" || ordType === "TAKE_PROFIT_MARKET";
-          });
-          await Promise.all(
-            protectiveOrders.map((row) =>
-              binanceDelete("/fapi/v1/order", { symbol, orderId: String(row.orderId) }).catch(() => null)
-            ),
-          );
+          if (!res.ok) throw new Error(data.msg || `Binance algo error ${res.status}`);
+          return data;
+        };
+        const cancelExistingBinanceTpSl = async () => {
+          const qs = binanceSignedQuery(apiSecret, { symbol, algoType: "CONDITIONAL" });
+          await fetch(`${base}/fapi/v1/algoOpenOrders?${qs}`, {
+            method: "DELETE",
+            headers: { "X-MBX-APIKEY": apiKey },
+            signal: AbortSignal.timeout(6000),
+          }).catch(() => null);
         };
         if (body.type === "leverage") {
           const leverage = Math.max(1, Math.min(125, Math.round(Number(body.leverage) || 1)));
@@ -1712,9 +1713,14 @@ const server = http.createServer(async (request, reply) => {
               return;
             }
             try {
-              const r = await binancePost("/fapi/v1/order", {
-                symbol, side: tpslSide, type: "TAKE_PROFIT_MARKET",
-                stopPrice: normalizedTp, closePosition: "true", workingType: "CONTRACT_PRICE",
+              const r = await binanceAlgoPost({
+                algoType: "CONDITIONAL",
+                symbol,
+                side: tpslSide,
+                type: "TAKE_PROFIT_MARKET",
+                triggerPrice: normalizedTp,
+                closePosition: "true",
+                workingType: "CONTRACT_PRICE",
               });
               results.push({ tp: r });
             } catch (e) {
@@ -1728,9 +1734,14 @@ const server = http.createServer(async (request, reply) => {
               return;
             }
             try {
-              const r = await binancePost("/fapi/v1/order", {
-                symbol, side: tpslSide, type: "STOP_MARKET",
-                stopPrice: normalizedSl, closePosition: "true", workingType: "CONTRACT_PRICE",
+              const r = await binanceAlgoPost({
+                algoType: "CONDITIONAL",
+                symbol,
+                side: tpslSide,
+                type: "STOP_MARKET",
+                triggerPrice: normalizedSl,
+                closePosition: "true",
+                workingType: "CONTRACT_PRICE",
               });
               results.push({ sl: r });
             } catch (e) {
@@ -1800,9 +1811,14 @@ const server = http.createServer(async (request, reply) => {
               return;
             }
             try {
-              const r = await binancePost("/fapi/v1/order", {
-                symbol, side: tpslSide, type: "TAKE_PROFIT_MARKET",
-                stopPrice: normalizedTp, closePosition: "true", workingType: "CONTRACT_PRICE",
+              const r = await binanceAlgoPost({
+                algoType: "CONDITIONAL",
+                symbol,
+                side: tpslSide,
+                type: "TAKE_PROFIT_MARKET",
+                triggerPrice: normalizedTp,
+                closePosition: "true",
+                workingType: "CONTRACT_PRICE",
               });
               tpslResults.push({ tp: r });
             } catch (e) {
@@ -1816,9 +1832,14 @@ const server = http.createServer(async (request, reply) => {
               return;
             }
             try {
-              const r = await binancePost("/fapi/v1/order", {
-                symbol, side: tpslSide, type: "STOP_MARKET",
-                stopPrice: normalizedSl, closePosition: "true", workingType: "CONTRACT_PRICE",
+              const r = await binanceAlgoPost({
+                algoType: "CONDITIONAL",
+                symbol,
+                side: tpslSide,
+                type: "STOP_MARKET",
+                triggerPrice: normalizedSl,
+                closePosition: "true",
+                workingType: "CONTRACT_PRICE",
               });
               tpslResults.push({ sl: r });
             } catch (e) {
