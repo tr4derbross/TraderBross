@@ -23,9 +23,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         return null;
       }
     })();
-    const fromBrowser = typeof navigator !== "undefined" ? navigator.language : null;
-    const next = normalizeLocale(fromStorage || fromBrowser);
-    setLocaleState(next);
+    if (fromStorage) {
+      setLocaleState(normalizeLocale(fromStorage));
+    }
   }, []);
 
   const setLocale = (next: Locale) => {
