@@ -29,6 +29,7 @@ type ChartType = "candles" | "line";
 type ChartMenu = { x: number; y: number; price: number } | null;
 type MarkerPosition = "aboveBar" | "belowBar";
 type MarkerShape = "circle" | "square" | "arrowUp" | "arrowDown";
+const ENABLE_CHART_TPSL_DRAG = false;
 
 type Props = {
   activeVenue: TradingVenueId;
@@ -777,6 +778,7 @@ export default function PriceChart({
   }, [chartReady, openOrders]);
 
   useEffect(() => {
+    if (!ENABLE_CHART_TPSL_DRAG) return;
     const shell = chartShellRef.current;
     const container = chartContainerRef.current;
     if (!shell || !container || !activePosition || !onUpdatePositionTpSl) return;
@@ -882,6 +884,7 @@ export default function PriceChart({
   };
 
   const startProtectionDrag = (target: "tp" | "sl") => {
+    if (!ENABLE_CHART_TPSL_DRAG) return;
     if (!activePosition) return;
     setDragTarget(target);
     setDragPreviewPrice(
@@ -1201,37 +1204,41 @@ export default function PriceChart({
               >
                 {activePosition.side.toUpperCase()} {activePosition.leverage}x
               </span>
-              <button
-                type="button"
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  startProtectionDrag("tp");
-                }}
-                className="pointer-events-auto rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.18em]"
-                style={{
-                  color: "#0ecb81",
-                  borderColor: "rgba(14,203,129,0.24)",
-                  background: "rgba(7,20,15,0.9)",
-                }}
-              >
-                {activePosition.tpPrice ? "Drag TP" : "Create TP"}
-              </button>
-              <button
-                type="button"
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  startProtectionDrag("sl");
-                }}
-                className="pointer-events-auto rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.18em]"
-                style={{
-                  color: "#f6465d",
-                  borderColor: "rgba(246,70,93,0.24)",
-                  background: "rgba(22,10,13,0.9)",
-                }}
-              >
-                {activePosition.slPrice ? "Drag SL" : "Create SL"}
-              </button>
-              {dragTarget && (
+              {ENABLE_CHART_TPSL_DRAG && (
+                <>
+                  <button
+                    type="button"
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      startProtectionDrag("tp");
+                    }}
+                    className="pointer-events-auto rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.18em]"
+                    style={{
+                      color: "#0ecb81",
+                      borderColor: "rgba(14,203,129,0.24)",
+                      background: "rgba(7,20,15,0.9)",
+                    }}
+                  >
+                    {activePosition.tpPrice ? "Drag TP" : "Create TP"}
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      startProtectionDrag("sl");
+                    }}
+                    className="pointer-events-auto rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.18em]"
+                    style={{
+                      color: "#f6465d",
+                      borderColor: "rgba(246,70,93,0.24)",
+                      background: "rgba(22,10,13,0.9)",
+                    }}
+                  >
+                    {activePosition.slPrice ? "Drag SL" : "Create SL"}
+                  </button>
+                </>
+              )}
+              {ENABLE_CHART_TPSL_DRAG && dragTarget && (
                 <span
                   className="rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.18em]"
                   style={{
