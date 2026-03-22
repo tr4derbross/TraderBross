@@ -140,58 +140,11 @@ function QuickTradeChips({
   onQuickTrade?: (preset: NewsTradePreset, item: NewsItem) => void;
 }) {
   const quickPresets = buildNewsTradePresets(item);
-  const primarySymbol = item.ticker?.[0];
 
-  if (quickPresets.length === 0 && !primarySymbol) return null;
+  if (quickPresets.length === 0) return null;
 
   return (
     <div className="mt-2.5 flex flex-wrap gap-1.5">
-      {primarySymbol ? (
-        <>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onQuickTrade?.(
-                {
-                  symbol: primarySymbol,
-                  side: "long",
-                  orderType: "market",
-                  tpPercent: 2,
-                  slPercent: 1,
-                  label: `Hizli Al ${primarySymbol}`,
-                  rationale: "One-click fast buy preset.",
-                },
-                item,
-              );
-            }}
-            className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold text-emerald-200 transition-colors hover:border-emerald-400/50 hover:bg-emerald-500/16"
-          >
-            Hizli Al
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onQuickTrade?.(
-                {
-                  symbol: primarySymbol,
-                  side: "short",
-                  orderType: "market",
-                  tpPercent: 2,
-                  slPercent: 1,
-                  label: `Hizli Sat ${primarySymbol}`,
-                  rationale: "One-click fast sell preset.",
-                },
-                item,
-              );
-            }}
-            className="rounded-full border border-rose-400/30 bg-rose-500/10 px-2.5 py-1 text-[10px] font-bold text-rose-200 transition-colors hover:border-rose-400/50 hover:bg-rose-500/16"
-          >
-            Hizli Sat
-          </button>
-        </>
-      ) : null}
       {quickPresets.map((preset) => (
         <button
           key={preset.label}
