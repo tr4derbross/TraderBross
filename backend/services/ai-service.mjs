@@ -225,6 +225,13 @@ async function callOpenRouter(config, payload) {
       // Try next free model in the list.
     }
   }
+  // Safety net: if configured model IDs are invalid/unavailable, let OpenRouter route automatically.
+  try {
+    const autoText = await callOpenRouterModel(config, payload, "openrouter/auto");
+    if (autoText) return autoText;
+  } catch {
+    // Fall through to global failure.
+  }
   throw new Error("openrouter_http_429:all_models_failed_or_unavailable");
 }
 
