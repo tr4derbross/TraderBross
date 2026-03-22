@@ -955,10 +955,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       if (match) {
         setActiveSymbol(match);
         setRightTab("trade");
-        setMobileWorkspaceTab(() => {
-          const desktop = window.innerWidth >= 1280;
-          return desktop ? "chart" : "tools";
-        });
+        setMobileWorkspaceTab("chart");
       }
     }
   }, [setActiveSymbol, tradableSet]);
@@ -975,10 +972,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       setActiveSymbol(symbol);
     }
     setRightTab("trade");
-    setMobileWorkspaceTab((prev) => {
-      const desktop = window.innerWidth >= 1280;
-      return desktop ? prev : "tools";
-    });
+    setMobileWorkspaceTab("chart");
   }, [setActiveSymbol, tradableSet]);
 
   const buildActiveVenueConnection = useCallback((): VenueConnectionInput | undefined => {
@@ -1541,6 +1535,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       className={`panel-shell soft-divider flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border ${extraClassName}`}
     >
       <PriceChart
+        key={`${activeVenueState.venueId}:${activeVenueState.activeSymbol}:${quoteAsset}`}
         activeVenue={activeVenueState.venueId}
         activeSymbol={activeVenueState.activeSymbol}
         availableTickers={tradableSymbols}
