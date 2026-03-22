@@ -31,6 +31,11 @@ import { createWhaleEventEngine } from "./onchain/whale-engine.mjs";
 import { createWatchlistRelevance } from "./core/watchlist-relevance.mjs";
 import { createRuleAnalysisEngine } from "./analysis/rule-analysis.mjs";
 import { getVenueQuotes } from "../services/venue-service.mjs";
+import {
+  createBinanceQuoteStream,
+  createBybitQuoteStream,
+  createOkxQuoteStream,
+} from "../services/market-service.mjs";
 import { getDefiLlamaTvl, getEthGas, getFearGreed, getForexRates, getMempoolStats } from "../services/stats-service.mjs";
 
 function dedupeBy(items, getKey) {
@@ -138,6 +143,9 @@ export function createTerminalDataService({ config, logger }) {
 
   let started = false;
   let stopHyperliquid = null;
+  let stopBinanceQuotes = null;
+  let stopOkxQuotes = null;
+  let stopBybitQuotes = null;
   let stopLiquidations = null;
   let stopTreeNews = null;
   let intervals = [];
@@ -156,6 +164,20 @@ export function createTerminalDataService({ config, logger }) {
       bySymbol.set(tick.symbol, toFrontendQuote(tick));
     });
     state.quotes = Array.from(bySymbol.values()).sort((a, b) => a.symbol.localeCompare(b.symbol));
+  }
+
+  function mergeVenueQuotePatch(venue, quotes) {
+    const venueKey = venue === "OKX" ? "OKX" : venue === "Bybit" ? "Bybit" : "Binance";
+    const current = Array.isArray(state.venueQuotes?.[venueKey]) ? state.venueQuotes[venueKey] : [];
+    const bySymbol = new Map(current.map((item) => [item.symbol, item]));
+    (Array.isArray(quotes) ? quotes : []).forEach((quote) => {
+      if (!quote?.symbol) return;
+      bySymbol.set(quote.symbol, quote);
+    });
+    state.venueQuotes = {
+      ...state.venueQuotes,
+      [venueKey]: Array.from(bySymbol.values()).sort((a, b) => a.symbol.localeCompare(b.symbol)),
+    };
   }
 
   function markProvider(provider, status, error = null) {
@@ -625,6 +647,30 @@ export function createTerminalDataService({ config, logger }) {
   }
 
   function startStreamingAdapters() {
+    stopBinanceQuotes = createBinanceQuoteStream({
+      logger,
+      onQuotes(quotes) {
+        mergeVenueQuotePatch("Binance", quotes);
+        publish("venueQuotes", state.venueQuotes);
+      },
+    });
+
+    stopOkxQuotes = createOkxQuoteStream({
+      logger,
+      onQuotes(quotes) {
+        mergeVenueQuotePatch("OKX", quotes);
+        publish("venueQuotes", state.venueQuotes);
+      },
+    });
+
+    stopBybitQuotes = createBybitQuoteStream({
+      logger,
+      onQuotes(quotes) {
+        mergeVenueQuotePatch("Bybit", quotes);
+        publish("venueQuotes", state.venueQuotes);
+      },
+    });
+
     if (featureFlags.enableHyperliquidWs !== false) {
       stopHyperliquid = createHyperliquidMarketStream({
         logger,
@@ -870,9 +916,15 @@ export function createTerminalDataService({ config, logger }) {
     if (!started) return;
     started = false;
     if (stopHyperliquid) stopHyperliquid();
+    if (stopBinanceQuotes) stopBinanceQuotes();
+    if (stopOkxQuotes) stopOkxQuotes();
+    if (stopBybitQuotes) stopBybitQuotes();
     if (stopLiquidations) stopLiquidations();
     if (stopTreeNews) stopTreeNews();
     stopHyperliquid = null;
+    stopBinanceQuotes = null;
+    stopOkxQuotes = null;
+    stopBybitQuotes = null;
     stopLiquidations = null;
     stopTreeNews = null;
     intervals.forEach(clearInterval);

@@ -149,6 +149,10 @@ pm2 save
 - Reconnect: exponential backoff with capped retries and reset cycle.
 
 News ingestion includes RSS/JSON/social plus official exchange announcements (Binance, Bybit, OKX), merged in backend and served via `GET /api/news`.
+Venue quote streams use official public WebSocket feeds:
+- Binance: `wss://data-stream.binance.vision/stream?streams=!miniTicker@arr`
+- OKX: `wss://ws.okx.com:8443/ws/v5/public` (`tickers`)
+- Bybit: `wss://stream.bybit.com/v5/public/linear` (`tickers.*`)
 
 ## Ops Commands
 
