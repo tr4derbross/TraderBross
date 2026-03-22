@@ -24,6 +24,7 @@ import type { NewsItem, TickerQuote } from "@/lib/mock-data";
 import { getAllTradeLinks } from "@/lib/referral-links";
 import { useRealtimeSelector } from "@/lib/realtime-client";
 import { apiFetch } from "@/lib/api-client";
+import { useI18n } from "@/components/i18n/LanguageProvider";
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 
@@ -333,7 +334,7 @@ interface TrendingTopic {
   sentiment: { bullish: number; bearish: number; neutral: number };
 }
 
-function TrendingTopics({ news }: { news: NewsItem[] }) {
+function TrendingTopics({ news, label }: { news: NewsItem[]; label: string }) {
   const topics = useMemo<TrendingTopic[]>(() => {
     const map = new Map<string, TrendingTopic>();
     for (const item of news) {
@@ -364,7 +365,7 @@ function TrendingTopics({ news }: { news: NewsItem[] }) {
       <div className="mb-2.5 flex items-center gap-1.5">
         <Flame className="h-3.5 w-3.5 text-orange-400" />
         <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#A0A0A0]">
-          Trending Now
+          {label}
         </span>
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -395,7 +396,15 @@ function TrendingTopics({ news }: { news: NewsItem[] }) {
 
 /* ── Market Impact panel ──────────────────────────────────────────────────── */
 
-function MarketImpact({ item, quotes }: { item: NewsItem; quotes: TickerQuote[] }) {
+function MarketImpact({
+  item,
+  quotes,
+  labels,
+}: {
+  item: NewsItem;
+  quotes: TickerQuote[];
+  labels: { title: string; change24h: string };
+}) {
   const relevantQuotes = useMemo(
     () => quotes.filter((quote) => item.ticker?.includes(quote.symbol)),
     [item.ticker, quotes]
@@ -408,9 +417,9 @@ function MarketImpact({ item, quotes }: { item: NewsItem; quotes: TickerQuote[] 
       <div className="mb-2 flex items-center gap-1.5">
         <BarChart2 className="h-3 w-3 text-[#F2B705]/80" />
         <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">
-          Market Prices
+          {labels.title}
         </span>
-        <span className="ml-auto text-[9px] text-[#3A3A3A]">24h change</span>
+        <span className="ml-auto text-[9px] text-[#3A3A3A]">{labels.change24h}</span>
       </div>
       <div className="space-y-1.5">
         {relevantQuotes.map((q) => {
@@ -498,6 +507,16 @@ const CHART_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
 /* ── Page ──────────────────────────────────────────────────────────────────── */
 
 export default function NewsPage() {
+  const { locale } = useI18n();
+  const t =
+    locale === "tr"
+      ? { title: "Haberler & Tweetler", live: "Canlı", loading: "Yükleniyor", refresh: "Yenile", search: "Başlık veya sembol ara…", noItems: "Filtrelere uygun içerik yok.", screener: "Tarayıcı", events: "Etkinlikler", trade: "İşlem", trending: "Trend Olanlar", marketPrices: "Piyasa Fiyatları", change24h: "24s değişim" }
+      : locale === "de"
+      ? { title: "News & Tweets", live: "Live", loading: "Lädt", refresh: "Aktualisieren", search: "Schlagzeilen oder Symbol suchen…", noItems: "Keine passenden Einträge.", screener: "Screener", events: "Events", trade: "Handeln", trending: "Trending", marketPrices: "Marktpreise", change24h: "24h Änderung" }
+      : locale === "zh"
+      ? { title: "新闻与推文", live: "实时", loading: "加载中", refresh: "刷新", search: "搜索标题或币种…", noItems: "没有符合筛选条件的内容。", screener: "筛选器", events: "事件", trade: "交易", trending: "热门主题", marketPrices: "市场价格", change24h: "24小时变化" }
+      : { title: "News & Tweets", live: "Live", loading: "Loading", refresh: "Refresh", search: "Search headlines, symbols…", noItems: "No items match your filters.", screener: "Screener", events: "Events", trade: "Trade", trending: "Trending Now", marketPrices: "Market Prices", change24h: "24h change" };
+
   const [sourceFilter, setSourceFilter]       = useState<SourceFilter>("all");
   const [sentimentFilter, setSentimentFilter] = useState<SentimentFilter>("all");
   const [search, setSearch]                   = useState("");
@@ -556,7 +575,7 @@ export default function NewsPage() {
           <div className="flex shrink-0 items-center justify-between border-b border-[rgba(242,183,5,0.08)] px-4 py-2.5">
             <div className="flex items-center gap-2">
               <h1 className="text-[13px] font-bold tracking-[-0.01em] text-[#FFFFFF]">
-                News &amp; Tweets
+                {t.title}
               </h1>
               <span
                 className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${
@@ -570,7 +589,7 @@ export default function NewsPage() {
                     isLive ? "animate-pulse bg-[#4CAF50]" : "bg-[#6B6B6B]"
                   }`}
                 />
-                {isLive ? "Live" : "Loading"}
+                {isLive ? t.live : t.loading}
               </span>
               {liveCount > 0 && (
                 <span className="rounded-full border border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.08)] px-2 py-0.5 text-[9px] font-bold text-[#F2B705]">
@@ -584,7 +603,7 @@ export default function NewsPage() {
               className="flex items-center gap-1.5 rounded-full border border-[rgba(242,183,5,0.12)] bg-[rgba(242,183,5,0.04)] px-2.5 py-1.5 text-[10px] text-[#A0A0A0] transition hover:text-[#FFFFFF] disabled:opacity-40"
             >
               <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-              Refresh
+              {t.refresh}
             </button>
           </div>
 
@@ -597,7 +616,7 @@ export default function NewsPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search headlines, symbols…"
+                placeholder={t.search}
                 className="w-full rounded-lg border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.04)] py-1.5 pl-7 pr-3 text-[11px] text-[#A0A0A0] outline-none placeholder:text-[#6B6B6B] focus:border-[rgba(242,183,5,0.3)] transition"
               />
             </div>
@@ -615,7 +634,10 @@ export default function NewsPage() {
                   }`}
                 >
                   {icon}
-                  {label}
+                  {value === "all" ? (locale === "tr" ? "Tümü" : locale === "de" ? "Alle" : locale === "zh" ? "全部" : "All")
+                    : value === "news" ? (locale === "tr" ? "Haber" : locale === "de" ? "News" : locale === "zh" ? "新闻" : "News")
+                    : value === "social" ? (locale === "tr" ? "Sosyal" : locale === "de" ? "Social" : locale === "zh" ? "社交" : "Social")
+                    : (locale === "tr" ? "Balinalar" : locale === "de" ? "Whales" : locale === "zh" ? "鲸鱼" : "Whales")}
                   {value !== "all" && (
                     <span className="opacity-50">
                       {value === "news"
@@ -647,7 +669,11 @@ export default function NewsPage() {
                           : "text-[#3A3A3A] hover:text-[#6B6B6B]"
                       }`}
                     >
-                      {label}
+                      {value === "bullish"
+                        ? locale === "tr" ? "Yükseliş" : locale === "de" ? "Bullisch" : locale === "zh" ? "看涨" : "Bullish"
+                        : value === "bearish"
+                        ? locale === "tr" ? "Düşüş" : locale === "de" ? "Bärisch" : locale === "zh" ? "看跌" : "Bearish"
+                        : locale === "tr" ? "Nötr" : locale === "de" ? "Neutral" : locale === "zh" ? "中性" : "Neutral"}
                     </button>
                   )
                 )}
@@ -666,7 +692,7 @@ export default function NewsPage() {
             ) : news.length === 0 ? (
               <div className="flex flex-col items-center gap-3 py-16 text-[#6B6B6B]">
                 <Newspaper className="h-7 w-7 opacity-30" />
-                <p className="text-sm">No items match your filters.</p>
+                <p className="text-sm">{t.noItems}</p>
               </div>
             ) : (
               feedItems
@@ -700,21 +726,21 @@ export default function NewsPage() {
                 className="flex items-center gap-1 rounded-md border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.04)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#6B6B6B] transition hover:text-[#A0A0A0]"
               >
                 <BarChart2 className="h-2.5 w-2.5" />
-                Screener
+                {t.screener}
               </Link>
               <Link
                 href="/calendar"
                 className="flex items-center gap-1 rounded-md border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.04)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#6B6B6B] transition hover:text-[#A0A0A0]"
               >
                 <Calendar className="h-2.5 w-2.5" />
-                Events
+                {t.events}
               </Link>
               <Link
                 href={`/terminal?ticker=${chartSymbol.replace("USDT", "")}`}
                 className="flex items-center gap-1 rounded-md border border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.08)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#F2B705] transition hover:bg-[rgba(242,183,5,0.16)]"
               >
                 <LayoutDashboard className="h-2.5 w-2.5" />
-                Trade
+                {t.trade}
               </Link>
             </div>
           </div>
@@ -725,7 +751,7 @@ export default function NewsPage() {
           </div>
 
           {/* Trending Topics */}
-          <TrendingTopics news={news} />
+          <TrendingTopics news={news} label={t.trending} />
 
           {/* Selected item detail + market impact */}
           {selectedItem && (
@@ -770,7 +796,7 @@ export default function NewsPage() {
               </div>
 
               {/* Market impact */}
-              <MarketImpact item={selectedItem} quotes={quotes} />
+              <MarketImpact item={selectedItem} quotes={quotes} labels={{ title: t.marketPrices, change24h: t.change24h }} />
             </>
           )}
         </div>
@@ -778,3 +804,4 @@ export default function NewsPage() {
     </div>
   );
 }
+

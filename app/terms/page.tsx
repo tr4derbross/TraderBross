@@ -1,8 +1,20 @@
+"use client";
+
 import LegalPage from "@/components/LegalPage";
+import { useI18n } from "@/components/i18n/LanguageProvider";
 
 export default function TermsPage() {
+  const { locale } = useI18n();
+  const title =
+    locale === "tr"
+      ? "Kullanim Sartlari"
+      : locale === "de"
+      ? "Nutzungsbedingungen"
+      : locale === "zh"
+      ? "服务条款"
+      : "Terms of Service";
   return (
-    <LegalPage title="Terms of Service" effectiveDate="21.03.26">
+    <LegalPage title={title} effectiveDate="21.03.26">
       <p>
         Welcome to TraderBross. By accessing or using TraderBross, you agree to these Terms of
         Service.
