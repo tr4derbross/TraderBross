@@ -124,6 +124,12 @@ export function createTerminalDataService({ config, logger }) {
     news: { status: "idle", providerCalls: 0, cacheHits: 0, staleServed: 0, lastSuccessAt: null, lastErrorAt: null, lastError: null },
     whales: { status: "idle", providerCalls: 0, cacheHits: 0, staleServed: 0, lastSuccessAt: null, lastErrorAt: null, lastError: null },
   };
+  const providerCooldownUntil = new Map();
+
+  function isRateLimitedError(error) {
+    const message = String(error || "").toLowerCase();
+    return message.includes("http 429") || message.includes("rate_limit_exceeded");
+  }
 
   const NEWS_SOURCES = ["rss", "json", "exchange_announcements", "tree", "ninja", "social_rss"];
   const newsSourceHealth = NEWS_SOURCES.reduce((acc, source) => {
@@ -284,13 +290,25 @@ export function createTerminalDataService({ config, logger }) {
 
   async function callWithFallback({ cacheKey, ttlMs, staleMs, limiterKey, primary, fallback, providerName }) {
     const cacheResult = await cache.remember(cacheKey, { ttlMs, staleMs }, async () => {
+      const now = Date.now();
+      const cooldownUntil = providerCooldownUntil.get(providerName) || 0;
+      if (fallback && cooldownUntil > now) {
+        providerHealth[providerName].staleServed += 1;
+        markProvider(providerName, "fallback");
+        return fallback();
+      }
       try {
         markProvider(providerName, "fetching");
         providerHealth[providerName].providerCalls += 1;
         const value = await runRateLimited(limiter, limiterKey, primary);
+        providerCooldownUntil.set(providerName, 0);
         markProvider(providerName, "ok");
         return value;
       } catch (primaryError) {
+        if (isRateLimitedError(primaryError)) {
+          const cooldownMs = Math.max(30_000, Number(ttl.marketSnapshotMs) || 20_000) * 6;
+          providerCooldownUntil.set(providerName, Date.now() + cooldownMs);
+        }
         if (!fallback) {
           markProvider(providerName, "degraded", primaryError);
           throw primaryError;
