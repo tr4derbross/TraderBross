@@ -394,6 +394,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const [secureStorageScope, setSecureStorageScope] = useState<string>("anon");
   const [secureCexStateReady, setSecureCexStateReady] = useState(false);
   const secureCexStorage = useEncryptedLocalStorage<SecureStoredCexState>(`traderbross:cex:${secureStorageScope}`);
+  const secureCexStorageRef = useRef(secureCexStorage);
+  const hydratedSecureScopeRef = useRef<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<NewsItem | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>("trade");
   const [dexSubTab, setDexSubTab] = useState<DexSubTab>("hl");
@@ -403,11 +405,11 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const [hlKeyStatus, setHlKeyStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [viewportWidth, setViewportWidth] = useState(1440);
   const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<WorkspaceTab>("chart");
-  const [headerPlatform, setHeaderPlatform] = useState<HeaderPlatform>("hyperliquid");
+  const [headerPlatform, setHeaderPlatform] = useState<HeaderPlatform>("binance");
   const [headerConnectOpen, setHeaderConnectOpen] = useState(false);
   const [headerConnection, setHeaderConnection] = useState<HeaderConnectionState>({
     status: "disconnected",
-    platform: "hyperliquid",
+    platform: "binance",
   });
   const [headerActionMessage, setHeaderActionMessage] = useState("");
   const [headerCexCredentials, setHeaderCexCredentials] = useState<HeaderCexCredentialMap>(
@@ -551,13 +553,17 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   }, [headerConnection]);
 
   useEffect(() => {
+    secureCexStorageRef.current = secureCexStorage;
+  }, [secureCexStorage]);
+
+  useEffect(() => {
     if (!secureCexStateReady) return;
-    void secureCexStorage.setItem(SECURE_CEX_STORAGE_KEY, {
+    void secureCexStorageRef.current.setItem(SECURE_CEX_STORAGE_KEY, {
       version: 1,
       credentials: headerCexCredentials,
       testnetMode: cexTestnetMode,
     });
-  }, [cexTestnetMode, headerCexCredentials, secureCexStateReady, secureCexStorage]);
+  }, [cexTestnetMode, headerCexCredentials, secureCexStateReady]);
 
   // NOTE: Raw CEX credentials are intentionally NOT persisted to localStorage.
   // Credentials are stored encrypted in device-local storage (AES-GCM) and can be
@@ -913,8 +919,14 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
   useEffect(() => {
     let cancelled = false;
+    if (hydratedSecureScopeRef.current === secureStorageScope) {
+      return () => {
+        cancelled = true;
+      };
+    }
+    hydratedSecureScopeRef.current = secureStorageScope;
     const loadSecureCexState = async () => {
-      const stored = await secureCexStorage.getItem(SECURE_CEX_STORAGE_KEY);
+      const stored = await secureCexStorageRef.current.getItem(SECURE_CEX_STORAGE_KEY);
       if (cancelled) return;
       if (stored?.credentials) {
         setHeaderCexCredentials(stored.credentials);
@@ -929,7 +941,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     return () => {
       cancelled = true;
     };
-  }, [secureCexStorage]);
+  }, [secureStorageScope]);
 
   const handleSelectItem = useCallback((item: NewsItem) => {
     setSelectedItem(item);
