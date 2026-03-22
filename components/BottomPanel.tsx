@@ -47,6 +47,22 @@ function calcPriceFromPercent(position: Position, percent: string, target: "tp" 
   return (position.entryPrice * multiplier).toString();
 }
 
+function calcBreakEvenPrice(position: Position) {
+  const feeRate = 0.0005 * 2;
+  if (position.side === "long") return position.entryPrice * (1 + feeRate);
+  return Math.max(0, position.entryPrice * (1 - feeRate));
+}
+
+function calcMarginRatio(position: Position) {
+  const notional = Math.max(position.amount * position.currentPrice, 0.000001);
+  return (position.margin / notional) * 100;
+}
+
+function calcEstimatedFunding(position: Position) {
+  const notional = Math.max(position.amount * position.currentPrice, 0);
+  return notional * 0.0001;
+}
+
 const TP_PERCENT_PRESETS = ["1", "2", "3", "5"];
 const SL_PERCENT_PRESETS = ["0.5", "1", "1.5", "2"];
 
@@ -339,6 +355,10 @@ export default function BottomPanel({
   }, [positionSort, positions]);
   const totalUnrealizedPnL = positions.reduce((sum, p) => sum + calcPnl(p), 0);
   const pnlPositive = totalUnrealizedPnL >= 0;
+  const closeAllPositions = () => {
+    sortedPositions.forEach((pos) => onClosePosition(pos.id, 100));
+    setCloseMenuPosId(null);
+  };
 
   const tabDefs = [
     { key: "positions"  as const, label: "Positions",   count: positions.length  },
@@ -428,11 +448,16 @@ export default function BottomPanel({
               <tr style={{ background: "rgba(0,0,0,0.45)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                 <TH>Symbol</TH>
                 <TH>Size</TH>
-                <TH>Mark Price</TH>
                 <TH>Entry Price</TH>
+                <TH>Break Even</TH>
+                <TH>Mark Price</TH>
                 <TH>Liq. Price</TH>
-                <TH>Risk</TH>
+                <TH>Margin Ratio</TH>
                 <TH>Margin</TH>
+                <TH>PNL (ROI %)</TH>
+                <TH>Est. Funding Fee</TH>
+                <TH>Close</TH>
+                <TH>TP/SL for Position</TH>
                 <TH right>
                   <button
                     type="button"
@@ -470,21 +495,21 @@ export default function BottomPanel({
                     </span>
                   </button>
                 </TH>
-                <TH>TP / SL</TH>
-                <TH>Actions</TH>
               </tr>
             </thead>
             <tbody>
               {positions.length === 0 ? (
-                <EmptyRow cols={10} label="No open positions" />
+                <EmptyRow cols={13} label="No open positions" />
               ) : (
                 sortedPositions.map((pos, idx) => {
                   const pnl     = calcPnl(pos);
                   const roe     = calcRoe(pos);
-                  const notional = pos.amount * pos.currentPrice;
                   const isLong  = pos.side === "long";
                   const pUp     = pnl >= 0;
                   const isEditing = editingPosId === pos.id;
+                  const breakEvenPrice = calcBreakEvenPrice(pos);
+                  const marginRatio = calcMarginRatio(pos);
+                  const fundingEstimate = calcEstimatedFunding(pos);
                   const liqDistancePct = Math.abs((pos.currentPrice - pos.liquidationPrice) / Math.max(pos.currentPrice, 0.000001)) * 100;
                   const liqRiskLevel = liqDistancePct <= 2 ? "critical" : liqDistancePct <= 5 ? "warning" : "normal";
 
@@ -517,53 +542,44 @@ export default function BottomPanel({
                     >
                       {/* Symbol */}
                       <td className="px-3 py-2.5">
-                        <div className="flex flex-col gap-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-[#f5efe1]">{pos.ticker}</span>
-                            <span className="text-zinc-600">USDT</span>
-                            <span className="text-[9px] uppercase tracking-wide text-zinc-700">Perp</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span
-                              className="inline-flex items-center gap-0.5 rounded px-1.5 py-[2px] text-[9px] font-bold"
-                              style={{
-                                background: isLong ? "rgba(52,211,153,0.1)" : "rgba(248,113,113,0.1)",
-                                border: `1px solid ${isLong ? "rgba(52,211,153,0.2)" : "rgba(248,113,113,0.2)"}`,
-                                color: isLong ? "#34d399" : "#f87171",
-                              }}
-                            >
-                              {isLong ? "▲ LONG" : "▼ SHORT"}
-                            </span>
-                            <span
-                              className="rounded px-1.5 py-[2px] text-[9px] font-bold"
-                              style={{ background: "rgba(212,161,31,0.08)", border: "1px solid rgba(212,161,31,0.18)", color: "#d4a11f" }}
-                            >
-                              {pos.leverage}×
-                            </span>
-                            <span
-                              className="rounded px-1.5 py-[2px] text-[9px] text-zinc-600"
-                              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
-                            >
-                              {pos.marginMode}
-                            </span>
-                          </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-[#f5efe1]">{pos.ticker}USDT</span>
+                          <span
+                            className="inline-flex items-center gap-0.5 rounded px-1.5 py-[2px] text-[9px] font-bold"
+                            style={{
+                              background: isLong ? "rgba(52,211,153,0.1)" : "rgba(248,113,113,0.1)",
+                              border: `1px solid ${isLong ? "rgba(52,211,153,0.2)" : "rgba(248,113,113,0.2)"}`,
+                              color: isLong ? "#34d399" : "#f87171",
+                            }}
+                          >
+                            {isLong ? "LONG" : "SHORT"}
+                          </span>
+                          <span
+                            className="rounded px-1.5 py-[2px] text-[9px] font-bold"
+                            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", color: "#a1a1aa" }}
+                          >
+                            {pos.marginMode}
+                          </span>
                         </div>
                       </td>
 
                       {/* Size */}
                       <td className="px-3 py-2.5">
-                        <div className="tabular-nums text-white">{pos.amount.toFixed(4)}</div>
-                        <div className="tabular-nums text-[10px] text-zinc-500">${notional.toFixed(2)}</div>
+                        <div className="tabular-nums text-emerald-300">{pos.amount.toFixed(4)} USDT</div>
+                        <div className="tabular-nums text-[10px] text-zinc-500">{pos.leverage}x</div>
                       </td>
+
+                      {/* Entry */}
+                      <td className="px-3 py-2.5 tabular-nums font-semibold text-zinc-200">${fmt(pos.entryPrice)}</td>
+
+                      {/* Break Even */}
+                      <td className="px-3 py-2.5 tabular-nums text-zinc-300">${fmt(breakEvenPrice)}</td>
 
                       {/* Mark */}
                       <td className="px-3 py-2.5 tabular-nums font-semibold text-white">${fmt(pos.currentPrice)}</td>
 
-                      {/* Entry */}
-                      <td className="px-3 py-2.5 tabular-nums text-zinc-300">${fmt(pos.entryPrice)}</td>
-
                       {/* Liq */}
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2.5 tabular-nums">
                         <span
                           className="inline-flex items-center gap-1 rounded px-1.5 py-[3px] text-[10px] tabular-nums"
                           style={{
@@ -588,15 +604,12 @@ export default function BottomPanel({
                           <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
                           ${fmt(pos.liquidationPrice)}
                         </span>
-                        <div className="mt-0.5 text-[9px] tabular-nums text-zinc-600">
-                          {liqDistancePct.toFixed(2)}% away
-                        </div>
                       </td>
 
-                      {/* Risk */}
-                      <td className="px-3 py-2.5">
-                        <div
-                          className="inline-flex rounded px-1.5 py-[2px] text-[9px] font-bold uppercase tracking-wide"
+                      {/* Margin Ratio */}
+                      <td className="px-3 py-2.5 tabular-nums">
+                        <span
+                          className="inline-flex rounded px-1.5 py-[2px] text-[9px] font-bold"
                           style={{
                             background:
                               liqRiskLevel === "critical"
@@ -604,12 +617,6 @@ export default function BottomPanel({
                                 : liqRiskLevel === "warning"
                                   ? "rgba(245,158,11,0.1)"
                                   : "rgba(52,211,153,0.1)",
-                            border:
-                              liqRiskLevel === "critical"
-                                ? "1px solid rgba(248,113,113,0.32)"
-                                : liqRiskLevel === "warning"
-                                  ? "1px solid rgba(245,158,11,0.25)"
-                                  : "1px solid rgba(52,211,153,0.22)",
                             color:
                               liqRiskLevel === "critical"
                                 ? "#f87171"
@@ -618,19 +625,18 @@ export default function BottomPanel({
                                   : "#34d399",
                           }}
                         >
-                          {liqRiskLevel === "critical" ? "High" : liqRiskLevel === "warning" ? "Mid" : "Low"}
-                        </div>
-                        <div className="mt-0.5 text-[9px] tabular-nums text-zinc-600">{liqDistancePct.toFixed(2)}%</div>
+                          {marginRatio.toFixed(2)}%
+                        </span>
                       </td>
 
                       {/* Margin */}
                       <td className="px-3 py-2.5">
-                        <div className="tabular-nums text-zinc-300">${pos.margin.toFixed(2)}</div>
+                        <div className="tabular-nums text-zinc-300">${pos.margin.toFixed(2)} USDT</div>
                         <div className="text-[10px] text-zinc-600">{pos.marginMode}</div>
                       </td>
 
                       {/* PNL */}
-                      <td className="px-3 py-2.5 text-right">
+                      <td className="px-3 py-2.5">
                         <div className="font-bold tabular-nums" style={{ color: pUp ? "#34d399" : "#f87171" }}>
                           {pUp ? "+" : ""}${pnl.toFixed(2)}
                         </div>
@@ -639,17 +645,102 @@ export default function BottomPanel({
                         </div>
                       </td>
 
-                      {/* TP / SL */}
-                      <td className="px-3 py-2.5" style={{ minWidth: 160 }}>
-                        <div className="flex flex-col gap-0.5 text-[10px]">
-                          <span className="tabular-nums" style={{ color: pos.tpPrice ? "#34d399" : "#3f3f46" }}>
-                            TP: {pos.tpPrice ? `$${fmt(pos.tpPrice)}` : "—"}
+                      {/* Est Funding */}
+                      <td className="px-3 py-2.5 tabular-nums" style={{ color: fundingEstimate >= 0 ? "#34d399" : "#f87171" }}>
+                        {fundingEstimate >= 0 ? "+" : ""}{fundingEstimate.toFixed(2)} USDT
+                      </td>
+
+                      {/* Close */}
+                      <td className="px-3 py-2.5">
+                        <div className="relative flex items-center gap-2">
+                          <button
+                            onClick={() =>
+                              setCloseMenuPosId((current) => {
+                                if (current === pos.id) return null;
+                                return pos.id;
+                              })
+                            }
+                            className="whitespace-nowrap rounded-md px-2 py-1.5 text-[10px] font-bold transition-all"
+                            style={{
+                              background: closeMenuPosId === pos.id ? "rgba(212,161,31,0.16)" : "rgba(212,161,31,0.08)",
+                              border: `1px solid ${closeMenuPosId === pos.id ? "rgba(212,161,31,0.45)" : "rgba(212,161,31,0.22)"}`,
+                              color: "#d4a11f",
+                            }}
+                          >
+                            Close
+                          </button>
+                          <button
+                            onClick={() => onClosePosition(pos.id, 100)}
+                            className="whitespace-nowrap rounded-md px-3 py-1.5 text-[10px] font-bold transition-all"
+                            style={{
+                              background: "rgba(239,68,68,0.12)",
+                              border: "1px solid rgba(239,68,68,0.32)",
+                              color: "#f87171",
+                            }}
+                          >
+                            Market
+                          </button>
+                          {closeMenuPosId === pos.id && (
+                            <div
+                              className="absolute left-0 top-full z-20 mt-1 flex w-[min(220px,calc(100vw-24px))] flex-col gap-1 rounded-lg p-2"
+                              style={{ background: "rgba(0,0,0,0.72)", border: "1px solid rgba(212,161,31,0.2)" }}
+                            >
+                              <div className="text-[9px] uppercase tracking-[0.1em] text-zinc-500">Partial Close</div>
+                              <div className="grid grid-cols-4 gap-1">
+                                {[25, 50, 75, 100].map((pct) => (
+                                  <button
+                                    key={pct}
+                                    onClick={() => {
+                                      onClosePosition(pos.id, pct);
+                                      setCloseMenuPosId(null);
+                                    }}
+                                    className="rounded-md py-1 text-[9px] font-bold"
+                                    style={{ background: "rgba(212,161,31,0.1)", border: "1px solid rgba(212,161,31,0.24)", color: "#d4a11f" }}
+                                  >
+                                    {pct}%
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* TP/SL for position */}
+                      <td className="px-3 py-2.5" style={{ minWidth: 165 }}>
+                        <div className="flex items-center gap-1 text-[10px] tabular-nums">
+                          <span style={{ color: pos.tpPrice ? "#34d399" : "#3f3f46" }}>
+                            {pos.tpPrice ? fmt(pos.tpPrice) : "--"}
                           </span>
-                          <span className="tabular-nums" style={{ color: pos.slPrice ? "#f87171" : "#3f3f46" }}>
-                            SL: {pos.slPrice ? `$${fmt(pos.slPrice)}` : "—"}
+                          <span className="text-zinc-600">/</span>
+                          <span style={{ color: pos.slPrice ? "#f87171" : "#3f3f46" }}>
+                            {pos.slPrice ? fmt(pos.slPrice) : "--"}
                           </span>
                         </div>
+                      </td>
 
+                      {/* TP/SL actions */}
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() =>
+                              setQuickMenuPosId((current) => {
+                                if (current === pos.id) return null;
+                                setEditingPosId(null);
+                                return pos.id;
+                              })
+                            }
+                            className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-2.5 py-1.5 text-[10px] font-semibold transition-all"
+                            style={{
+                              background: "rgba(255,255,255,0.04)",
+                              border: "1px solid rgba(255,255,255,0.1)",
+                              color: "#d4d4d8",
+                            }}
+                          >
+                            <Plus className="mr-1 h-3 w-3" />
+                            Add
+                          </button>
+                        </div>
                         {quickMenuPosId === pos.id && (
                           <div
                             className="mt-2 rounded-lg p-2"
@@ -713,7 +804,6 @@ export default function BottomPanel({
                             </button>
                           </div>
                         )}
-
                         {isEditing && (
                           <TpSlEditor
                             position={pos}
@@ -730,93 +820,30 @@ export default function BottomPanel({
                           />
                         )}
                       </td>
-
-                      {/* Actions */}
-                      <td className="px-3 py-2.5">
-                        <div className="relative flex items-center gap-2">
-                          <button
-                            onClick={() =>
-                              setQuickMenuPosId((current) => {
-                                if (current === pos.id) return null;
-                                setEditingPosId(null);
-                                return pos.id;
-                              })
-                            }
-                            className="flex h-6 w-6 items-center justify-center rounded-md transition"
-                            style={{
-                              background: quickMenuPosId === pos.id ? "rgba(212,161,31,0.15)" : "rgba(255,255,255,0.04)",
-                              border: `1px solid ${quickMenuPosId === pos.id ? "rgba(212,161,31,0.35)" : "rgba(255,255,255,0.08)"}`,
-                              color: quickMenuPosId === pos.id ? "#d4a11f" : "#52525b",
-                            }}
-                            title="Set TP / SL"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                          <button
-                            onClick={() =>
-                              setCloseMenuPosId((current) => {
-                                if (current === pos.id) return null;
-                                return pos.id;
-                              })
-                            }
-                            className="whitespace-nowrap rounded-md px-2 py-1.5 text-[10px] font-bold transition-all"
-                            style={{
-                              background: closeMenuPosId === pos.id ? "rgba(212,161,31,0.16)" : "rgba(212,161,31,0.08)",
-                              border: `1px solid ${closeMenuPosId === pos.id ? "rgba(212,161,31,0.45)" : "rgba(212,161,31,0.22)"}`,
-                              color: "#d4a11f",
-                            }}
-                          >
-                            Close
-                          </button>
-                          <button
-                            onClick={() => onClosePosition(pos.id, 100)}
-                            className="whitespace-nowrap rounded-md px-3 py-1.5 text-[10px] font-bold transition-all"
-                            style={{
-                              background: "rgba(239,68,68,0.12)",
-                              border: "1px solid rgba(239,68,68,0.32)",
-                              color: "#f87171",
-                            }}
-                            onMouseEnter={(e) => {
-                              (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.26)";
-                              (e.currentTarget as HTMLElement).style.borderColor = "rgba(239,68,68,0.55)";
-                            }}
-                            onMouseLeave={(e) => {
-                              (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.12)";
-                              (e.currentTarget as HTMLElement).style.borderColor = "rgba(239,68,68,0.32)";
-                            }}
-                          >
-                            Market Close
-                          </button>
-                        </div>
-                        {closeMenuPosId === pos.id && (
-                          <div
-                            className="absolute right-0 z-20 mt-1 flex w-[min(220px,calc(100vw-24px))] flex-col gap-1 rounded-lg p-2"
-                            style={{ background: "rgba(0,0,0,0.72)", border: "1px solid rgba(212,161,31,0.2)" }}
-                          >
-                            <div className="text-[9px] uppercase tracking-[0.1em] text-zinc-500">Partial Close</div>
-                            <div className="grid grid-cols-4 gap-1">
-                              {[25, 50, 75, 100].map((pct) => (
-                                <button
-                                  key={pct}
-                                  onClick={() => {
-                                    onClosePosition(pos.id, pct);
-                                    setCloseMenuPosId(null);
-                                  }}
-                                  className="rounded-md py-1 text-[9px] font-bold"
-                                  style={{ background: "rgba(212,161,31,0.1)", border: "1px solid rgba(212,161,31,0.24)", color: "#d4a11f" }}
-                                >
-                                  {pct}%
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </td>
                     </tr>
                   );
                 })
               )}
             </tbody>
+            {positions.length > 0 && (
+              <tfoot>
+                <tr style={{ background: "rgba(0,0,0,0.32)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                  <td colSpan={9} className="px-3 py-2 text-[10px] text-zinc-500">
+                    Close All Positions
+                  </td>
+                  <td colSpan={4} className="px-3 py-2 text-right">
+                    <button
+                      type="button"
+                      onClick={closeAllPositions}
+                      className="rounded-md px-3 py-1.5 text-[10px] font-bold"
+                      style={{ background: "rgba(212,161,31,0.12)", border: "1px solid rgba(212,161,31,0.28)", color: "#d4a11f" }}
+                    >
+                      Market Close All
+                    </button>
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         )}
 
