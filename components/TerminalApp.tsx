@@ -86,9 +86,19 @@ function FundingStatsBar({ ticker }: { ticker: string }) {
 
   useEffect(() => {
     let active = true;
-    apiFetch<{ rates?: { venue: string; rate: number | null }[] }>(`/api/funding?ticker=${ticker}`)
+    apiFetch<Array<{ symbol?: string; fundingRate?: string | number | null }> | { rates?: { venue: string; rate: number | null }[] }>(`/api/funding?ticker=${ticker}`)
       .then((d) => {
         if (!active) return;
+        if (Array.isArray(d)) {
+          const normalizedTicker = String(ticker || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+          const match =
+            d.find((row) => String(row.symbol || "").toUpperCase() === `${normalizedTicker}USDT`) ??
+            d.find((row) => String(row.symbol || "").toUpperCase() === `${normalizedTicker}USDC`) ??
+            d[0];
+          const value = Number(match?.fundingRate ?? NaN);
+          setFunding(Number.isFinite(value) ? value : null);
+          return;
+        }
         const item = d.rates?.find((r) => r.venue === "Binance") ?? d.rates?.[0];
         setFunding(item?.rate ?? null);
       })
@@ -2297,7 +2307,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                           API Wallet — Trading Key
                         </div>
                         <p className="text-[10px] leading-4 text-zinc-500">
-                          Enter your Hyperliquid API wallet private key to enable in-terminal order placement with builder fee revenue.
+                          Enter your Hyperliquid API wallet private key to enable in-terminal order placement.
                         </p>
                         {hlVaultToken ? (
                           <div className="flex items-center justify-between gap-2">

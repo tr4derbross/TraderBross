@@ -15,6 +15,12 @@ type FundingVenue = {
   status: "live" | "unavailable";
 };
 
+type FundingApiRow = {
+  symbol?: string;
+  fundingRate?: string | number | null;
+  nextFundingTime?: string | number | null;
+};
+
 type PriceData = {
   time: number;
   open: number;
@@ -377,9 +383,28 @@ export default function PriceChart({
   useEffect(() => {
     let active = true;
 
-    apiFetch<{ rates?: FundingVenue[] }>(`/api/funding?ticker=${ticker}`)
+    apiFetch<{ rates?: FundingVenue[] } | FundingApiRow[]>(`/api/funding?ticker=${ticker}`)
       .then((payload) => {
         if (!active) return;
+        if (Array.isArray(payload)) {
+          const normalizedTicker = String(ticker || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+          const match =
+            payload.find((row) => String(row.symbol || "").toUpperCase() === `${normalizedTicker}USDT`) ??
+            payload.find((row) => String(row.symbol || "").toUpperCase() === `${normalizedTicker}USDC`) ??
+            payload[0];
+          const rate = Number(match?.fundingRate ?? NaN);
+          const nextFundingTime = Number(match?.nextFundingTime ?? NaN);
+          setFundingRates([
+            {
+              venue: "Binance",
+              rate: Number.isFinite(rate) ? rate : null,
+              nextFundingTime: Number.isFinite(nextFundingTime) ? nextFundingTime : null,
+              intervalHours: 8,
+              status: Number.isFinite(rate) ? "live" : "unavailable",
+            },
+          ]);
+          return;
+        }
         setFundingRates(Array.isArray(payload.rates) ? payload.rates : []);
       })
       .catch(() => {
