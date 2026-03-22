@@ -204,7 +204,7 @@ function NewsCard({
               Trade →
             </Link>
             <Link
-              href={`/terminal${item.ticker?.[0] ? `?ticker=${item.ticker[0]}&ai=1` : "?ai=1"}`}
+              href={`/terminal${item.ticker?.[0] ? `?ticker=${item.ticker[0]}` : ""}`}
               onClick={(e) => e.stopPropagation()}
               className="flex items-center gap-1 rounded border border-[rgba(242,183,5,0.15)] bg-[rgba(242,183,5,0.06)] px-2 py-0.5 text-[9px] font-bold text-[#A0A0A0] transition hover:bg-[rgba(242,183,5,0.12)] hover:text-[#F2B705]"
             >
