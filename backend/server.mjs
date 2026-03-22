@@ -54,16 +54,29 @@ if (upstashCache.enabled) {
 }
 
 if (config.security.proxyAuthEnabled && !String(config.security.proxyAuthSecret || "").trim()) {
-  logger.warn("backend.security.proxy_secret_missing", {
+  logger.error("backend.security.proxy_secret_missing", {
     message:
-      "REQUIRE_PROXY_AUTH is enabled but PROXY_SHARED_SECRET is missing. Sensitive routes will be denied until configured.",
+      "REQUIRE_PROXY_AUTH is enabled but PROXY_SHARED_SECRET is missing. All sensitive routes are permanently blocked until this is configured.",
   });
 }
 
+if (String(process.env.NODE_ENV || "").toLowerCase() === "production") {
+  const localhostOrigins = config.frontendOrigins.filter(
+    (o) => o.includes("localhost") || o.includes("127.0.0.1"),
+  );
+  if (localhostOrigins.length > 0) {
+    logger.warn("backend.security.cors_localhost_in_production", {
+      message: "CORS_ORIGINS contains localhost entries in production. Remove these from the CORS_ORIGINS env var.",
+      origins: localhostOrigins,
+    });
+  }
+}
+
 if (String(process.env.NODE_ENV || "").toLowerCase() === "production" && !String(process.env.VAULT_ENCRYPTION_KEY || "").trim()) {
-  logger.warn("backend.security.vault_key_missing", {
-    message: "VAULT_ENCRYPTION_KEY is not set. Vault key will rotate on restart and invalidate sessions.",
+  logger.error("backend.security.vault_key_missing", {
+    message: "VAULT_ENCRYPTION_KEY is not set in production. Sessions cannot persist across restarts. Set this variable and restart.",
   });
+  process.exit(1);
 }
 
 process.on("unhandledRejection", (reason) => {
