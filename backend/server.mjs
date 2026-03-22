@@ -1354,25 +1354,43 @@ const server = http.createServer(async (request, reply) => {
         connection: "keep-alive",
       });
 
-      for await (const packet of streamChat(config, body, { consumerKey: clientIp })) {
-        if (packet?.type === "meta") {
-          logger.info("ai.chat.provider_selected", {
-            requestId,
-            clientIp,
-            primaryProvider,
-            selectedProvider: packet.provider || "unknown",
-            usedFallback: String(packet.provider || "") !== String(primaryProvider),
-          });
-          reply.write(`data: ${JSON.stringify({ provider: packet.provider })}\n\n`);
-          continue;
+      let hadError = false;
+      try {
+        for await (const packet of streamChat(config, body, { consumerKey: clientIp })) {
+          if (packet?.type === "meta") {
+            logger.info("ai.chat.provider_selected", {
+              requestId,
+              clientIp,
+              primaryProvider,
+              selectedProvider: packet.provider || "unknown",
+              usedFallback: String(packet.provider || "") !== String(primaryProvider),
+            });
+            reply.write(`data: ${JSON.stringify({ provider: packet.provider })}\n\n`);
+            continue;
+          }
+          if (packet?.type === "chunk" && packet.text) {
+            reply.write(`data: ${JSON.stringify({ text: packet.text })}\n\n`);
+          }
         }
-        if (packet?.type === "chunk" && packet.text) {
-          reply.write(`data: ${JSON.stringify({ text: packet.text })}\n\n`);
-        }
+      } catch (error) {
+        hadError = true;
+        logger.error("ai.chat.stream_failed", {
+          requestId,
+          clientIp,
+          primaryProvider,
+          error: String(error),
+        });
+        // Fail soft for UI: keep SSE contract and provide a safe fallback message.
+        reply.write(`data: ${JSON.stringify({ provider: "mock" })}\n\n`);
+        reply.write(
+          `data: ${JSON.stringify({
+            text: "AI providers are temporarily unavailable. Safe fallback mode is active. Please retry in a moment.",
+          })}\n\n`,
+        );
       }
       reply.write("data: [DONE]\n\n");
       reply.end();
-      logger.info("ai.chat.completed", { requestId, clientIp });
+      logger.info("ai.chat.completed", { requestId, clientIp, hadError });
       return;
     }
 
