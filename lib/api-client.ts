@@ -39,7 +39,19 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     });
 
     if (!response.ok) {
-      throw new Error(`Request failed: ${response.status}`);
+      let detail = "";
+      try {
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const payload = await response.json() as { error?: string; message?: string; detail?: string };
+          detail = payload?.message || payload?.error || payload?.detail || "";
+        } else {
+          detail = (await response.text()).trim();
+        }
+      } catch {
+        detail = "";
+      }
+      throw new Error(detail ? `Request failed: ${response.status} (${detail})` : `Request failed: ${response.status}`);
     }
 
     const payload = (await response.json()) as T;
