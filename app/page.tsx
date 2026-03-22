@@ -5,16 +5,21 @@ import Link from "next/link";
 import {
   Zap,
   Newspaper,
-    BarChart2,
+  BarChart2,
   Shield,
   Globe,
   TrendingUp,
   Send,
   ArrowRight,
   ChevronRight,
+  Plug,
+  Eye,
+  MousePointerClick,
+  Check,
 } from "lucide-react";
 import PageWrapper from "@/components/PageWrapper";
 import { useI18n } from "@/components/i18n/LanguageProvider";
+import TerminalMockup from "@/components/landing/TerminalMockup";
 
 /* ─── Animation variants ─────────────────────────────────────────────────────── */
 
@@ -87,6 +92,88 @@ const DEMO_MESSAGES = [
   },
 ];
 
+const HOW_IT_WORKS = [
+  {
+    step: "01",
+    icon: Plug,
+    title: "Connect Your Exchange",
+    desc: "Link Binance, OKX, Bybit, or Hyperliquid in seconds. Your API keys are encrypted and stored in a secure vault — never exposed.",
+  },
+  {
+    step: "02",
+    icon: Eye,
+    title: "Monitor Everything in One View",
+    desc: "Real-time news ranked by impact, whale movements, liquidation data, and market screener — all streaming live in one terminal.",
+  },
+  {
+    step: "03",
+    icon: MousePointerClick,
+    title: "Execute With Full Context",
+    desc: "Click a news item, see the signal analysis, set your TP/SL, and send the order — without leaving the terminal.",
+  },
+];
+
+const PRICING_PLANS = [
+  {
+    name: "Free",
+    price: "$0",
+    period: "forever",
+    desc: "Get started with real-time data and basic tools.",
+    highlight: false,
+    features: [
+      "Live price feed (WebSocket)",
+      "News aggregation (limited)",
+      "Market screener (top 20)",
+      "Paper trading mode",
+      "1 exchange connection",
+    ],
+    cta: "Start Free",
+    ctaHref: "/terminal",
+  },
+  {
+    name: "Pro",
+    price: "$19",
+    period: "per month",
+    desc: "Everything you need to trade news professionally.",
+    highlight: true,
+    features: [
+      "Everything in Free",
+      "All 4 exchange connections",
+      "Full screener (100+ pairs)",
+      "Whale tracker",
+      "AI signal analysis",
+      "News sentiment filters",
+      "Priority data feed",
+    ],
+    cta: "Start Pro",
+    ctaHref: "/terminal",
+  },
+  {
+    name: "Trader",
+    price: "$49",
+    period: "per month",
+    desc: "For professional traders who need every edge.",
+    highlight: false,
+    features: [
+      "Everything in Pro",
+      "Real-time whale alerts",
+      "Exchange announcement feed",
+      "Advanced liquidation data",
+      "Multi-account vault",
+      "Early access to new features",
+    ],
+    cta: "Start Trader",
+    ctaHref: "/terminal",
+  },
+];
+
+const EXCHANGE_LOGOS = [
+  { name: "Binance", color: "#F0B90B" },
+  { name: "OKX", color: "#FFFFFF" },
+  { name: "Bybit", color: "#F7A600" },
+  { name: "Hyperliquid", color: "#4ADE80" },
+];
+
 /* ─── Page ─────────────────────────────────────────────────────────────────────── */
 
 export default function LandingPage() {
@@ -96,7 +183,7 @@ export default function LandingPage() {
     <PageWrapper>
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section
-        className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 text-center"
+        className="relative flex flex-col items-center justify-start overflow-hidden px-4 pt-28 pb-10 text-center"
         style={{
           background:
             "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(242,183,5,0.08), #0B0B0B)",
@@ -123,7 +210,7 @@ export default function LandingPage() {
           variants={stagger}
           initial="hidden"
           animate="show"
-          className="relative z-10 flex max-w-3xl flex-col items-center gap-5"
+          className="relative z-10 flex w-full max-w-5xl flex-col items-center gap-5"
         >
           <motion.p
             variants={fadeUp}
@@ -169,7 +256,7 @@ export default function LandingPage() {
           {/* Stats */}
           <motion.div
             variants={fadeUp}
-            className="mt-4 flex flex-wrap items-center justify-center gap-8"
+            className="mt-2 flex flex-wrap items-center justify-center gap-8"
           >
             {STATS.map(({ value, label }) => (
               <div key={label} className="text-center">
@@ -181,6 +268,36 @@ export default function LandingPage() {
                 </div>
               </div>
             ))}
+          </motion.div>
+
+          {/* Exchange logos */}
+          <motion.div
+            variants={fadeUp}
+            className="flex items-center gap-2 flex-wrap justify-center"
+          >
+            <span className="text-[10px] text-[#6B6B6B] mr-1">Supported exchanges:</span>
+            {EXCHANGE_LOGOS.map(({ name, color }) => (
+              <span
+                key={name}
+                className="flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold"
+                style={{
+                  borderColor: `${color}30`,
+                  color,
+                  background: `${color}0A`,
+                }}
+              >
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: color }}
+                />
+                {name}
+              </span>
+            ))}
+          </motion.div>
+
+          {/* Terminal Mockup */}
+          <motion.div variants={fadeUp} className="w-full">
+            <TerminalMockup />
           </motion.div>
         </motion.div>
 
@@ -229,8 +346,63 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── How It Works ─────────────────────────────────────────────────── */}
+      <section className="border-y border-[#1A1A1A] py-20" style={{ background: "radial-gradient(ellipse 60% 40% at 50% 100%, rgba(242,183,5,0.04), #0B0B0B)" }}>
+        <div className="mx-auto max-w-5xl px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            viewport={{ once: true }}
+            className="mb-12 text-center"
+          >
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F2B705]">
+              How It Works
+            </p>
+            <h2 className="mt-2 text-2xl font-bold text-[#FFFFFF] sm:text-3xl">
+              From News to Trade in 3 Steps
+            </h2>
+          </motion.div>
+
+          <div className="grid gap-8 md:grid-cols-3 relative">
+            {/* Connector line */}
+            <div className="hidden md:block absolute top-8 left-[calc(16.66%+1rem)] right-[calc(16.66%+1rem)] h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(242,183,5,0.3), rgba(242,183,5,0.3), transparent)" }} />
+
+            {HOW_IT_WORKS.map(({ step, icon: Icon, title, desc }, i) => (
+              <motion.div
+                key={step}
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: i * 0.1 }}
+                viewport={{ once: true }}
+                className="relative flex flex-col items-center text-center"
+              >
+                {/* Step circle */}
+                <div
+                  className="relative mb-5 flex h-16 w-16 items-center justify-center rounded-full"
+                  style={{
+                    background: "rgba(242,183,5,0.08)",
+                    border: "1px solid rgba(242,183,5,0.25)",
+                  }}
+                >
+                  <Icon size={22} className="text-[#F2B705]" />
+                  <span
+                    className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-[8px] font-bold text-[#0B0B0B]"
+                    style={{ background: "#F2B705" }}
+                  >
+                    {step}
+                  </span>
+                </div>
+                <h3 className="mb-2 text-[15px] font-semibold text-[#FFFFFF]">{title}</h3>
+                <p className="text-[12px] leading-relaxed text-[#6B6B6B]">{desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Terminal Demo ───────────────────────────────────────────────────────── */}
-      <section className="border-y border-[#2A2A2A] bg-[#0B0B0B] py-20">
+      <section className="border-b border-[#2A2A2A] bg-[#0B0B0B] py-20">
         <div className="mx-auto max-w-2xl px-4">
           <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -297,6 +469,88 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Pricing ──────────────────────────────────────────────────────── */}
+      <section className="py-20 border-b border-[#1A1A1A]">
+        <div className="mx-auto max-w-5xl px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            viewport={{ once: true }}
+            className="mb-10 text-center"
+          >
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F2B705]">
+              Pricing
+            </p>
+            <h2 className="mt-2 text-2xl font-bold text-[#FFFFFF] sm:text-3xl">
+              Start Free. Upgrade When You Need More.
+            </h2>
+            <p className="mt-2 text-[13px] text-[#6B6B6B]">
+              No credit card required to start. Cancel anytime.
+            </p>
+          </motion.div>
+
+          <div className="grid gap-5 md:grid-cols-3">
+            {PRICING_PLANS.map(({ name, price, period, desc, highlight, features, cta, ctaHref }, i) => (
+              <motion.div
+                key={name}
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: i * 0.08 }}
+                viewport={{ once: true }}
+                className="relative flex flex-col rounded-xl p-6"
+                style={{
+                  background: highlight ? "rgba(242,183,5,0.06)" : "#111",
+                  border: highlight
+                    ? "1px solid rgba(242,183,5,0.35)"
+                    : "1px solid #2A2A2A",
+                }}
+              >
+                {highlight && (
+                  <div
+                    className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-[10px] font-bold text-[#0B0B0B]"
+                    style={{ background: "#F2B705" }}
+                  >
+                    Most Popular
+                  </div>
+                )}
+
+                <div className="mb-4">
+                  <h3 className="text-[13px] font-semibold uppercase tracking-widest text-[#6B6B6B]">
+                    {name}
+                  </h3>
+                  <div className="mt-1 flex items-end gap-1">
+                    <span className="text-3xl font-bold text-[#FFFFFF]">{price}</span>
+                    <span className="mb-1 text-[11px] text-[#6B6B6B]">/{period}</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-[#6B6B6B]">{desc}</p>
+                </div>
+
+                <ul className="flex-1 space-y-2 mb-6">
+                  {features.map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-[12px] text-[#A0A0A0]">
+                      <Check size={13} className="mt-0.5 shrink-0 text-[#F2B705]" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+
+                <Link
+                  href={ctaHref}
+                  className={`block w-full rounded-lg py-2.5 text-center text-[13px] font-semibold transition-opacity hover:opacity-90 ${
+                    highlight
+                      ? "bg-[#F2B705] text-[#0B0B0B]"
+                      : "border border-[#2A2A2A] text-[#A0A0A0] hover:border-[#F2B705] hover:text-[#F2B705]"
+                  }`}
+                >
+                  {cta}
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Bottom CTA ────────────────────────────────────────────────────── */}
       <section className="py-20 text-center">
         <motion.div
@@ -332,8 +586,3 @@ export default function LandingPage() {
     </PageWrapper>
   );
 }
-
-
-
-
-
