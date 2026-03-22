@@ -222,6 +222,15 @@ export default function ChatPanel({ context }: ChatPanelProps) {
             if (data === "[DONE]") break;
             try {
               const parsed = JSON.parse(data);
+              if (parsed.provider) {
+                const map: Record<string, string> = {
+                  groq: "Groq",
+                  gemini: "Gemini",
+                  openrouter: "OpenRouter :free",
+                  mock: "Mock Analyst (Free-safe)",
+                };
+                setProviderLabel(map[String(parsed.provider).toLowerCase()] ?? String(parsed.provider));
+              }
               if (parsed.text) {
                 accumulated += parsed.text;
                 setMessages((prev) =>

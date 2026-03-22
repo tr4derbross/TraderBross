@@ -23,11 +23,13 @@ import { createTerminalDataService } from "./data/terminal-data-service.mjs";
 import { CORE_SYMBOLS, canonicalSymbol, symbolAliases } from "./data/core/symbol-map.mjs";
 import { MemoryCache } from "./services/cache.mjs";
 import { createRateLimiter } from "./services/rate-limiter.mjs";
+import { createUpstashCache } from "./services/upstash-cache.mjs";
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel);
 const terminalData = createTerminalDataService({ config, logger });
 const endpointCache = new MemoryCache();
+const upstashCache = createUpstashCache(config, logger);
 const clients = new Set();
 let bootstrapRefreshInFlight = false;
 const rateLimiter = createRateLimiter(config, logger);
@@ -44,6 +46,13 @@ const SENSITIVE_ROUTES = new Set([
   "/api/bybit/order",
   "/api/hyperliquid/order",
 ]);
+
+if (upstashCache.enabled) {
+  logger.info("upstash.cache.enabled", {
+    prefix: config.upstash?.prefix || "traderbross:cache",
+    ttl: upstashCache.ttl,
+  });
+}
 
 if (config.security.proxyAuthEnabled && !String(config.security.proxyAuthSecret || "").trim()) {
   logger.warn("backend.security.proxy_secret_missing", {
@@ -282,6 +291,23 @@ function concatBytes(parts) {
     offset += part.length;
   }
   return merged;
+}
+
+function buildHttpCacheKey(pathname, searchParams) {
+  const pairs = Array.from(searchParams.entries()).sort(([aKey, aValue], [bKey, bValue]) => {
+    if (aKey === bKey) return aValue.localeCompare(bValue);
+    return aKey.localeCompare(bKey);
+  });
+  const encoded = pairs.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join("&");
+  return encoded ? `${pathname}?${encoded}` : pathname;
+}
+
+function getPrimaryAiProvider(config) {
+  if (!config?.ai?.allowExternal) return "mock";
+  if (config.groqApiKey) return "groq";
+  if (config.geminiApiKey) return "gemini";
+  if (config.openrouterApiKey) return "openrouter";
+  return "mock";
 }
 
 function hyperAddressToBytes(address) {
@@ -636,6 +662,13 @@ const server = http.createServer(async (request, reply) => {
 
     if (request.method === "GET" && url.pathname === "/api/bootstrap") {
       const mode = (url.searchParams.get("mode") || "").toLowerCase();
+      const bootstrapCacheKey = buildHttpCacheKey(url.pathname, url.searchParams);
+      const cachedBootstrap = await upstashCache.getJson(bootstrapCacheKey);
+      if (cachedBootstrap) {
+        json(reply, 200, cachedBootstrap);
+        return;
+      }
+
       const snapshot = buildSnapshot();
       if ((snapshot.quotes?.length || 0) === 0 && snapshot.connectionState !== "connected") {
         if (!bootstrapRefreshInFlight) {
@@ -651,7 +684,9 @@ const server = http.createServer(async (request, reply) => {
         }
       }
       const latest = buildSnapshot();
-      json(reply, 200, mode === "lite" ? buildLiteSnapshot(latest) : latest);
+      const payload = mode === "lite" ? buildLiteSnapshot(latest) : latest;
+      void upstashCache.setJson(bootstrapCacheKey, payload, upstashCache.ttl.bootstrapSec);
+      json(reply, 200, payload);
       return;
     }
 
@@ -675,14 +710,30 @@ const server = http.createServer(async (request, reply) => {
       const type = url.searchParams.get("type");
       const quote = (url.searchParams.get("quote") || "USDT").toUpperCase();
       if (type === "quotes") {
-        json(reply, 200, buildSnapshot().quotes || []);
+        const quoteCacheKey = buildHttpCacheKey(url.pathname, url.searchParams);
+        const cachedQuotes = await upstashCache.getJson(quoteCacheKey);
+        if (cachedQuotes) {
+          json(reply, 200, cachedQuotes);
+          return;
+        }
+        const payload = buildSnapshot().quotes || [];
+        void upstashCache.setJson(quoteCacheKey, payload, upstashCache.ttl.pricesSec);
+        json(reply, 200, payload);
         return;
       }
 
       const ticker = canonicalTickerParam(url.searchParams.get("ticker"), "BTC");
       const interval = url.searchParams.get("interval") || "1d";
       const limit = Math.min(Number(url.searchParams.get("limit") || 120), 500);
-      json(reply, 200, await getBinanceCandles(ticker, interval, limit, quote));
+      const candlesCacheKey = buildHttpCacheKey(url.pathname, url.searchParams);
+      const cachedCandles = await upstashCache.getJson(candlesCacheKey);
+      if (cachedCandles) {
+        json(reply, 200, cachedCandles);
+        return;
+      }
+      const payload = await getBinanceCandles(ticker, interval, limit, quote);
+      void upstashCache.setJson(candlesCacheKey, payload, upstashCache.ttl.pricesSec);
+      json(reply, 200, payload);
       return;
     }
 
@@ -1036,13 +1087,21 @@ const server = http.createServer(async (request, reply) => {
     }
 
     if (request.method === "GET" && url.pathname === "/api/news") {
-      json(reply, 200, terminalData.getNews({
+      const newsCacheKey = buildHttpCacheKey(url.pathname, url.searchParams);
+      const cachedNews = await upstashCache.getJson(newsCacheKey);
+      if (cachedNews) {
+        json(reply, 200, cachedNews);
+        return;
+      }
+      const payload = terminalData.getNews({
         sector: url.searchParams.get("sector"),
         ticker: url.searchParams.get("ticker")
           ? canonicalTickerParam(url.searchParams.get("ticker"), "BTC")
           : null,
         keyword: url.searchParams.get("keyword"),
-      }));
+      });
+      void upstashCache.setJson(newsCacheKey, payload, upstashCache.ttl.newsSec);
+      json(reply, 200, payload);
       return;
     }
 
@@ -1266,23 +1325,54 @@ const server = http.createServer(async (request, reply) => {
     }
 
     if (request.method === "GET" && url.pathname === "/api/chat") {
-      json(reply, 200, { provider: getProviderLabel(config) });
+      json(reply, 200, {
+        provider: getProviderLabel(config),
+        externalEnabled: Boolean(config?.ai?.allowExternal),
+        limits: {
+          perMinute: Number(config?.ai?.maxRequestsPerMinute || 12),
+          perDay: Number(config?.ai?.maxRequestsPerDay || 200),
+        },
+      });
       return;
     }
 
     if (request.method === "POST" && url.pathname === "/api/chat") {
       const body = await readJson(request);
+      const clientIp = getClientIp(request);
+      const requestId = crypto.randomUUID();
+      const primaryProvider = getPrimaryAiProvider(config);
+      logger.info("ai.chat.request", {
+        requestId,
+        clientIp,
+        primaryProvider,
+        externalEnabled: Boolean(config?.ai?.allowExternal),
+      });
+
       reply.writeHead(200, {
         "content-type": "text/event-stream",
         "cache-control": "no-cache",
         connection: "keep-alive",
       });
 
-      for await (const chunk of streamChat(config, body)) {
-        reply.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+      for await (const packet of streamChat(config, body, { consumerKey: clientIp })) {
+        if (packet?.type === "meta") {
+          logger.info("ai.chat.provider_selected", {
+            requestId,
+            clientIp,
+            primaryProvider,
+            selectedProvider: packet.provider || "unknown",
+            usedFallback: String(packet.provider || "") !== String(primaryProvider),
+          });
+          reply.write(`data: ${JSON.stringify({ provider: packet.provider })}\n\n`);
+          continue;
+        }
+        if (packet?.type === "chunk" && packet.text) {
+          reply.write(`data: ${JSON.stringify({ text: packet.text })}\n\n`);
+        }
       }
       reply.write("data: [DONE]\n\n");
       reply.end();
+      logger.info("ai.chat.completed", { requestId, clientIp });
       return;
     }
 

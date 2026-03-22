@@ -18,6 +18,7 @@ import { fetchRssNews } from "./adapters/news-rss.adapter.mjs";
 import { getDefaultSocialRssFeeds } from "./adapters/news-rss.adapter.mjs";
 import { getDefaultNitterSocialFeeds } from "./adapters/news-rss.adapter.mjs";
 import { fetchJsonNews } from "./adapters/news-json.adapter.mjs";
+import { fetchExchangeAnnouncements } from "./adapters/news-exchange-announcements.adapter.mjs";
 import { fetchTreeOfAlphaNews } from "./adapters/news-treeofalpha.adapter.mjs";
 import { createTreeOfAlphaNewsStream } from "./adapters/news-treeofalpha.adapter.mjs";
 import { fetchNinjaNewsBundle } from "./adapters/news-ninjanews.adapter.mjs";
@@ -119,7 +120,7 @@ export function createTerminalDataService({ config, logger }) {
     whales: { status: "idle", providerCalls: 0, cacheHits: 0, staleServed: 0, lastSuccessAt: null, lastErrorAt: null, lastError: null },
   };
 
-  const NEWS_SOURCES = ["rss", "json", "tree", "ninja", "social_rss"];
+  const NEWS_SOURCES = ["rss", "json", "exchange_announcements", "tree", "ninja", "social_rss"];
   const newsSourceHealth = NEWS_SOURCES.reduce((acc, source) => {
     acc[source] = {
       status: "idle",
@@ -401,9 +402,10 @@ export function createTerminalDataService({ config, logger }) {
   async function refreshNewsLayer() {
     const rssEnabled = featureFlags.enableNewsRss !== false;
     const jsonEnabled = featureFlags.enableNewsJson !== false;
+    const exchangeAnnouncementsEnabled = featureFlags.enableNewsExchangeAnnouncements !== false;
     const treeEnabled = featureFlags.enableNewsTree !== false;
     const ninjaEnabled = featureFlags.enableNewsNinja !== false;
-    if (!rssEnabled && !jsonEnabled && !treeEnabled && !ninjaEnabled) {
+    if (!rssEnabled && !jsonEnabled && !exchangeAnnouncementsEnabled && !treeEnabled && !ninjaEnabled) {
       markProvider("news", "disabled");
       return;
     }
@@ -436,13 +438,16 @@ export function createTerminalDataService({ config, logger }) {
         });
         // Keep social fetch budget tight to avoid periodic latency spikes.
         const mergedSocialFeeds = Array.from(dedupedFeedMap.values()).slice(0, 12);
-        const [rss, json, tree, social, ninjaBundle] = await Promise.all([
+        const [rss, json, exchangeAnnouncements, tree, social, ninjaBundle] = await Promise.all([
           fetchNewsSource("rss", rssEnabled, () => fetchRssNews()),
           fetchNewsSource("json", jsonEnabled, () =>
             fetchJsonNews({
               cryptopanicKey: config.cryptopanicKey,
               cryptocompareApiKey: config.cryptocompareApiKey,
             }),
+          ),
+          fetchNewsSource("exchange_announcements", exchangeAnnouncementsEnabled, () =>
+            fetchExchangeAnnouncements({ limit: ttl.exchangeAnnouncementsLimit || 30 }),
           ),
           fetchNewsSource("tree", treeEnabled, () => fetchTreeOfAlphaNews({ limit: ttl.treeNewsLimit || 300 })),
           fetchNewsSource("social_rss", mergedSocialFeeds.length > 0, () => fetchRssNews({ feeds: mergedSocialFeeds })),
@@ -467,6 +472,7 @@ export function createTerminalDataService({ config, logger }) {
         const engineSnapshot = newsEngine.ingest([
           ...rss,
           ...json,
+          ...exchangeAnnouncements,
           ...treeRows,
           ...ninjaNewsRows,
           ...socialRows,
@@ -501,6 +507,9 @@ export function createTerminalDataService({ config, logger }) {
           const errors = [];
           if (rssEnabled && rss.length === 0) errors.push("rss_empty_or_unavailable");
           if (jsonEnabled && json.length === 0) errors.push("json_empty_or_unavailable");
+          if (exchangeAnnouncementsEnabled && exchangeAnnouncements.length === 0) {
+            errors.push("exchange_announcements_empty_or_unavailable");
+          }
           if (treeEnabled && treeRows.length === 0) errors.push("tree_news_empty_or_unavailable");
           if (ninjaEnabled && ninjaNewsRows.length === 0 && ninjaSocialRows.length === 0) {
             errors.push("ninja_news_empty_or_unavailable");
@@ -762,6 +771,7 @@ export function createTerminalDataService({ config, logger }) {
     const newsFetchedTs = maxTimestamp([
       newsSourceHealth.rss?.lastSuccessAt,
       newsSourceHealth.json?.lastSuccessAt,
+      newsSourceHealth.exchange_announcements?.lastSuccessAt,
       newsSourceHealth.tree?.lastSuccessAt,
       newsSourceHealth.ninja?.lastSuccessAt,
     ]);

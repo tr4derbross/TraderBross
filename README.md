@@ -83,6 +83,8 @@ Frontend:
 ```env
 NEXT_PUBLIC_API_BASE_URL=https://your-backend.example.com
 NEXT_PUBLIC_WS_URL=wss://your-backend.example.com/ws
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
 ```
 
 Backend:
@@ -95,6 +97,14 @@ LOG_LEVEL=info
 PROXY_SHARED_SECRET=your-long-random-secret
 REQUIRE_PROXY_AUTH=true
 VAULT_ENCRYPTION_KEY=your-32-byte-key
+UPSTASH_REDIS_REST_URL=your-upstash-rest-url
+UPSTASH_REDIS_REST_TOKEN=your-upstash-rest-token
+# AI budget guard (free-safe defaults)
+AI_ALLOW_EXTERNAL=false
+AI_MAX_REQUESTS_PER_MINUTE=12
+AI_MAX_REQUESTS_PER_DAY=200
+OPENROUTER_API_KEY=your-openrouter-key
+AI_OPENROUTER_MODELS=meta-llama/llama-3.1-8b-instruct:free,mistralai/mistral-7b-instruct:free
 ```
 
 ## Local Run
@@ -138,6 +148,8 @@ pm2 save
 - Backend heartbeat broadcast every 10s.
 - Reconnect: exponential backoff with capped retries and reset cycle.
 
+News ingestion includes RSS/JSON/social plus official exchange announcements (Binance, Bybit, OKX), merged in backend and served via `GET /api/news`.
+
 ## Ops Commands
 
 ```bash
@@ -153,6 +165,25 @@ BACKEND_BASE_URL=https://your-backend.example.com npm run ops:health
 BACKEND_BASE_URL=https://your-backend.example.com npm run security:smoke
 FRONTEND_BASE_URL=https://your-frontend.example.com BACKEND_BASE_URL=https://your-backend.example.com npm run ops:go-live
 ```
+
+## Supabase Setup (Step 1)
+
+This repo now includes App Router-ready Supabase auth/database scaffolding:
+
+- Browser client: `lib/supabase/client.ts`
+- Server client: `lib/supabase/server.ts`
+- Session proxy: `proxy.ts`, `lib/supabase/middleware.ts`
+- Auth pages: `/sign-in`, `/auth/callback`
+- Watchlist API route: `GET|PUT /api/account/watchlist`
+- SQL schema: `supabase/schema.sql`
+
+Setup:
+
+1. Create a Supabase project.
+2. Run `supabase/schema.sql` in Supabase SQL Editor.
+3. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`.
+4. In Supabase Auth settings, add redirect URL: `http://localhost:3000/auth/callback` (and production domain equivalent).
+5. Start app and open `/sign-in`.
 
 ## Runbooks
 
