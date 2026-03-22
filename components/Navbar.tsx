@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Send, Twitter } from "lucide-react";
 import { useI18n } from "@/components/i18n/LanguageProvider";
+import LanguageSwitcher from "@/components/i18n/LanguageSwitcher";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -139,6 +140,9 @@ export default function Navbar() {
                 >
                   <Twitter size={14} /> {dict.nav.twitter}
                 </a>
+                <div className="ml-auto">
+                  <LanguageSwitcher />
+                </div>
               </div>
             </motion.div>
           </>
