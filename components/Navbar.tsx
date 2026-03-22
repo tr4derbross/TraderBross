@@ -57,7 +57,7 @@ export default function Navbar() {
           {/* Right icons + mobile hamburger */}
           <div className="flex items-center gap-3">
             <a
-              href="https://t.me/traderbross"
+              href="https://t.me/+gmvsMPoWofA2ZjY0"
               target="_blank"
               rel="noreferrer"
               className="hidden text-[#6B6B6B] transition-colors hover:text-[#F2B705] md:flex"
@@ -125,7 +125,7 @@ export default function Navbar() {
               </nav>
               <div className="mt-4 flex items-center gap-4 border-t border-[#2A2A2A] pt-4">
                 <a
-                  href="https://t.me/traderbross"
+                  href="https://t.me/+gmvsMPoWofA2ZjY0"
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center gap-2 text-[12px] text-[#6B6B6B] hover:text-[#A0A0A0] transition-colors"

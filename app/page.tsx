@@ -157,7 +157,7 @@ export default function LandingPage() {
               {dict.landing.openTerminal} <ArrowRight size={15} />
             </Link>
             <a
-              href="https://t.me/traderbross"
+              href="https://t.me/+gmvsMPoWofA2ZjY0"
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-2 rounded-lg border border-[rgba(242,183,5,0.2)] px-6 py-3 text-[13px] font-medium text-[#A0A0A0] transition-colors hover:border-[rgba(242,183,5,0.4)] hover:text-[#FFFFFF]"
