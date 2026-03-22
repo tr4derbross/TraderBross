@@ -402,6 +402,7 @@ function ResizeDivider({ onDrag }: { onDrag: (dx: number) => void }) {
 }
 
 export default function TerminalApp({ initialTicker }: { initialTicker?: string } = {}) {
+  const initialSymbol = normalizeVenueTicker(initialTicker || "BTC") || "BTC";
   const [secureStorageScope, setSecureStorageScope] = useState<string>("anon");
   const [secureCexStateReady, setSecureCexStateReady] = useState(false);
   const secureCexStorage = useEncryptedLocalStorage<SecureStoredCexState>(`traderbross:cex:${secureStorageScope}`);
@@ -435,9 +436,10 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const [activeVenueState, setActiveVenueState] = useState<ActiveVenueState>({
     venueId: "hyperliquid",
     venueType: "wallet",
-    activeSymbol: (initialTicker || "BTC").toUpperCase(),
+    activeSymbol: initialSymbol,
     connectionStatus: "disconnected",
   });
+  const lastValidSymbolRef = useRef<string>(initialSymbol);
   const { checkNewsAgainstAlerts, checkPriceAlerts } = useAlerts();
   const headerControlRef = useRef<HTMLDivElement | null>(null);
   const headerPanelRef = useRef<HTMLDivElement | null>(null);
@@ -942,13 +944,26 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   }, [activeVenueState.venueId, quoteAsset]);
 
   useEffect(() => {
+    if (!tradableSet.has(activeVenueState.activeSymbol)) return;
+    lastValidSymbolRef.current = activeVenueState.activeSymbol;
+  }, [activeVenueState.activeSymbol, tradableSet]);
+
+  useEffect(() => {
     if (tradableSymbols.length === 0) return;
-    if (!tradableSet.has(activeVenueState.activeSymbol)) {
-      setActiveVenueState((prev) => ({
-        ...prev,
-        activeSymbol: tradableSymbols[0],
-      }));
-    }
+    if (tradableSet.has(activeVenueState.activeSymbol)) return;
+
+    const fallback =
+      (lastValidSymbolRef.current && tradableSet.has(lastValidSymbolRef.current)
+        ? lastValidSymbolRef.current
+        : null) ??
+      (tradableSet.has("BTC") ? "BTC" : null) ??
+      (tradableSet.has("ETH") ? "ETH" : null) ??
+      tradableSymbols[0];
+
+    setActiveVenueState((prev) => ({
+      ...prev,
+      activeSymbol: fallback,
+    }));
   }, [activeVenueState.activeSymbol, tradableSet, tradableSymbols]);
 
   const setActiveSymbol = useCallback((symbol: string) => {
@@ -1028,15 +1043,14 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
   const handleTickerRoute = useCallback((ticker: string, item: NewsItem) => {
     setSelectedItem(item);
-    const symbol = String(ticker || "")
-      .split("-")[0]
-      .replace(/(USDT|USDC|USD)$/i, "")
-      .replace(/PERP$/i, "")
-      .replace(/[^A-Z0-9]/gi, "")
-      .toUpperCase();
-    if (symbol && tradableSet.has(symbol)) {
-      setActiveSymbol(symbol);
-    }
+    const normalizedFromClick = normalizeVenueTicker(String(ticker || ""));
+    const fallbackFromItem = (item.ticker ?? [])
+      .map((value) => normalizeVenueTicker(value))
+      .find((value) => tradableSet.has(value));
+    const nextSymbol =
+      (normalizedFromClick && tradableSet.has(normalizedFromClick) ? normalizedFromClick : null) ??
+      fallbackFromItem;
+    if (nextSymbol) setActiveSymbol(nextSymbol);
     setRightTab("trade");
     setMobileWorkspaceTab("chart");
   }, [setActiveSymbol, tradableSet]);
