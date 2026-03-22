@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import BrandMark from "@/components/BrandMark";
+import { useI18n } from "@/components/i18n/LanguageProvider";
 
 type LegalPageProps = {
   title: string;
@@ -8,6 +11,7 @@ type LegalPageProps = {
 };
 
 export default function LegalPage({ title, effectiveDate, children }: LegalPageProps) {
+  const { dict } = useI18n();
   return (
     <main className="landing-shell min-h-screen text-[var(--text-primary)]">
       <section className="mx-auto flex w-full max-w-4xl flex-col px-5 pb-12 pt-6 sm:px-8 lg:px-10">
@@ -16,7 +20,7 @@ export default function LegalPage({ title, effectiveDate, children }: LegalPageP
             <BrandMark className="h-auto w-[138px] sm:w-[160px]" />
             <div className="hidden sm:block">
               <div className="text-[10px] uppercase tracking-[0.28em] text-amber-200/80">TraderBross</div>
-              <div className="text-[11px] text-zinc-500">Legal and policy information</div>
+              <div className="text-[11px] text-zinc-500">{dict.legal.info}</div>
             </div>
           </div>
 
@@ -24,7 +28,7 @@ export default function LegalPage({ title, effectiveDate, children }: LegalPageP
             href="/terminal"
             className="brand-chip-active inline-flex items-center justify-center rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-[0.16em]"
           >
-            Open Terminal
+            {dict.legal.openTerminal}
           </Link>
         </header>
 
@@ -32,7 +36,7 @@ export default function LegalPage({ title, effectiveDate, children }: LegalPageP
           <div className="mb-8 border-b border-[rgba(212,161,31,0.1)] pb-6">
             <div className="text-[10px] uppercase tracking-[0.24em] text-amber-200">TraderBross</div>
             <h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-[#f8f3e5]">{title}</h1>
-            <p className="mt-3 text-sm text-zinc-500">Effective date: {effectiveDate}</p>
+            <p className="mt-3 text-sm text-zinc-500">{dict.legal.effectiveDate}: {effectiveDate}</p>
           </div>
 
           <div className="legal-content space-y-8 text-[15px] leading-8 text-[var(--text-secondary)]">

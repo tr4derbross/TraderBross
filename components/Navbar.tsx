@@ -5,18 +5,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Send, Twitter } from "lucide-react";
-
-const NAV_LINKS = [
-  { href: "/",          label: "Home" },
-  { href: "/terminal",  label: "Terminal" },
-  { href: "/news",      label: "News" },
-  { href: "/screener",  label: "Screener" },
-  { href: "/calendar",  label: "Calendar" },
-];
+import { useI18n } from "@/components/i18n/LanguageProvider";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const { dict } = useI18n();
+  const NAV_LINKS = [
+    { href: "/", label: dict.nav.home },
+    { href: "/terminal", label: dict.nav.terminal },
+    { href: "/news", label: dict.nav.news },
+    { href: "/screener", label: dict.nav.screener },
+    { href: "/calendar", label: dict.nav.calendar },
+  ];
 
   return (
     <>
@@ -59,7 +60,7 @@ export default function Navbar() {
               target="_blank"
               rel="noreferrer"
               className="hidden text-[#6B6B6B] transition-colors hover:text-[#F2B705] md:flex"
-              aria-label="Telegram"
+              aria-label={dict.nav.telegram}
             >
               <Send size={16} />
             </a>
@@ -68,7 +69,7 @@ export default function Navbar() {
               target="_blank"
               rel="noreferrer"
               className="hidden text-[#6B6B6B] transition-colors hover:text-[#FFFFFF] md:flex"
-              aria-label="Twitter / X"
+              aria-label={dict.nav.twitter}
             >
               <Twitter size={16} />
             </a>
@@ -128,7 +129,7 @@ export default function Navbar() {
                   rel="noreferrer"
                   className="flex items-center gap-2 text-[12px] text-[#6B6B6B] hover:text-[#A0A0A0] transition-colors"
                 >
-                  <Send size={14} /> Telegram
+                  <Send size={14} /> {dict.nav.telegram}
                 </a>
                 <a
                   href="https://x.com/traderbross"
@@ -136,7 +137,7 @@ export default function Navbar() {
                   rel="noreferrer"
                   className="flex items-center gap-2 text-[12px] text-[#6B6B6B] hover:text-[#A0A0A0] transition-colors"
                 >
-                  <Twitter size={14} /> Twitter
+                  <Twitter size={14} /> {dict.nav.twitter}
                 </a>
               </div>
             </motion.div>

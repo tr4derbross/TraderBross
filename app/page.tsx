@@ -14,6 +14,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import PageWrapper from "@/components/PageWrapper";
+import { useI18n } from "@/components/i18n/LanguageProvider";
 
 /* ─── Animation variants ─────────────────────────────────────────────────────── */
 
@@ -89,6 +90,8 @@ const DEMO_MESSAGES = [
 /* ─── Page ─────────────────────────────────────────────────────────────────────── */
 
 export default function LandingPage() {
+  const { dict } = useI18n();
+
   return (
     <PageWrapper>
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
@@ -126,22 +129,21 @@ export default function LandingPage() {
             variants={fadeUp}
             className="font-mono text-[10px] tracking-[0.2em] text-[#F2B705] uppercase"
           >
-            Real-Time News Trading Terminal
+            {dict.landing.badge}
           </motion.p>
 
           <motion.h1
             variants={fadeUp}
             className="text-4xl font-bold leading-tight tracking-tight text-[#FFFFFF] sm:text-5xl md:text-6xl"
           >
-            Trade Crypto News<br />Before the Repricing
+            {dict.landing.heroLine1}<br />{dict.landing.heroLine2}
           </motion.h1>
 
           <motion.p
             variants={fadeUp}
             className="max-w-lg text-base text-[#A0A0A0] sm:text-lg"
           >
-            Track breaking crypto news, get instant signal context, and execute trades
-            from one terminal before momentum shifts.
+            {dict.landing.heroDesc}
           </motion.p>
 
           <motion.div
@@ -152,7 +154,7 @@ export default function LandingPage() {
               href="/terminal"
               className="flex items-center gap-2 rounded-lg bg-[#F2B705] px-6 py-3 text-[13px] font-semibold text-[#0B0B0B] transition-opacity hover:opacity-90"
             >
-              Open Live Terminal <ArrowRight size={15} />
+              {dict.landing.openTerminal} <ArrowRight size={15} />
             </Link>
             <a
               href="https://t.me/traderbross"
@@ -160,7 +162,7 @@ export default function LandingPage() {
               rel="noreferrer"
               className="flex items-center gap-2 rounded-lg border border-[rgba(242,183,5,0.2)] px-6 py-3 text-[13px] font-medium text-[#A0A0A0] transition-colors hover:border-[rgba(242,183,5,0.4)] hover:text-[#FFFFFF]"
             >
-              <Send size={14} /> Get News Alerts
+              <Send size={14} /> {dict.landing.getAlerts}
             </a>
           </motion.div>
 
@@ -196,10 +198,10 @@ export default function LandingPage() {
           className="mb-10 text-center"
         >
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F2B705]">
-            Features
+            {dict.landing.featuresTitle}
           </p>
           <h2 className="mt-2 text-2xl font-bold text-[#FFFFFF] sm:text-3xl">
-            Why Active Crypto Traders Use TraderBross
+            {dict.landing.featuresHeading}
           </h2>
         </motion.div>
 
@@ -305,7 +307,7 @@ export default function LandingPage() {
           className="mx-auto max-w-lg px-4"
         >
           <h2 className="text-2xl font-bold text-[#FFFFFF] sm:text-3xl">
-            Turn Headlines Into Trades Faster
+            {dict.landing.ctaHeading}
           </h2>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
             {["Live market feed", "Signal trade context", "4 exchanges"].map(
@@ -323,7 +325,7 @@ export default function LandingPage() {
             href="/terminal"
             className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#F2B705] px-8 py-3.5 text-[13px] font-semibold text-[#0B0B0B] transition-opacity hover:opacity-90"
           >
-            Start Trading Smarter <ArrowRight size={15} />
+            {dict.landing.ctaButton} <ArrowRight size={15} />
           </Link>
         </motion.div>
       </section>
