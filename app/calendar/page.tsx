@@ -21,6 +21,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useI18n } from "@/components/i18n/LanguageProvider";
 
 /* ── Config ─────────────────────────────────────────────────────────────────── */
 
@@ -104,7 +105,18 @@ function formatDate(dateStr: string): string {
 
 /* ── Event Card ──────────────────────────────────────────────────────────────── */
 
-function EventCard({ event }: { event: CalendarEvent }) {
+function EventCard({
+  event,
+  labels,
+}: {
+  event: CalendarEvent;
+  labels: {
+    today: string;
+    past: string;
+    trade: string;
+    category: Record<EventCategory, string>;
+  };
+}) {
   const meta    = CATEGORY_META[event.category];
   const days    = daysUntil(event.date);
   const isPast  = days < 0;
@@ -150,7 +162,7 @@ function EventCard({ event }: { event: CalendarEvent }) {
             }`}
           >
             <div className="text-[9px] font-bold uppercase tracking-[0.12em]">
-              {isToday ? "TODAY" : isPast ? "Past" : `${days}d`}
+              {isToday ? labels.today : isPast ? labels.past : `${days}d`}
             </div>
             <div className="text-[10px] font-semibold">{formatDate(event.date)}</div>
           </div>
@@ -167,7 +179,7 @@ function EventCard({ event }: { event: CalendarEvent }) {
             className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[9px] font-bold ${meta.color}`}
           >
             {meta.icon}
-            {meta.label}
+            {labels.category[event.category] ?? meta.label}
           </span>
           <span
             className={`rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] ${IMPORTANCE_MAP[event.importance]}`}
@@ -183,7 +195,7 @@ function EventCard({ event }: { event: CalendarEvent }) {
                 className="flex items-center gap-1 rounded-md border border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.08)] px-2 py-0.5 text-[9px] font-bold text-[#F2B705] transition hover:bg-[rgba(242,183,5,0.16)]"
               >
                 <LayoutDashboard className="h-2.5 w-2.5" />
-                Trade
+                {labels.trade}
               </Link>
             ) : null}
             {event.source && event.source.startsWith("http") && (
@@ -205,7 +217,21 @@ function EventCard({ event }: { event: CalendarEvent }) {
 
 /* ── Timeline group ──────────────────────────────────────────────────────────── */
 
-function MonthGroup({ month, events }: { month: string; events: CalendarEvent[] }) {
+function MonthGroup({
+  month,
+  events,
+  labels,
+}: {
+  month: string;
+  events: CalendarEvent[];
+  labels: {
+    events: string;
+    today: string;
+    past: string;
+    trade: string;
+    category: Record<EventCategory, string>;
+  };
+}) {
   return (
     <div>
       <div className="mb-3 flex items-center gap-3">
@@ -216,11 +242,11 @@ function MonthGroup({ month, events }: { month: string; events: CalendarEvent[] 
           </span>
         </div>
         <div className="h-px flex-1 bg-[rgba(242,183,5,0.08)]" />
-        <span className="text-[10px] text-[#3A3A3A]">{events.length} events</span>
+        <span className="text-[10px] text-[#3A3A3A]">{events.length} {labels.events}</span>
       </div>
       <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
         {events.map((e) => (
-          <EventCard key={e.id} event={e} />
+          <EventCard key={e.id} event={e} labels={labels} />
         ))}
       </div>
     </div>
@@ -242,6 +268,120 @@ const ALL_CATEGORIES: (EventCategory | "all")[] = [
 ];
 
 export default function CalendarPage() {
+  const { locale } = useI18n();
+  const t =
+    locale === "tr"
+      ? {
+          title: "Kripto Takvimi",
+          upcoming: "yaklasan",
+          subtitle: "Token unlock, protokol guncellemeleri, konferanslar ve regülasyon kilometre taslari",
+          next7: "Sonraki 7 gun",
+          highImpact: "Yuksek Etki",
+          tokenUnlocks: "Token Unlock",
+          conferences: "Konferanslar",
+          all: "Tumu",
+          showPast: "Gecmisi goster",
+          noEvents: "Yaklasan etkinlik bulunamadi.",
+          joinTelegram: "canli guncellemeler icin Telegram kanalina katil",
+          events: "etkinlik",
+          today: "BUGUN",
+          past: "Gecmis",
+          trade: "Islem",
+          categories: {
+            tokenUnlock: "Token Unlock",
+            hardFork: "Hard Fork",
+            upgrade: "Yukseltme",
+            conference: "Konferans",
+            listing: "Listeleme",
+            mainnet: "Mainnet",
+            regulation: "Regulasyon",
+            airdrop: "Airdrop",
+          } satisfies Record<EventCategory, string>,
+        }
+      : locale === "de"
+      ? {
+          title: "Krypto Kalender",
+          upcoming: "bevorstehend",
+          subtitle: "Token Unlocks, Protokoll-Upgrades, Konferenzen und Regulierungs-Meilensteine",
+          next7: "Nächste 7 Tage",
+          highImpact: "Hohe Wirkung",
+          tokenUnlocks: "Token Unlocks",
+          conferences: "Konferenzen",
+          all: "Alle",
+          showPast: "Vergangenheit anzeigen",
+          noEvents: "Keine bevorstehenden Events gefunden.",
+          joinTelegram: "trete unserem Telegram fur Live-Updates bei",
+          events: "Events",
+          today: "HEUTE",
+          past: "Vergangen",
+          trade: "Handeln",
+          categories: {
+            tokenUnlock: "Token Unlock",
+            hardFork: "Hard Fork",
+            upgrade: "Upgrade",
+            conference: "Konferenz",
+            listing: "Listing",
+            mainnet: "Mainnet",
+            regulation: "Regulierung",
+            airdrop: "Airdrop",
+          } satisfies Record<EventCategory, string>,
+        }
+      : locale === "zh"
+      ? {
+          title: "加密日历",
+          upcoming: "即将到来",
+          subtitle: "代币解锁、协议升级、会议与监管里程碑",
+          next7: "未来7天",
+          highImpact: "高影响",
+          tokenUnlocks: "代币解锁",
+          conferences: "会议",
+          all: "全部",
+          showPast: "显示历史",
+          noEvents: "未找到即将发生的事件。",
+          joinTelegram: "加入我们的 Telegram 获取实时更新",
+          events: "事件",
+          today: "今天",
+          past: "过去",
+          trade: "交易",
+          categories: {
+            tokenUnlock: "代币解锁",
+            hardFork: "硬分叉",
+            upgrade: "升级",
+            conference: "会议",
+            listing: "上币",
+            mainnet: "主网",
+            regulation: "监管",
+            airdrop: "空投",
+          } satisfies Record<EventCategory, string>,
+        }
+      : {
+          title: "Crypto Calendar",
+          upcoming: "upcoming",
+          subtitle: "Token unlocks, protocol upgrades, conferences & regulation milestones",
+          next7: "Next 7 days",
+          highImpact: "High Impact",
+          tokenUnlocks: "Token Unlocks",
+          conferences: "Conferences",
+          all: "All",
+          showPast: "Show past",
+          noEvents: "No upcoming events found.",
+          joinTelegram: "join our Telegram",
+          events: "events",
+          today: "TODAY",
+          past: "Past",
+          trade: "Trade",
+          categories: {
+            tokenUnlock: "Token Unlock",
+            hardFork: "Hard Fork",
+            upgrade: "Upgrade",
+            conference: "Conference",
+            listing: "Listing",
+            mainnet: "Mainnet",
+            regulation: "Regulation",
+            airdrop: "Airdrop",
+          } satisfies Record<EventCategory, string>,
+        };
+
   const [events, setEvents]       = useState<CalendarEvent[]>([]);
   const [loading, setLoading]     = useState(true);
   const [catFilter, setCatFilter] = useState<EventCategory | "all">("all");
@@ -290,17 +430,17 @@ export default function CalendarPage() {
           <div className="mb-6">
             <div className="mb-1 flex items-center gap-2">
               <Calendar className="h-4 w-4 text-[#F2B705]" />
-              <h1 className="text-[15px] font-bold tracking-[-0.01em] text-[#FFFFFF]">
-                Crypto Calendar
+                <h1 className="text-[15px] font-bold tracking-[-0.01em] text-[#FFFFFF]">
+                {t.title}
               </h1>
               {!loading && (
                 <span className="rounded-full border border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.08)] px-2 py-0.5 text-[9px] font-bold text-[#F2B705]">
-                  {events.filter((e) => daysUntil(e.date) >= 0).length} upcoming
+                  {events.filter((e) => daysUntil(e.date) >= 0).length} {t.upcoming}
                 </span>
               )}
             </div>
             <p className="text-[11px] text-[#6B6B6B]">
-              Token unlocks, protocol upgrades, conferences &amp; regulation milestones
+              {t.subtitle}
             </p>
           </div>
 
@@ -309,7 +449,7 @@ export default function CalendarPage() {
             <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <div className="rounded-xl border border-[#F2B705]/15 bg-[#F2B705]/5 px-3 py-2.5">
                 <div className="text-[10px] uppercase tracking-[0.14em] text-[#F2B705]/60">
-                  Next 7 days
+                  {t.next7}
                 </div>
                 <div className="mt-0.5 font-mono text-[15px] font-bold text-[#F2B705]">
                   {upcoming.length}
@@ -317,7 +457,7 @@ export default function CalendarPage() {
               </div>
               <div className="rounded-xl border border-[#FF4D4D]/15 bg-[#FF4D4D]/5 px-3 py-2.5">
                 <div className="text-[10px] uppercase tracking-[0.14em] text-[#FF4D4D]/60">
-                  High Impact
+                  {t.highImpact}
                 </div>
                 <div className="mt-0.5 font-mono text-[15px] font-bold text-[#FF4D4D]">
                   {highCount}
@@ -325,7 +465,7 @@ export default function CalendarPage() {
               </div>
               <div className="rounded-xl border border-[rgba(242,183,5,0.15)] bg-[rgba(242,183,5,0.05)] px-3 py-2.5">
                 <div className="text-[10px] uppercase tracking-[0.14em] text-[#A0A0A0]/60">
-                  Token Unlocks
+                  {t.tokenUnlocks}
                 </div>
                 <div className="mt-0.5 font-mono text-[15px] font-bold text-[#A0A0A0]">
                   {events.filter((e) => e.category === "tokenUnlock" && daysUntil(e.date) >= 0).length}
@@ -333,7 +473,7 @@ export default function CalendarPage() {
               </div>
               <div className="rounded-xl border border-[rgba(242,183,5,0.12)] bg-[rgba(242,183,5,0.04)] px-3 py-2.5">
                 <div className="text-[10px] uppercase tracking-[0.14em] text-[#F2B705]/60">
-                  Conferences
+                  {t.conferences}
                 </div>
                 <div className="mt-0.5 font-mono text-[15px] font-bold text-[#F2B705]">
                   {events.filter((e) => e.category === "conference" && daysUntil(e.date) >= 0).length}
@@ -358,7 +498,7 @@ export default function CalendarPage() {
                     }`}
                   >
                     {meta?.icon}
-                    {cat === "all" ? "All" : meta?.label}
+                    {cat === "all" ? t.all : cat ? t.categories[cat] : meta?.label}
                   </button>
                 );
               })}
@@ -374,7 +514,7 @@ export default function CalendarPage() {
               <ChevronRight
                 className={`h-3 w-3 transition-transform ${showPast ? "rotate-90" : ""}`}
               />
-              Show past
+              {t.showPast}
             </button>
           </div>
 
@@ -395,7 +535,7 @@ export default function CalendarPage() {
           ) : Object.keys(groups).length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-20 text-[#6B6B6B]">
               <Calendar className="h-8 w-8 opacity-30" />
-              <p className="text-sm">No upcoming events found.</p>
+              <p className="text-sm">{t.noEvents}</p>
               <p className="text-[11px] text-[#3A3A3A]">
                 Check back soon or{" "}
                 <a
@@ -404,7 +544,7 @@ export default function CalendarPage() {
                   rel="noreferrer"
                   className="text-[#F2B705]/70 transition hover:text-[#F2B705] underline underline-offset-2"
                 >
-                  join our Telegram
+                  {t.joinTelegram}
                 </a>{" "}
                 for live updates.
               </p>
@@ -412,7 +552,7 @@ export default function CalendarPage() {
           ) : (
             <div className="space-y-8">
               {Object.entries(groups).map(([month, evts]) => (
-                <MonthGroup key={month} month={month} events={evts} />
+                <MonthGroup key={month} month={month} events={evts} labels={{ events: t.events, today: t.today, past: t.past, trade: t.trade, category: t.categories }} />
               ))}
             </div>
           )}

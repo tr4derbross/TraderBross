@@ -1,8 +1,20 @@
+"use client";
+
 import LegalPage from "@/components/LegalPage";
+import { useI18n } from "@/components/i18n/LanguageProvider";
 
 export default function PrivacyPage() {
+  const { locale } = useI18n();
+  const title =
+    locale === "tr"
+      ? "Gizlilik Politikasi"
+      : locale === "de"
+      ? "Datenschutzerklarung"
+      : locale === "zh"
+      ? "隐私政策"
+      : "Privacy Policy";
   return (
-    <LegalPage title="Privacy Policy" effectiveDate="21.03.26">
+    <LegalPage title={title} effectiveDate="21.03.26">
       <p>
         TraderBross (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) provides a crypto news trading terminal and related
         tools for traders.

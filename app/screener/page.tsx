@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -18,8 +18,9 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useI18n } from "@/components/i18n/LanguageProvider";
 
-/* ── Helpers ───────────────────────────────────────────────────────────────── */
+/* â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function fmt(n: number, decimals = 2): string {
   if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`;
@@ -50,10 +51,10 @@ function fmtOI(v: number): string {
 }
 
 const SORT_TABS = [
-  { key: "volume",  label: "Volume",  icon: BarChart2   },
-  { key: "gainers", label: "Gainers", icon: TrendingUp  },
-  { key: "losers",  label: "Losers",  icon: TrendingDown },
-];
+  { key: "volume", icon: BarChart2 },
+  { key: "gainers", icon: TrendingUp },
+  { key: "losers", icon: TrendingDown },
+] as const;
 
 function getReferralUrl(symbol: string): string {
   const ref = process.env.NEXT_PUBLIC_BINANCE_REF;
@@ -62,11 +63,11 @@ function getReferralUrl(symbol: string): string {
     : `https://www.binance.com/en/trade/${symbol}_USDT`;
 }
 
-/* ── RSI Badge ──────────────────────────────────────────────────────────────── */
+/* â”€â”€ RSI Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function RsiBadge({ rsi }: { rsi: number | null | undefined }) {
   if (rsi == null)
-    return <span className="text-[10px] text-[#3A3A3A]">—</span>;
+    return <span className="text-[10px] text-[#3A3A3A]">â€”</span>;
 
   const isOversold   = rsi < 30;
   const isOverbought = rsi > 70;
@@ -82,7 +83,7 @@ function RsiBadge({ rsi }: { rsi: number | null | undefined }) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${cls}`}
-      title={`RSI-14 (4h): ${rsi}${isOversold ? " — Oversold" : isOverbought ? " — Overbought" : ""}`}
+      title={`RSI-14 (4h): ${rsi}${isOversold ? " â€” Oversold" : isOverbought ? " â€” Overbought" : ""}`}
     >
       {rsi.toFixed(1)}
       {label && <span className="text-[8px] opacity-70">{label}</span>}
@@ -90,23 +91,23 @@ function RsiBadge({ rsi }: { rsi: number | null | undefined }) {
   );
 }
 
-/* ── L/S Ratio Badge ─────────────────────────────────────────────────────────── */
+/* â”€â”€ L/S Ratio Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function LSBadge({ ratio }: { ratio: number | null | undefined }) {
   if (ratio == null)
-    return <span className="text-[10px] text-[#3A3A3A]">—</span>;
+    return <span className="text-[10px] text-[#3A3A3A]">â€”</span>;
   const bullish = ratio >= 1;
   return (
     <span
       className={`text-[10px] font-bold tabular-nums ${bullish ? "text-[#4CAF50]" : "text-[#FF4D4D]"}`}
-      title={`Global Long/Short Account Ratio (1h): ${ratio} — ${bullish ? "More longs than shorts" : "More shorts than longs"}`}
+      title={`Global Long/Short Account Ratio (1h): ${ratio} â€” ${bullish ? "More longs than shorts" : "More shorts than longs"}`}
     >
       {ratio.toFixed(2)}
     </span>
   );
 }
 
-/* ── Mini sparkline bar ─────────────────────────────────────────────────────── */
+/* â”€â”€ Mini sparkline bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function MiniRange({ low, high, price }: { low: number; high: number; price: number }) {
   const pct = high > low ? ((price - low) / (high - low)) * 100 : 50;
@@ -124,7 +125,7 @@ function MiniRange({ low, high, price }: { low: number; high: number; price: num
   );
 }
 
-/* ── Stat card ─────────────────────────────────────────────────────────────── */
+/* â”€â”€ Stat card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function StatCard({
   label,
@@ -152,9 +153,17 @@ function StatCard({
   );
 }
 
-/* ── Desktop table row ───────────────────────────────────────────────────────── */
+/* â”€â”€ Desktop table row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
+function CoinRow({
+  coin,
+  rank,
+  labels,
+}: {
+  coin: ScreenerCoin;
+  rank: number;
+  labels: { terminal: string; trade: string };
+}) {
   const positive = coin.change24h >= 0;
   return (
     <tr className="group border-b border-[rgba(242,183,5,0.05)] transition-colors hover:bg-[rgba(242,183,5,0.03)]">
@@ -204,7 +213,7 @@ function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
             ${fmtOI(coin.openInterestUsd)}
           </span>
         ) : (
-          <span className="text-[10px] text-[#3A3A3A]">—</span>
+          <span className="text-[10px] text-[#3A3A3A]">â€”</span>
         )}
       </td>
       <td className="hidden py-2.5 pr-4 text-right xl:table-cell">
@@ -227,7 +236,7 @@ function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
             className="flex items-center gap-1 rounded-md border border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.08)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#F2B705] transition hover:bg-[rgba(242,183,5,0.16)]"
           >
             <LayoutDashboard className="h-2.5 w-2.5" />
-            Terminal
+            {labels.terminal}
           </Link>
           <a
             href={getReferralUrl(coin.symbol)}
@@ -236,7 +245,7 @@ function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
             className="flex items-center gap-1 rounded-md border border-[rgba(242,183,5,0.08)] bg-[rgba(242,183,5,0.03)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#6B6B6B] transition hover:text-[#A0A0A0]"
           >
             <ExternalLink className="h-2.5 w-2.5" />
-            Trade
+            {labels.trade}
           </a>
         </div>
       </td>
@@ -244,9 +253,17 @@ function CoinRow({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
   );
 }
 
-/* ── Mobile coin card ────────────────────────────────────────────────────────── */
+/* â”€â”€ Mobile coin card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-function CoinCard({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
+function CoinCard({
+  coin,
+  rank,
+  labels,
+}: {
+  coin: ScreenerCoin;
+  rank: number;
+  labels: { terminal: string; trade: string; volume: string };
+}) {
   const positive = coin.change24h >= 0;
   return (
     <div className="rounded-xl border border-[rgba(242,183,5,0.1)] bg-[#121212] p-4">
@@ -288,7 +305,7 @@ function CoinCard({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
           </div>
         </div>
         <div>
-          <div className="text-[9px] uppercase tracking-[0.12em] text-[#6B6B6B]">Volume</div>
+          <div className="text-[9px] uppercase tracking-[0.12em] text-[#6B6B6B]">{labels.volume}</div>
           <div className="mt-0.5 text-[11px] font-mono text-[#A0A0A0]">
             ${fmtVol(coin.volume24h)}
           </div>
@@ -307,7 +324,7 @@ function CoinCard({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
           className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-[rgba(242,183,5,0.2)] bg-[rgba(242,183,5,0.08)] py-1.5 text-[10px] font-bold text-[#F2B705] transition hover:bg-[rgba(242,183,5,0.16)]"
         >
           <LayoutDashboard className="h-3 w-3" />
-          Terminal
+          {labels.terminal}
         </Link>
         <a
           href={getReferralUrl(coin.symbol)}
@@ -316,16 +333,162 @@ function CoinCard({ coin, rank }: { coin: ScreenerCoin; rank: number }) {
           className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-[rgba(242,183,5,0.08)] bg-[rgba(242,183,5,0.03)] py-1.5 text-[10px] font-bold text-[#6B6B6B] transition hover:text-[#A0A0A0]"
         >
           <ExternalLink className="h-3 w-3" />
-          Trade
+          {labels.trade}
         </a>
       </div>
     </div>
   );
 }
 
-/* ── Page ──────────────────────────────────────────────────────────────────── */
+/* â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 export default function ScreenerPage() {
+  const { locale } = useI18n();
+  const t =
+    locale === "tr"
+      ? {
+          pageTitle: "Piyasa Tarayici",
+          loading: "Yukleniyor",
+          pairs: "parite",
+          oversold: "asiri satim",
+          overbought: "asiri alim",
+          updated: "Guncellendi",
+          refresh: "Yenile",
+          vol24h: "24s Hacim",
+          gainers: "Yukselenler",
+          losers: "Dusenler",
+          totalPairs: "Pariteler",
+          top: "Top",
+          minVol: ">$500K hacim",
+          sortVolume: "Hacim",
+          sortGainers: "Yukselen",
+          sortLosers: "Dusen",
+          searchPlaceholder: "Sembol filtrele...",
+          loadError: "Piyasa verisi yuklenemedi.",
+          retry: "Tekrar Dene",
+          coin: "Coin",
+          price: "Fiyat",
+          range24h: "24s Aralik",
+          action: "Aksiyon",
+          noCoins: "Coin bulunamadi",
+          showing: "Gosterilen",
+          of: "/",
+          source: "Binance Spot + Futures",
+          rsiLow: "RSI <30 = Asiri satim",
+          rsiHigh: "RSI >70 = Asiri alim",
+          autoRefresh: "Oto yenileme 2dk",
+          terminal: "Terminal",
+          trade: "Islem",
+          volume: "Hacim",
+        }
+      : locale === "de"
+      ? {
+          pageTitle: "Markt Screener",
+          loading: "Ladt",
+          pairs: "Paare",
+          oversold: "uberverkauft",
+          overbought: "uberkauft",
+          updated: "Aktualisiert",
+          refresh: "Aktualisieren",
+          vol24h: "24h Volumen",
+          gainers: "Gewinner",
+          losers: "Verlierer",
+          totalPairs: "Paare",
+          top: "Top",
+          minVol: ">$500K Vol",
+          sortVolume: "Volumen",
+          sortGainers: "Gewinner",
+          sortLosers: "Verlierer",
+          searchPlaceholder: "Symbol filtern...",
+          loadError: "Marktdaten konnten nicht geladen werden.",
+          retry: "Erneut versuchen",
+          coin: "Coin",
+          price: "Preis",
+          range24h: "24h Range",
+          action: "Aktion",
+          noCoins: "Keine Coins gefunden",
+          showing: "Zeige",
+          of: "von",
+          source: "Binance Spot + Futures",
+          rsiLow: "RSI <30 = Uberverkauft",
+          rsiHigh: "RSI >70 = Uberkauft",
+          autoRefresh: "Auto-Refresh 2m",
+          terminal: "Terminal",
+          trade: "Handel",
+          volume: "Volumen",
+        }
+      : locale === "zh"
+      ? {
+          pageTitle: "å¸‚åœºç­›é€‰å™¨",
+          loading: "åŠ è½½ä¸­",
+          pairs: "äº¤æ˜“å¯¹",
+          oversold: "è¶…å–",
+          overbought: "è¶…ä¹°",
+          updated: "å·²æ›´æ–°",
+          refresh: "åˆ·æ–°",
+          vol24h: "24å°æ—¶æˆäº¤é‡",
+          gainers: "æ¶¨å¹…æ¦œ",
+          losers: "è·Œå¹…æ¦œ",
+          totalPairs: "äº¤æ˜“å¯¹",
+          top: "Top",
+          minVol: ">$500K æˆäº¤é‡",
+          sortVolume: "æˆäº¤é‡",
+          sortGainers: "ä¸Šæ¶¨",
+          sortLosers: "ä¸‹è·Œ",
+          searchPlaceholder: "ç­›é€‰å¸ç§...",
+          loadError: "æ— æ³•åŠ è½½å¸‚åœºæ•°æ®ã€‚",
+          retry: "é‡è¯•",
+          coin: "å¸ç§",
+          price: "ä»·æ ¼",
+          range24h: "24å°æ—¶åŒºé—´",
+          action: "æ“ä½œ",
+          noCoins: "æœªæ‰¾åˆ°å¸ç§",
+          showing: "æ˜¾ç¤º",
+          of: "/",
+          source: "Binance ç°è´§ + åˆçº¦",
+          rsiLow: "RSI <30 = è¶…å–",
+          rsiHigh: "RSI >70 = è¶…ä¹°",
+          autoRefresh: "è‡ªåŠ¨åˆ·æ–° 2åˆ†é’Ÿ",
+          terminal: "ç»ˆç«¯",
+          trade: "äº¤æ˜“",
+          volume: "æˆäº¤é‡",
+        }
+      : {
+          pageTitle: "Market Screener",
+          loading: "Loading",
+          pairs: "pairs",
+          oversold: "oversold",
+          overbought: "overbought",
+          updated: "Updated",
+          refresh: "Refresh",
+          vol24h: "24h Volume",
+          gainers: "Gainers",
+          losers: "Losers",
+          totalPairs: "Pairs",
+          top: "Top",
+          minVol: ">$500K vol",
+          sortVolume: "Volume",
+          sortGainers: "Gainers",
+          sortLosers: "Losers",
+          searchPlaceholder: "Filter symbol...",
+          loadError: "Could not load market data.",
+          retry: "Retry",
+          coin: "Coin",
+          price: "Price",
+          range24h: "24h Range",
+          action: "Action",
+          noCoins: "No coins found",
+          showing: "Showing",
+          of: "of",
+          source: "Binance Spot + Futures",
+          rsiLow: "RSI <30 = Oversold",
+          rsiHigh: "RSI >70 = Overbought",
+          autoRefresh: "Auto-refresh 2m",
+          terminal: "Terminal",
+          trade: "Trade",
+          volume: "Volume",
+        };
+
   const [sort, setSort]       = useState<"volume" | "gainers" | "losers">("volume");
   const [search, setSearch]   = useState("");
   const [coins, setCoins]     = useState<ScreenerCoin[]>([]);
@@ -344,11 +507,11 @@ export default function ScreenerPage() {
       setLastUpdate(new Date());
     } catch (err) {
       console.error("[Screener] fetch failed:", err);
-      setError("Could not load market data.");
+      setError(t.loadError);
     } finally {
       setLoading(false);
     }
-  }, [sort]);
+  }, [sort, t.loadError]);
 
   useEffect(() => {
     load();
@@ -393,7 +556,7 @@ export default function ScreenerPage() {
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <BarChart2 className="h-4 w-4 text-[#F2B705]" />
                 <h1 className="text-[15px] font-bold tracking-[-0.01em] text-[#FFFFFF]">
-                  Market Screener
+                  {t.pageTitle}
                 </h1>
                 <span
                   className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${
@@ -409,24 +572,24 @@ export default function ScreenerPage() {
                         : "bg-[#6B6B6B]"
                     }`}
                   />
-                  {loading ? "Loading" : `${coins.length} pairs`}
+                  {loading ? t.loading : `${coins.length} ${t.pairs}`}
                 </span>
                 {!loading && oversoldCount > 0 && (
                   <span className="flex items-center gap-1 rounded-full border border-[#4CAF50]/20 bg-[#4CAF50]/8 px-2 py-0.5 text-[9px] font-bold text-[#4CAF50]">
                     <Activity className="h-2.5 w-2.5" />
-                    {oversoldCount} oversold
+                    {oversoldCount} {t.oversold}
                   </span>
                 )}
                 {!loading && overboughtCount > 0 && (
                   <span className="flex items-center gap-1 rounded-full border border-[#FF4D4D]/20 bg-[#FF4D4D]/8 px-2 py-0.5 text-[9px] font-bold text-[#FF4D4D]">
                     <Activity className="h-2.5 w-2.5" />
-                    {overboughtCount} overbought
+                    {overboughtCount} {t.overbought}
                   </span>
                 )}
               </div>
               {lastUpdate && (
                 <p className="text-[11px] text-[#6B6B6B]">
-                  Updated {lastUpdate.toLocaleTimeString()} · RSI-14 &amp; OI enriched for top 20 futures pairs
+                  {t.updated} {lastUpdate.toLocaleTimeString()} · RSI-14 &amp; OI enriched for top 20 futures pairs
                 </p>
               )}
             </div>
@@ -436,7 +599,7 @@ export default function ScreenerPage() {
               className="flex items-center gap-1.5 self-start rounded-full border border-[rgba(242,183,5,0.12)] bg-[rgba(242,183,5,0.04)] px-3 py-1.5 text-[10px] text-[#A0A0A0] transition hover:text-[#FFFFFF] disabled:opacity-40"
             >
               <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-              Refresh
+              {t.refresh}
             </button>
           </div>
 
@@ -448,22 +611,22 @@ export default function ScreenerPage() {
               ))
             ) : (
               <>
-                <StatCard label="24h Volume" value={fmt(totalVol)} variant="default" />
+                <StatCard label={t.vol24h} value={fmt(totalVol)} variant="default" />
                 <StatCard
-                  label="Gainers"
+                  label={t.gainers}
                   value={gainersCount.toString()}
-                  sub={topGainer ? `Top: ${topGainer.symbol} +${topGainer.change24h.toFixed(1)}%` : undefined}
+                  sub={topGainer ? `${t.top}: ${topGainer.symbol} +${topGainer.change24h.toFixed(1)}%` : undefined}
                   variant="bull"
                 />
                 <StatCard
-                  label="Losers"
+                  label={t.losers}
                   value={losersCount.toString()}
-                  sub={topLoser ? `Top: ${topLoser.symbol} ${topLoser.change24h.toFixed(1)}%` : undefined}
+                  sub={topLoser ? `${t.top}: ${topLoser.symbol} ${topLoser.change24h.toFixed(1)}%` : undefined}
                   variant="bear"
                 />
-                <StatCard label="Pairs" value={coins.length.toString()} sub=">$500K vol" variant="accent" />
-                <StatCard label="Oversold" value={oversoldCount.toString()} sub="RSI-14 < 30" variant="bull" />
-                <StatCard label="Overbought" value={overboughtCount.toString()} sub="RSI-14 > 70" variant="bear" />
+                <StatCard label={t.totalPairs} value={coins.length.toString()} sub={t.minVol} variant="accent" />
+                <StatCard label={t.oversold} value={oversoldCount.toString()} sub="RSI-14 < 30" variant="bull" />
+                <StatCard label={t.overbought} value={overboughtCount.toString()} sub="RSI-14 > 70" variant="bear" />
               </>
             )}
           </div>
@@ -472,7 +635,7 @@ export default function ScreenerPage() {
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             {/* Sort tabs */}
             <div className="flex items-center gap-1 rounded-xl border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.03)] p-1">
-              {SORT_TABS.map(({ key, label, icon: Icon }) => (
+              {SORT_TABS.map(({ key, icon: Icon }) => (
                 <button
                   key={key}
                   onClick={() => setSort(key as typeof sort)}
@@ -483,7 +646,7 @@ export default function ScreenerPage() {
                   }`}
                 >
                   <Icon className="h-3 w-3" />
-                  {label}
+                  {key === "volume" ? t.sortVolume : key === "gainers" ? t.sortGainers : t.sortLosers}
                 </button>
               ))}
             </div>
@@ -495,7 +658,7 @@ export default function ScreenerPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Filter symbol…"
+                placeholder={t.searchPlaceholder}
                 className="w-full rounded-xl border border-[rgba(242,183,5,0.1)] bg-[rgba(242,183,5,0.04)] py-1.5 pl-8 pr-3 text-[11px] text-[#A0A0A0] outline-none placeholder:text-[#6B6B6B] focus:border-[rgba(242,183,5,0.3)] sm:w-[180px] transition"
               />
             </div>
@@ -511,7 +674,7 @@ export default function ScreenerPage() {
                 className="flex items-center gap-1.5 rounded-full border border-[#FF4D4D]/30 bg-[#FF4D4D]/10 px-4 py-1.5 text-[11px] font-bold text-[#FF4D4D] transition hover:bg-[#FF4D4D]/20"
               >
                 <RefreshCw className="h-3 w-3" />
-                Retry
+                {t.retry}
               </button>
             </div>
           )}
@@ -523,15 +686,15 @@ export default function ScreenerPage() {
                 <thead>
                   <tr className="border-b border-[rgba(242,183,5,0.08)] bg-[rgba(242,183,5,0.04)]">
                     <th className="py-2.5 pl-4 pr-2 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">#</th>
-                    <th className="py-2.5 pr-3 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">Coin</th>
-                    <th className="py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">Price</th>
+                    <th className="py-2.5 pr-3 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">{t.coin}</th>
+                    <th className="py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">{t.price}</th>
                     <th className="py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">24h %</th>
                     <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B] lg:table-cell" title="RSI-14 on 4h candles">RSI-14</th>
                     <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B] xl:table-cell" title="Open Interest in USD">OI (USD)</th>
                     <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B] xl:table-cell" title="Long/Short Account Ratio">L/S</th>
-                    <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B] sm:table-cell">Volume</th>
-                    <th className="hidden py-2.5 pr-4 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B] md:table-cell">24h Range</th>
-                    <th className="py-2.5 pr-3 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">Action</th>
+                    <th className="hidden py-2.5 pr-4 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B] sm:table-cell">{t.volume}</th>
+                    <th className="hidden py-2.5 pr-4 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B] md:table-cell">{t.range24h}</th>
+                    <th className="py-2.5 pr-3 text-right text-[9px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">{t.action}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -550,13 +713,13 @@ export default function ScreenerPage() {
                       <td colSpan={10} className="py-16 text-center">
                         <div className="flex flex-col items-center gap-2 text-[#6B6B6B]">
                           <Search className="h-6 w-6 opacity-30" />
-                          <p className="text-sm">No coins found</p>
+                          <p className="text-sm">{t.noCoins}</p>
                         </div>
                       </td>
                     </tr>
                   ) : (
                     filtered.map((coin, i) => (
-                      <CoinRow key={coin.symbol} coin={coin} rank={i + 1} />
+                      <CoinRow key={coin.symbol} coin={coin} rank={i + 1} labels={{ terminal: t.terminal, trade: t.trade }} />
                     ))
                   )}
                 </tbody>
@@ -566,20 +729,20 @@ export default function ScreenerPage() {
             {!loading && filtered.length > 0 && (
               <div className="flex items-center justify-between border-t border-[rgba(242,183,5,0.06)] px-4 py-2">
                 <span className="text-[10px] text-[#3A3A3A]">
-                  Showing {filtered.length} of {coins.length} pairs · Binance Spot + Futures
+                  {t.showing} {filtered.length} {t.of} {coins.length} {t.pairs} · {t.source}
                 </span>
                 <div className="flex items-center gap-3 text-[10px] text-[#3A3A3A]">
                   <span className="flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-[#4CAF50]/50" />
-                    RSI &lt;30 = Oversold
+                    {t.rsiLow}
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-[#FF4D4D]/50" />
-                    RSI &gt;70 = Overbought
+                    {t.rsiHigh}
                   </span>
                   <span className="flex items-center gap-1">
                     <Zap className="h-2.5 w-2.5" />
-                    Auto-refresh 45s
+                    {t.autoRefresh}
                   </span>
                 </div>
               </div>
@@ -595,11 +758,11 @@ export default function ScreenerPage() {
             ) : filtered.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-12 text-[#6B6B6B]">
                 <Search className="h-6 w-6 opacity-30" />
-                <p className="text-sm">No coins found</p>
+                <p className="text-sm">{t.noCoins}</p>
               </div>
             ) : (
               filtered.map((coin, i) => (
-                <CoinCard key={coin.symbol} coin={coin} rank={i + 1} />
+                <CoinCard key={coin.symbol} coin={coin} rank={i + 1} labels={{ terminal: t.terminal, trade: t.trade, volume: t.volume }} />
               ))
             )}
           </div>
@@ -608,3 +771,5 @@ export default function ScreenerPage() {
     </PageWrapper>
   );
 }
+
+
