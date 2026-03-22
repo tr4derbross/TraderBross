@@ -18,10 +18,8 @@ import HyperliquidPanel from "@/components/HyperliquidPanel";
 import DydxPanel from "@/components/DydxPanel";
 import SignalsPanel from "@/components/SignalsPanel";
 import WatchlistPanel from "@/components/WatchlistPanel";
-import ChatPanel from "@/components/ChatPanel";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { FearGreedPill } from "@/components/FearGreedWidget";
-import { useFearGreed } from "@/hooks/useFearGreed";
 import { apiFetch } from "@/lib/api-client";
 import { buildApiUrl } from "@/lib/runtime-env";
 import { useRealtimeSelector } from "@/lib/realtime-client";
@@ -62,7 +60,6 @@ import {
   TrendingUp,
   Activity,
   Eye,
-  Bot,
   Zap,
 } from "lucide-react";
 
@@ -195,7 +192,7 @@ function OrderBookMini({ ticker }: { ticker: string }) {
   );
 }
 
-type RightTab = "trade" | "dex" | "signals" | "watch" | "ai";
+type RightTab = "trade" | "dex" | "signals" | "watch";
 type DexSubTab = "hl" | "dydx";
 type WorkspaceTab = "news" | "chart" | "tools";
 type HeaderPlatform = "hyperliquid" | "dydx" | "okx" | "bybit" | "binance";
@@ -630,7 +627,6 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     if (wsQuotes.length > 0) checkPriceAlerts(wsQuotes);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsQuotes]);
-  const { data: fearGreedData } = useFearGreed();
   const { ticker: activeVenueTicker, connectionState: activeVenueFeedState } = useVenueMarketData(
     activeVenueState.venueId,
     activeVenueState.activeSymbol
@@ -1480,14 +1476,6 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     vaultTokens,
   ]);
 
-  const handleAskAI = useCallback(
-    (item: NewsItem) => {
-      handleSelectItem(item);
-      setRightTab("ai");
-    },
-    [handleSelectItem]
-  );
-
   const renderNewsPanel = () => (
     <ErrorBoundary label="News Feed">
     <div className="panel-shell soft-divider flex h-full min-h-0 flex-col overflow-hidden border xl:rounded-l-xl xl:border-r-0">
@@ -1497,7 +1485,6 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         onQuickTrade={handleNewsQuickTrade}
         selectedItem={selectedItem}
         onNewItem={(item) => checkNewsAgainstAlerts(item)}
-        onAskAI={handleAskAI}
       />
     </div>
     </ErrorBoundary>
@@ -1570,10 +1557,8 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
             { id: "dex"     as const, label: "DEX",     Icon: Zap        },
             { id: "signals" as const, label: "Signals", Icon: Activity   },
             { id: "watch"   as const, label: "Watch",   Icon: Eye        },
-            { id: "ai"      as const, label: "AI",      Icon: Bot        },
           ]).map(({ id, label, Icon }) => {
             const isActive = rightTab === id;
-            const isAI = id === "ai";
             return (
               <button
                 key={id}
@@ -1581,7 +1566,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                 title={label}
                 onClick={() => setRightTab(id)}
                 data-active={isActive}
-                className={`right-panel-tab shrink-0 ${isAI ? "tab-ai" : ""}`}
+                className="right-panel-tab shrink-0"
               >
                 <Icon className="tab-icon" />
                 <span>{label}</span>
@@ -1726,26 +1711,6 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         </ErrorBoundary>
       )}
 
-      {rightTab === "ai" && (
-        <ErrorBoundary label="AI Chat">
-          <div className="tab-content-enter min-h-0 flex-1 overflow-hidden">
-            <ChatPanel
-              context={{
-                ticker: activeVenueState.activeSymbol,
-                price: getTickerDisplayPrice(activeVenueTicker)
-                  ? String(getTickerDisplayPrice(activeVenueTicker))
-                  : undefined,
-                fearGreed: fearGreedData
-                  ? { value: fearGreedData.value, label: fearGreedData.label }
-                  : undefined,
-                recentNews: selectedItem
-                  ? [{ headline: selectedItem.headline, sentiment: selectedItem.sentiment ?? undefined }]
-                  : undefined,
-              }}
-            />
-          </div>
-        </ErrorBoundary>
-      )}
     </div>
   );
 

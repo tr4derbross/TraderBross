@@ -1336,93 +1336,17 @@ const server = http.createServer(async (request, reply) => {
     }
 
     if (request.method === "GET" && url.pathname === "/api/chat") {
-      json(reply, 200, {
-        provider: getProviderLabel(config),
-        externalEnabled: Boolean(config?.ai?.allowExternal),
-        limits: {
-          perMinute: Number(config?.ai?.maxRequestsPerMinute || 12),
-          perDay: Number(config?.ai?.maxRequestsPerDay || 200),
-        },
-      });
+      json(reply, 410, { error: "AI assistant is disabled." });
       return;
     }
 
     if (request.method === "POST" && url.pathname === "/api/chat") {
-      let body = {};
-      try {
-        body = await readJson(request);
-      } catch (parseError) {
-        logger.warn("ai.chat.invalid_json", {
-          error: String(parseError),
-        });
-        body = {
-          messages: [{ role: "user", content: "Analyze current crypto market context." }],
-          context: {},
-        };
-      }
-      const clientIp = getClientIp(request);
-      const consumerKey = getChatConsumerKey(request, clientIp);
-      const requestId = crypto.randomUUID();
-      const primaryProvider = getPrimaryAiProvider(config);
-      logger.info("ai.chat.request", {
-        requestId,
-        clientIp,
-        consumerKey,
-        primaryProvider,
-        externalEnabled: Boolean(config?.ai?.allowExternal),
-      });
-
-      reply.writeHead(200, {
-        "content-type": "text/event-stream",
-        "cache-control": "no-cache",
-        connection: "keep-alive",
-      });
-
-      let hadError = false;
-      try {
-        for await (const packet of streamChat(config, body, { consumerKey })) {
-          if (packet?.type === "meta") {
-            logger.info("ai.chat.provider_selected", {
-              requestId,
-              clientIp,
-              primaryProvider,
-              selectedProvider: packet.provider || "unknown",
-              usedFallback: String(packet.provider || "") !== String(primaryProvider),
-              reason: packet.reason || "ok",
-              failures: packet.failures || undefined,
-            });
-            reply.write(`data: ${JSON.stringify({ provider: packet.provider, reason: packet.reason || "ok" })}\n\n`);
-            continue;
-          }
-          if (packet?.type === "chunk" && packet.text) {
-            reply.write(`data: ${JSON.stringify({ text: packet.text })}\n\n`);
-          }
-        }
-      } catch (error) {
-        hadError = true;
-        logger.error("ai.chat.stream_failed", {
-          requestId,
-          clientIp,
-          primaryProvider,
-          error: String(error),
-        });
-        // Fail soft for UI: keep SSE contract and provide a safe fallback message.
-        reply.write(`data: ${JSON.stringify({ provider: "mock" })}\n\n`);
-        reply.write(
-          `data: ${JSON.stringify({
-            text: "AI providers are temporarily unavailable. Safe fallback mode is active. Please retry in a moment.",
-          })}\n\n`,
-        );
-      }
-      reply.write("data: [DONE]\n\n");
-      reply.end();
-      logger.info("ai.chat.completed", { requestId, clientIp, hadError });
+      json(reply, 410, { error: "AI assistant is disabled." });
       return;
     }
 
     if (request.method === "POST" && url.pathname === "/api/sentiment") {
-      const body = await readJson(request);
-      json(reply, 200, classifySentiment(body.headline || ""));
+      json(reply, 410, { error: "AI sentiment endpoint is disabled." });
       return;
     }
 
