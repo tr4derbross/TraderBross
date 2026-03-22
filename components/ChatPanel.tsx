@@ -143,6 +143,16 @@ export default function ChatPanel({ context }: ChatPanelProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  const getChatSessionId = useCallback(() => {
+    if (typeof window === "undefined") return "unknown";
+    const key = "traderbross-chat-session";
+    const existing = window.localStorage.getItem(key);
+    if (existing && existing.length >= 8) return existing;
+    const generated = crypto.randomUUID();
+    window.localStorage.setItem(key, generated);
+    return generated;
+  }, []);
+
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     messagesEndRef.current?.scrollIntoView({ behavior });
   }, []);
@@ -198,7 +208,10 @@ export default function ChatPanel({ context }: ChatPanelProps) {
       try {
         const response = await fetch(buildApiUrl("/api/chat"), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-traderbross-session": getChatSessionId(),
+          },
           body: JSON.stringify({
             messages: updatedMessages.map((m) => ({ role: m.role, content: m.content })),
             context,
@@ -254,7 +267,7 @@ export default function ChatPanel({ context }: ChatPanelProps) {
         abortRef.current = null;
       }
     },
-    [messages, isStreaming, context]
+    [messages, isStreaming, context, getChatSessionId]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
