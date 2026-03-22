@@ -28,7 +28,7 @@ import MarketStatsBar from "@/components/MarketStatsBar";
 import MarketSessionBar from "@/components/MarketSessionBar";
 import { useTradingState } from "@/hooks/useTradingState";
 import { useEncryptedLocalStorage } from "@/hooks/useEncryptedLocalStorage";
-import type { Position } from "@/hooks/useTradingState";
+import type { Position, Order } from "@/hooks/useTradingState";
 import type { ActiveVenueState, TradingVenueConnectionStatus, TradingVenueType } from "@/lib/active-venue";
 import { getVenueAdapter } from "@/lib/venues";
 import type { VenueBalance, VenueConnectionInput, VenuePosition } from "@/lib/venues/types";
@@ -667,6 +667,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   // ── Real venue balance + positions (overwrites paper state when connected) ──
   const [venueBalance, setVenueBalance] = useState<VenueBalance | null>(null);
   const [venuePositions, setVenuePositions] = useState<VenuePosition[] | null>(null);
+  const [venueOpenOrders, setVenueOpenOrders] = useState<Order[] | null>(null);
   const [venueRefreshTick, setVenueRefreshTick] = useState(0);
   const [venueTpSlMap, setVenueTpSlMap] = useState<Record<string, { tpPrice?: number; slPrice?: number }>>({});
 
@@ -681,6 +682,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       if (!isConnected) {
         setVenueBalance(null);
         setVenuePositions(null);
+        setVenueOpenOrders(null);
         setVenueTpSlMap({});
         return;
       }
@@ -688,9 +690,26 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       try {
         const connection = buildActiveVenueConnection();
         const adapter = getVenueAdapter(activeVenueState.venueId);
-        const [balance, pos] = await Promise.all([
+        const openOrdersPromise =
+          (activeVenueState.venueId === "binance" ||
+            activeVenueState.venueId === "okx" ||
+            activeVenueState.venueId === "bybit") &&
+          connection?.sessionToken
+            ? apiFetch<{ orders?: Array<Record<string, unknown>> }>(`/api/${activeVenueState.venueId}`, {
+                method: "POST",
+                body: JSON.stringify({
+                  type: "openOrders",
+                  sessionToken: connection.sessionToken,
+                }),
+              })
+                .then((payload) => (Array.isArray(payload?.orders) ? payload.orders : []))
+                .catch(() => [])
+            : Promise.resolve([]);
+
+        const [balance, pos, openRows] = await Promise.all([
           adapter.getBalance(connection),
           adapter.getPositions(connection),
+          openOrdersPromise,
         ]);
         if (!cancelled) {
           setVenueBalance(balance);
@@ -706,11 +725,44 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
             }
             return next;
           });
+          const mappedOpenOrders: Order[] = (openRows || []).map((row, index) => {
+            const ticker = String(row.ticker || row.symbol || "").toUpperCase().replace(/USDT$|USDC$/i, "");
+            const amount = Number(row.amount || row.size || row.qty || 0) || 0;
+            const price = Number(row.price || row.triggerPrice || row.stopPrice || 0) || 0;
+            const leverage = Math.max(1, Number(row.leverage || 1) || 1);
+            const rawType = String(row.type || row.orderType || "").toLowerCase();
+            const orderType: "market" | "limit" | "stop" =
+              rawType.includes("limit") ? "limit" : rawType.includes("stop") || rawType.includes("take_profit") ? "stop" : "market";
+            const side: "long" | "short" =
+              String(row.side || "").toLowerCase() === "sell" || String(row.side || "").toLowerCase() === "short" ? "short" : "long";
+            const marginMode: "isolated" | "cross" =
+              String(row.marginMode || "").toLowerCase() === "cross" ? "cross" : "isolated";
+            const stamp = row.timestamp ?? row.time ?? row.createdTime ?? Date.now();
+            return {
+              id: String(row.id || row.orderId || `${ticker}-${index}`),
+              ticker,
+              side,
+              type: orderType,
+              status: "open",
+              amount,
+              price,
+              total: Number(row.total || amount * price || 0),
+              margin: Number(row.margin || (amount * price) / leverage || 0),
+              leverage,
+              marginMode,
+              fee: Number(row.fee || 0),
+              tpPrice: Number.isFinite(Number(row.tpPrice)) ? Number(row.tpPrice) : undefined,
+              slPrice: Number.isFinite(Number(row.slPrice)) ? Number(row.slPrice) : undefined,
+              timestamp: new Date(stamp as string | number),
+            };
+          });
+          setVenueOpenOrders(mappedOpenOrders);
         }
       } catch {
         if (!cancelled) {
           setVenueBalance(null);
           setVenuePositions(null);
+          setVenueOpenOrders(null);
         }
       }
     };
@@ -761,6 +813,10 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       };
     });
   }, [venuePositions, positions, wsPrices, venueTpSlMap]);
+  const displayOrders: Order[] = useMemo(() => {
+    if (venueOpenOrders !== null) return venueOpenOrders;
+    return orders;
+  }, [orders, venueOpenOrders]);
 
   const handleNewsQuickTrade = (preset: NewsTradePreset, item: NewsItem) => {
     setSelectedItem(item);
@@ -1552,7 +1608,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         selectedEvent={selectedItem}
         eventItems={chartEventItems}
         positions={displayPositions}
-        orders={orders}
+        orders={displayOrders}
         onUpdatePositionTpSl={handleSetVenueTpSl}
         onPlaceOrder={placeOrder}
         onTickerChange={setActiveSymbol}
@@ -1915,7 +1971,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
             <div className={isMobile ? "" : "pt-2"}>
               <TradingActivityDrawer
                 positions={displayPositions}
-                orders={orders}
+                orders={displayOrders}
                 balance={displayBalance}
                 equityHistory={equityHistory}
                 onClosePosition={handleCloseVenuePosition}

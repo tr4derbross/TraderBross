@@ -1502,7 +1502,7 @@ const server = http.createServer(async (request, reply) => {
         json(reply, 401, { error: "Session expired. Re-save your credentials." });
         return;
       }
-      if (!["balance", "positions"].includes(String(body.type || ""))) {
+      if (!["balance", "positions", "openOrders"].includes(String(body.type || ""))) {
         json(reply, 400, { error: "Unknown type" });
         return;
       }
@@ -1588,6 +1588,90 @@ const server = http.createServer(async (request, reply) => {
               };
             });
           json(reply, 200, { positions });
+          return;
+        }
+        if (body.type === "openOrders") {
+          const [openOrdersRaw, openAlgoRaw] = await Promise.all([
+            (async () => {
+              const qs = binanceSignedQuery(apiSecret);
+              const res = await fetch(`${base}/fapi/v1/openOrders?${qs}`, {
+                headers: { "X-MBX-APIKEY": apiKey },
+                signal: AbortSignal.timeout(8000),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.msg || `Binance error ${res.status}`);
+              return Array.isArray(data) ? data : [];
+            })(),
+            (async () => {
+              try {
+                const qs = binanceSignedQuery(apiSecret, { algoType: "CONDITIONAL" });
+                const res = await fetch(`${base}/fapi/v1/openAlgoOrders?${qs}`, {
+                  headers: { "X-MBX-APIKEY": apiKey },
+                  signal: AbortSignal.timeout(7000),
+                });
+                const data = await res.json();
+                return Array.isArray(data) ? data : [];
+              } catch {
+                return [];
+              }
+            })(),
+          ]);
+
+          const mapBinanceType = (value) => {
+            const type = String(value || "").toUpperCase();
+            if (type === "LIMIT") return "limit";
+            if (type.includes("STOP") || type.includes("TAKE_PROFIT") || type === "TRAILING_STOP_MARKET") return "stop";
+            return "market";
+          };
+
+          const vanillaOrders = openOrdersRaw.map((row) => {
+            const symbol = String(row.symbol || "");
+            const ticker = symbol.replace(/USDT$|USDC$/i, "");
+            const price = finitePositiveNumber(row.price) || finitePositiveNumber(row.stopPrice) || 0;
+            const amount = Math.abs(parseFloat(row.origQty || row.quantity || "0")) || 0;
+            const leverage = Math.max(1, parseInt(row.leverage || "1", 10) || 1);
+            const marginMode = String(row.positionSide || row.marginType || "").toLowerCase().includes("cross") ? "cross" : "isolated";
+            return {
+              id: String(row.orderId || row.clientOrderId || `${symbol}-${row.updateTime || Date.now()}`),
+              ticker,
+              side: String(row.side || "").toUpperCase() === "SELL" ? "short" : "long",
+              type: mapBinanceType(row.type),
+              status: "open",
+              amount,
+              price,
+              total: amount * price,
+              margin: leverage > 0 ? (amount * price) / leverage : amount * price,
+              leverage,
+              marginMode,
+              fee: 0,
+              timestamp: new Date(Number(row.updateTime || row.time || Date.now())).toISOString(),
+            };
+          });
+
+          const algoOrders = openAlgoRaw.map((row) => {
+            const symbol = String(row.symbol || "");
+            const ticker = symbol.replace(/USDT$|USDC$/i, "");
+            const triggerPrice = finitePositiveNumber(row.triggerPrice || row.stopPrice || row.activatePrice) || 0;
+            const qty = Math.abs(parseFloat(row.quantity || row.origQty || "0")) || 0;
+            const ordType = String(row.orderType || row.type || "").toUpperCase();
+            return {
+              id: String(row.algoId || row.clientAlgoId || `${symbol}-${row.updateTime || Date.now()}-algo`),
+              ticker,
+              side: String(row.side || "").toUpperCase() === "SELL" ? "short" : "long",
+              type: ordType.includes("STOP") || ordType.includes("TAKE_PROFIT") ? "stop" : "limit",
+              status: "open",
+              amount: qty,
+              price: triggerPrice,
+              total: qty * triggerPrice,
+              margin: 0,
+              leverage: 1,
+              marginMode: "isolated",
+              fee: 0,
+              timestamp: new Date(Number(row.updateTime || row.time || Date.now())).toISOString(),
+            };
+          });
+
+          json(reply, 200, { orders: [...vanillaOrders, ...algoOrders] });
           return;
         }
         json(reply, 400, { error: "Unknown type" });
@@ -1983,6 +2067,63 @@ const server = http.createServer(async (request, reply) => {
           json(reply, 200, { positions });
           return;
         }
+        if (body.type === "openOrders") {
+          const [pendingOrders, conditionalAlgos, ocoAlgos] = await Promise.all([
+            requestOkx("GET", "/api/v5/trade/orders-pending?instType=SWAP").catch(() => ({ data: [] })),
+            requestOkx("GET", "/api/v5/trade/orders-algo-pending?ordType=conditional&instType=SWAP").catch(() => ({ data: [] })),
+            requestOkx("GET", "/api/v5/trade/orders-algo-pending?ordType=oco&instType=SWAP").catch(() => ({ data: [] })),
+          ]);
+          const vanillaRows = Array.isArray(pendingOrders?.data) ? pendingOrders.data : [];
+          const algoRows = [
+            ...(Array.isArray(conditionalAlgos?.data) ? conditionalAlgos.data : []),
+            ...(Array.isArray(ocoAlgos?.data) ? ocoAlgos.data : []),
+          ];
+          const toTicker = (instId) => String(instId || "").split("-")[0] || "";
+
+          const orders = [
+            ...vanillaRows.map((row) => {
+              const price = finitePositiveNumber(row.px || row.avgPx) || finitePositiveNumber(row.triggerPx) || 0;
+              const amount = Math.abs(parseFloat(row.sz || "0")) || 0;
+              return {
+                id: String(row.ordId || row.clOrdId || `${row.instId}-${row.cTime || Date.now()}`),
+                ticker: toTicker(row.instId),
+                side: String(row.side || "").toLowerCase() === "sell" ? "short" : "long",
+                type: String(row.ordType || "").toLowerCase().includes("limit") ? "limit" : "market",
+                status: "open",
+                amount,
+                price,
+                total: amount * price,
+                margin: 0,
+                leverage: Math.max(1, parseInt(row.lever || "1", 10) || 1),
+                marginMode: String(row.tdMode || row.mgnMode || "").toLowerCase() === "cross" ? "cross" : "isolated",
+                fee: 0,
+                timestamp: new Date(Number(row.cTime || row.uTime || Date.now())).toISOString(),
+              };
+            }),
+            ...algoRows.map((row) => {
+              const price =
+                finitePositiveNumber(row.tpTriggerPx || row.slTriggerPx || row.triggerPx || row.tpOrdPx || row.slOrdPx) || 0;
+              const amount = Math.abs(parseFloat(row.sz || "0")) || 0;
+              return {
+                id: String(row.algoId || row.clOrdId || `${row.instId}-${row.cTime || Date.now()}-algo`),
+                ticker: toTicker(row.instId),
+                side: String(row.side || "").toLowerCase() === "sell" ? "short" : "long",
+                type: "stop",
+                status: "open",
+                amount,
+                price,
+                total: amount * price,
+                margin: 0,
+                leverage: 1,
+                marginMode: String(row.tdMode || row.mgnMode || "").toLowerCase() === "cross" ? "cross" : "isolated",
+                fee: 0,
+                timestamp: new Date(Number(row.cTime || row.uTime || Date.now())).toISOString(),
+              };
+            }),
+          ];
+          json(reply, 200, { orders });
+          return;
+        }
         json(reply, 400, { error: "Unknown type" });
       } catch (err) {
         logger.warn("okx.data.failed", { type: body.type, error: String(err) });
@@ -2058,6 +2199,39 @@ const server = http.createServer(async (request, reply) => {
               slPrice: finitePositiveNumber(row.stopLoss),
             }));
           json(reply, 200, { positions });
+          return;
+        }
+        if (body.type === "openOrders") {
+          const data = await requestBybit("GET", "/v5/order/realtime", "category=linear&settleCoin=USDT&openOnly=0");
+          const rows = Array.isArray(data?.result?.list) ? data.result.list : [];
+          const orders = rows
+            .filter((row) => {
+              const status = String(row.orderStatus || "").toLowerCase();
+              return status === "new" || status === "partiallyfilled" || status === "untriggered";
+            })
+            .map((row) => {
+              const symbol = String(row.symbol || "");
+              const ticker = symbol.replace(/USDT$|USDC$/i, "");
+              const price = finitePositiveNumber(row.price || row.triggerPrice) || 0;
+              const amount = Math.abs(parseFloat(row.qty || "0")) || 0;
+              const kind = String(row.orderType || row.stopOrderType || "").toLowerCase();
+              return {
+                id: String(row.orderId || row.orderLinkId || `${symbol}-${row.createdTime || Date.now()}`),
+                ticker,
+                side: String(row.side || "").toLowerCase() === "sell" ? "short" : "long",
+                type: kind.includes("limit") ? "limit" : kind.includes("stop") ? "stop" : "market",
+                status: "open",
+                amount,
+                price,
+                total: amount * price,
+                margin: 0,
+                leverage: Math.max(1, parseInt(row.leverage || "1", 10) || 1),
+                marginMode: String(row.tradeMode || "").toLowerCase().includes("cross") ? "cross" : "isolated",
+                fee: 0,
+                timestamp: new Date(Number(row.createdTime || row.updatedTime || Date.now())).toISOString(),
+              };
+            });
+          json(reply, 200, { orders });
           return;
         }
         json(reply, 400, { error: "Unknown type" });
