@@ -304,3 +304,142 @@ export function createBinanceQuoteStream({ logger, onQuotes }) {
     socket?.close();
   };
 }
+
+export function createOkxQuoteStream({ logger, onQuotes }) {
+  const wsUrl = "wss://ws.okx.com:8443/ws/v5/public";
+  let socket = null;
+  let closed = false;
+  let retryTimer = null;
+
+  const subscribeArgs = Object.values(OKX_SYMBOLS).map((instId) => ({ channel: "tickers", instId }));
+
+  const connect = () => {
+    if (closed) return;
+    socket = new WebSocket(wsUrl);
+
+    socket.on("open", () => {
+      logger?.info?.("backend.ws.okx.connected");
+      socket?.send(JSON.stringify({ op: "subscribe", args: subscribeArgs }));
+    });
+
+    socket.on("message", (buffer) => {
+      try {
+        const payload = JSON.parse(buffer.toString());
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        if (rows.length === 0) return;
+
+        const quotes = rows
+          .map((row) => {
+            const instId = String(row?.instId || "");
+            const symbol = instId.split("-")[0] || "";
+            if (!symbol || !OKX_SYMBOLS[symbol]) return null;
+            const price = Number(row?.last || 0);
+            const open = Number(row?.open24h || row?.last || 0);
+            if (!Number.isFinite(price) || price <= 0) return null;
+            const change = price - open;
+            const changePct = open > 0 ? (change / open) * 100 : 0;
+            return {
+              symbol,
+              price: Number(price.toFixed(decimalsForPrice(price))),
+              change: Number(change.toFixed(decimalsForPrice(price))),
+              changePct: Number(changePct.toFixed(2)),
+            };
+          })
+          .filter(Boolean);
+
+        if (quotes.length > 0) {
+          cache.set("quotes:okx", quotes, 3000);
+          onQuotes(quotes);
+        }
+      } catch (error) {
+        logger?.warn?.("backend.ws.okx.parse_failed", { error: String(error) });
+      }
+    });
+
+    socket.on("close", () => {
+      logger?.warn?.("backend.ws.okx.closed");
+      if (!closed) retryTimer = setTimeout(connect, 2500);
+    });
+
+    socket.on("error", (error) => {
+      logger?.warn?.("backend.ws.okx.error", { error: String(error) });
+      socket?.close();
+    });
+  };
+
+  connect();
+
+  return () => {
+    closed = true;
+    if (retryTimer) clearTimeout(retryTimer);
+    socket?.close();
+  };
+}
+
+export function createBybitQuoteStream({ logger, onQuotes }) {
+  const wsUrl = "wss://stream.bybit.com/v5/public/linear";
+  let socket = null;
+  let closed = false;
+  let retryTimer = null;
+
+  const symbols = Object.values(BYBIT_SYMBOLS);
+  const topics = symbols.map((symbol) => `tickers.${symbol}`);
+
+  const connect = () => {
+    if (closed) return;
+    socket = new WebSocket(wsUrl);
+
+    socket.on("open", () => {
+      logger?.info?.("backend.ws.bybit.connected");
+      socket?.send(JSON.stringify({ op: "subscribe", args: topics }));
+    });
+
+    socket.on("message", (buffer) => {
+      try {
+        const payload = JSON.parse(buffer.toString());
+        const topic = String(payload?.topic || "");
+        if (!topic.startsWith("tickers.")) return;
+        const market = topic.replace("tickers.", "").toUpperCase();
+        const symbol = Object.entries(BYBIT_SYMBOLS).find(([, value]) => value === market)?.[0];
+        if (!symbol) return;
+
+        const row = Array.isArray(payload?.data) ? payload.data[0] : payload?.data;
+        const price = Number(row?.lastPrice || 0);
+        const open = Number(row?.prevPrice24h || row?.lastPrice || 0);
+        if (!Number.isFinite(price) || price <= 0) return;
+
+        const change = price - open;
+        const changePct = open > 0 ? (change / open) * 100 : 0;
+        const quote = {
+          symbol,
+          price: Number(price.toFixed(decimalsForPrice(price))),
+          change: Number(change.toFixed(decimalsForPrice(price))),
+          changePct: Number(changePct.toFixed(2)),
+        };
+
+        cache.set("quotes:bybit", [quote], 3000);
+        onQuotes([quote]);
+      } catch (error) {
+        logger?.warn?.("backend.ws.bybit.parse_failed", { error: String(error) });
+      }
+    });
+
+    socket.on("close", () => {
+      logger?.warn?.("backend.ws.bybit.closed");
+      if (!closed) retryTimer = setTimeout(connect, 2500);
+    });
+
+    socket.on("error", (error) => {
+      logger?.warn?.("backend.ws.bybit.error", { error: String(error) });
+      socket?.close();
+    });
+  };
+
+  connect();
+
+  return () => {
+    closed = true;
+    if (retryTimer) clearTimeout(retryTimer);
+    socket?.close();
+  };
+}
