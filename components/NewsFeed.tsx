@@ -18,7 +18,6 @@ type Props = {
   onNewItem?: (item: NewsItem) => void;
   onTickerSelect?: (ticker: string, item: NewsItem) => void;
   onQuickTrade?: (preset: NewsTradePreset, item: NewsItem) => void;
-  onAskAI?: (item: NewsItem) => void;
 };
 
 export default function NewsFeed({
@@ -27,7 +26,6 @@ export default function NewsFeed({
   onNewItem,
   onTickerSelect,
   onQuickTrade,
-  onAskAI,
 }: Props) {
   const [sector, setSector] = useState("All");
   const [ticker, setTicker] = useState("");
@@ -275,7 +273,6 @@ export default function NewsFeed({
                     onSelect={onSelectItem}
                     onTickerSelect={onTickerSelect}
                     onQuickTrade={onQuickTrade}
-                    onAskAI={onAskAI}
                     selected={selectedItem?.id === item.id}
                   />
                 ))}

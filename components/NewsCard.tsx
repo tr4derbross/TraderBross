@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api-client";
 import { NewsItem } from "@/lib/mock-data";
 import { buildNewsTradePresets, type NewsTradePreset } from "@/lib/news-trade";
 import {
@@ -10,10 +9,8 @@ import {
   Minus,
   ChevronDown,
   ChevronUp,
-  Loader2,
   ArrowRightLeft,
   ExternalLink,
-  Sparkles,
 } from "lucide-react";
 
 type Props = {
@@ -22,7 +19,6 @@ type Props = {
   onSelect: (item: NewsItem) => void;
   onTickerSelect?: (ticker: string, item: NewsItem) => void;
   onQuickTrade?: (preset: NewsTradePreset, item: NewsItem) => void;
-  onAskAI?: (item: NewsItem) => void;
   selected: boolean;
 };
 
@@ -369,9 +365,8 @@ function SocialCard({ item, isNew, onSelect, onTickerSelect, onQuickTrade, selec
   );
 }
 
-function NewsCardInner({ item, isNew, onSelect, onTickerSelect, onQuickTrade, onAskAI, selected }: Props) {
-  const [loadingSentiment, setLoadingSentiment] = useState(false);
-  const [sentiment, setSentiment] = useState<{
+function NewsCardInner({ item, isNew, onSelect, onTickerSelect, onQuickTrade, selected }: Props) {
+  const [sentiment] = useState<{
     score: string;
     confidence: number;
     reason: string;
@@ -386,33 +381,12 @@ function NewsCardInner({ item, isNew, onSelect, onTickerSelect, onQuickTrade, on
   );
   const [expanded, setExpanded] = useState(false);
 
-  const fetchSentiment = async () => {
-    if (sentiment || loadingSentiment) return;
-    setLoadingSentiment(true);
-    try {
-      const data = await apiFetch<{
-        score: string;
-        confidence: number;
-        reason: string;
-      }>("/api/sentiment", {
-        method: "POST",
-        body: JSON.stringify({ headline: item.headline, summary: item.summary }),
-      });
-      setSentiment(data);
-    } catch {
-      // ignore
-    } finally {
-      setLoadingSentiment(false);
-    }
-  };
-
   return (
     <CardShell
       selected={selected}
       isNew={isNew}
       onClick={() => {
         onSelect(item);
-        fetchSentiment();
         setExpanded((e) => !e);
       }}
     >
@@ -452,9 +426,7 @@ function NewsCardInner({ item, isNew, onSelect, onTickerSelect, onQuickTrade, on
         ))}
         <span className="ml-1 text-[10px] text-zinc-600">{item.sector}</span>
         <div className="ml-auto flex items-center">
-          {loadingSentiment ? (
-            <Loader2 className="h-3 w-3 animate-spin text-zinc-500" />
-          ) : sentiment ? (
+          {sentiment ? (
             <SentimentBadge score={sentiment.score} confidence={sentiment.confidence} />
           ) : null}
         </div>
@@ -482,24 +454,9 @@ function NewsCardInner({ item, isNew, onSelect, onTickerSelect, onQuickTrade, on
           <p className="text-[11px] leading-relaxed text-zinc-400">{item.summary}</p>
           {sentiment?.reason && (
             <p className="border-l-2 border-zinc-700 pl-2 text-[10px] italic text-zinc-500">
-              AI: {sentiment.reason}
+              Sentiment note: {sentiment.reason}
             </p>
           )}
-          <div className="flex items-center gap-2 pt-0.5">
-            {onAskAI && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAskAI(item);
-                }}
-                className="ml-auto inline-flex items-center gap-1 rounded-full border border-amber-400/20 bg-amber-500/8 px-2.5 py-1 text-[10px] font-medium text-amber-300 transition-colors hover:border-amber-400/40 hover:bg-amber-500/14 hover:text-amber-200"
-              >
-                <Sparkles className="h-3 w-3" />
-                Ask AI
-              </button>
-            )}
-          </div>
         </div>
       )}
     </CardShell>

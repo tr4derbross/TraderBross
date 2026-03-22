@@ -5,8 +5,7 @@ import Link from "next/link";
 import {
   Zap,
   Newspaper,
-  Bot,
-  BarChart2,
+    BarChart2,
   Shield,
   Globe,
   TrendingUp,
@@ -30,7 +29,7 @@ const stagger = {
 
 const STATS = [
   { value: "4",    label: "Exchanges" },
-  { value: "News+AI", label: "Decision Flow" },
+  { value: "News+Signals", label: "Decision Flow" },
   { value: "Live", label: "Market Feed" },
   { value: "Free", label: "Access" },
 ];
@@ -47,8 +46,8 @@ const FEATURES = [
     desc: "Trade Hyperliquid, Binance, OKX, and Bybit from one terminal with the same workflow.",
   },
   {
-    icon: Bot,
-    title: "AI Context in Seconds",
+    icon: TrendingUp,
+    title: "Signal Context in Seconds",
     desc: "Turn raw headlines into clear market context, key risks, and actionable trade direction.",
   },
   {
@@ -74,7 +73,7 @@ const DEMO_MESSAGES = [
     text: "Is the BTC setup still valid? News just dropped.",
   },
   {
-    role: "ai",
+    role: "terminal",
     text: "BTC is holding the $67,800 support despite the Grayscale news. RSI(4H) at 43 — not yet oversold but approaching. OI dropped 8% suggesting deleveraging. Setup remains valid with tight SL below $67,200. Watch for a reclaim above $68,500 to confirm bull continuation.",
   },
   {
@@ -82,7 +81,7 @@ const DEMO_MESSAGES = [
     text: "What about ETH funding rates?",
   },
   {
-    role: "ai",
+    role: "terminal",
     text: "ETH funding is +0.012% — slightly elevated but not extreme. Longs are paying, which typically signals mild bullish bias. If BTC breaks $67,200, expect ETH to test $3,480 support. The Dencun upgrade narrative should provide underlying support on dips.",
   },
 ];
@@ -141,7 +140,7 @@ export default function LandingPage() {
             variants={fadeUp}
             className="max-w-lg text-base text-[#A0A0A0] sm:text-lg"
           >
-            Track breaking crypto news, get instant AI context, and execute trades
+            Track breaking crypto news, get instant signal context, and execute trades
             from one terminal before momentum shifts.
           </motion.p>
 
@@ -228,7 +227,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── AI Demo ───────────────────────────────────────────────────────── */}
+      {/* ── Terminal Demo ───────────────────────────────────────────────────────── */}
       <section className="border-y border-[#2A2A2A] bg-[#0B0B0B] py-20">
         <div className="mx-auto max-w-2xl px-4">
           <motion.div
@@ -239,7 +238,7 @@ export default function LandingPage() {
             className="mb-6 text-center"
           >
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F2B705]">
-              AI Assistant
+              Terminal Brief
             </p>
             <h2 className="mt-2 text-2xl font-bold text-[#FFFFFF]">
               Fast Analysis You Can Trade On
@@ -268,9 +267,9 @@ export default function LandingPage() {
                       : "border border-[#2A2A2A] bg-[#1A1A1A] text-[#A0A0A0]"
                   }`}
                 >
-                  {msg.role === "ai" && (
+                  {msg.role === "terminal" && (
                     <span className="mb-1 block font-mono text-[8px] uppercase tracking-widest text-[#6B6B6B]">
-                      AI ·
+                      TERMINAL
                     </span>
                   )}
                   {msg.text}
@@ -309,7 +308,7 @@ export default function LandingPage() {
             Turn Headlines Into Trades Faster
           </h2>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-            {["Live market feed", "AI trade context", "4 exchanges"].map(
+            {["Live market feed", "Signal trade context", "4 exchanges"].map(
               (pill) => (
                 <span
                   key={pill}
@@ -331,5 +330,8 @@ export default function LandingPage() {
     </PageWrapper>
   );
 }
+
+
+
 
 
