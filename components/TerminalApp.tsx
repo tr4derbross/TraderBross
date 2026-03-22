@@ -29,12 +29,15 @@ import BrandMark from "@/components/BrandMark";
 import MarketStatsBar from "@/components/MarketStatsBar";
 import MarketSessionBar from "@/components/MarketSessionBar";
 import { useTradingState } from "@/hooks/useTradingState";
+import { useEncryptedLocalStorage } from "@/hooks/useEncryptedLocalStorage";
 import type { Position } from "@/hooks/useTradingState";
 import type { ActiveVenueState, TradingVenueConnectionStatus, TradingVenueType } from "@/lib/active-venue";
 import { getVenueAdapter } from "@/lib/venues";
 import type { VenueBalance, VenueConnectionInput, VenuePosition } from "@/lib/venues/types";
 import { validateExecutionRequest } from "@/lib/execution-validation";
 import type { NewsTradePreset } from "@/lib/news-trade";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 import {
   connectWalletByLabel,
   disconnectWalletSession,
@@ -238,6 +241,11 @@ type HeaderCexCredentialMap = Record<Extract<HeaderPlatform, "okx" | "bybit" | "
 type HeaderCexPlatform = keyof HeaderCexCredentialMap;
 type HeaderCexTestnetMap = Record<HeaderCexPlatform, boolean>;
 type NewsTradeIntent = NewsTradePreset & { sourceItemId: string };
+type SecureStoredCexState = {
+  version: 1;
+  credentials: HeaderCexCredentialMap;
+  testnetMode: HeaderCexTestnetMap;
+};
 
 const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
   {
@@ -306,6 +314,8 @@ const DEFAULT_CEX_TESTNET_MODE: HeaderCexTestnetMap = {
   bybit: false,
   binance: false,
 };
+
+const SECURE_CEX_STORAGE_KEY = "traderbross.cex.credentials.secure.v1";
 
 function maskCredentialPreview(value: string) {
   if (!value) return "Not saved";
@@ -384,6 +394,9 @@ function ResizeDivider({ onDrag }: { onDrag: (dx: number) => void }) {
 }
 
 export default function TerminalApp({ initialTicker }: { initialTicker?: string } = {}) {
+  const [secureStorageScope, setSecureStorageScope] = useState<string>("anon");
+  const [secureCexStateReady, setSecureCexStateReady] = useState(false);
+  const secureCexStorage = useEncryptedLocalStorage<SecureStoredCexState>(`traderbross:cex:${secureStorageScope}`);
   const [selectedItem, setSelectedItem] = useState<NewsItem | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>("trade");
   const [dexSubTab, setDexSubTab] = useState<DexSubTab>("hl");
@@ -540,9 +553,18 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     }
   }, [headerConnection]);
 
+  useEffect(() => {
+    if (!secureCexStateReady) return;
+    void secureCexStorage.setItem(SECURE_CEX_STORAGE_KEY, {
+      version: 1,
+      credentials: headerCexCredentials,
+      testnetMode: cexTestnetMode,
+    });
+  }, [cexTestnetMode, headerCexCredentials, secureCexStateReady, secureCexStorage]);
+
   // NOTE: Raw CEX credentials are intentionally NOT persisted to localStorage.
-  // Credentials are stored server-side (encrypted) via /api/vault/store.
-  // Only vault session tokens are persisted (in sessionStorage).
+  // Credentials are stored encrypted in device-local storage (AES-GCM) and can be
+  // vaulted server-side via /api/vault/store. Session tokens persist in sessionStorage.
 
   useEffect(() => {
     const venueMeta = HEADER_PLATFORMS.find((platform) => platform.id === headerPlatform) ?? HEADER_PLATFORMS[0];
@@ -867,6 +889,51 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       activeSymbol: normalizeVenueTicker(symbol) || "BTC",
     }));
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const resolveScope = async () => {
+      if (!hasSupabasePublicEnv()) {
+        if (!cancelled) setSecureStorageScope("anon");
+        return;
+      }
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!cancelled) {
+          setSecureStorageScope(user?.id || "anon");
+        }
+      } catch {
+        if (!cancelled) setSecureStorageScope("anon");
+      }
+    };
+    void resolveScope();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSecureCexState = async () => {
+      const stored = await secureCexStorage.getItem(SECURE_CEX_STORAGE_KEY);
+      if (cancelled) return;
+      if (stored?.credentials) {
+        setHeaderCexCredentials(stored.credentials);
+      }
+      if (stored?.testnetMode) {
+        setCexTestnetMode(stored.testnetMode);
+      }
+      setSecureCexStateReady(true);
+    };
+    setSecureCexStateReady(false);
+    void loadSecureCexState();
+    return () => {
+      cancelled = true;
+    };
+  }, [secureCexStorage]);
 
   const handleSelectItem = useCallback((item: NewsItem) => {
     setSelectedItem(item);
@@ -2363,7 +2430,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                       <div className="mt-2 text-[10px] text-zinc-400">
                         {headerActionMessage || (
                           vaultTokens[selectedHeaderCexPlatform as HeaderCexPlatform]
-                            ? "Credentials secured in server vault · only a session token is stored locally."
+                            ? "Credentials secured in server vault · device keeps encrypted local backup + session token."
                             : "Enter your API credentials and click Save to store them securely."
                         )}
                       </div>
@@ -2371,7 +2438,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                       {vaultTokens[selectedHeaderCexPlatform as HeaderCexPlatform] ? (
                         <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/8 px-2 py-1.5 text-[9px] text-emerald-400">
                           <span className="mt-0.5 shrink-0">🔒</span>
-                          <span>Keys encrypted server-side (AES-256). Your browser holds only a session token.</span>
+                          <span>Keys encrypted server-side; local backup is AES-GCM encrypted per device + user scope.</span>
                         </div>
                       ) : (
                         <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-500/12 bg-amber-500/5 px-2 py-1.5 text-[9px] text-amber-400/70">
@@ -2395,5 +2462,6 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     </div>
   );
 }
+
 
 
