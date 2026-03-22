@@ -159,6 +159,9 @@ export default function PriceChart({
   const [menu, setMenu] = useState<ChartMenu>(null);
   const [eventFocusArmed, setEventFocusArmed] = useState(false);
   const lastAutoFocusedEventRef = useRef<string | null>(null);
+  const hasFittedRef = useRef(false);
+  const hoverRafRef = useRef<number | null>(null);
+  const pendingHoverRef = useRef<PriceData | null>(null);
   const activePosition = positions.find((position) => position.ticker === ticker);
   const openOrders = orders.filter((order) => order.status === "open" && order.ticker === ticker);
   const lastBar = priceData[priceData.length - 1] ?? null;
@@ -357,6 +360,7 @@ export default function PriceChart({
     setDragTarget(null);
     setHoveredBar(null);
     setEventFocusArmed(false);
+    hasFittedRef.current = false;
   }, [activeVenue, ticker]);
 
   useEffect(() => {
@@ -450,8 +454,16 @@ export default function PriceChart({
       }
 
       chart.subscribeCrosshairMove((param) => {
+        const commitHover = (bar: PriceData | null) => {
+          pendingHoverRef.current = bar;
+          if (hoverRafRef.current !== null) return;
+          hoverRafRef.current = window.requestAnimationFrame(() => {
+            hoverRafRef.current = null;
+            setHoveredBar(pendingHoverRef.current);
+          });
+        };
         if (!param.time || !mainSeriesRef.current) {
-          setHoveredBar(null);
+          commitHover(null);
           return;
         }
 
@@ -459,10 +471,10 @@ export default function PriceChart({
           const point = param.seriesData.get(mainSeriesRef.current as never) as { open: number; high: number; low: number; close: number } | undefined;
           const volumePoint = param.seriesData.get(volumeSeries as never) as { value: number } | undefined;
           if (!point) {
-            setHoveredBar(null);
+            commitHover(null);
             return;
           }
-          setHoveredBar({
+          commitHover({
             time: typeof param.time === "number" ? param.time : 0,
             open: point.open,
             high: point.high,
@@ -472,7 +484,7 @@ export default function PriceChart({
           });
         } else {
           const bar = priceData.find((item) => item.time === (typeof param.time === "number" ? param.time : 0)) ?? null;
-          setHoveredBar(bar);
+          commitHover(bar);
         }
       });
 
@@ -518,6 +530,10 @@ export default function PriceChart({
       slLineRef.current = null;
       openOrderLinesRef.current = [];
       setChartReady(false);
+      if (hoverRafRef.current !== null) {
+        window.cancelAnimationFrame(hoverRafRef.current);
+        hoverRafRef.current = null;
+      }
     };
   }, [chartType]);
   useEffect(() => {
@@ -586,20 +602,29 @@ export default function PriceChart({
 
   useEffect(() => {
     if (!liveTickerPrice || !Number.isFinite(liveTickerPrice)) return;
-
-    setPriceData((prev) => {
-      if (prev.length === 0) return prev;
-      const next = [...prev];
-      const last = next[next.length - 1];
-      next[next.length - 1] = {
-        ...last,
-        close: liveTickerPrice,
-        high: Math.max(last.high, liveTickerPrice),
-        low: Math.min(last.low, liveTickerPrice),
-      };
-      return next;
-    });
-  }, [liveTickerPrice]);
+    if (!mainSeriesRef.current || priceData.length === 0) return;
+    const last = priceData[priceData.length - 1];
+    const updated = {
+      ...last,
+      close: liveTickerPrice,
+      high: Math.max(last.high, liveTickerPrice),
+      low: Math.min(last.low, liveTickerPrice),
+    };
+    if (chartType === "candles") {
+      (mainSeriesRef.current as { update?: (row: unknown) => void })?.update?.({
+        time: updated.time as never,
+        open: updated.open,
+        high: updated.high,
+        low: updated.low,
+        close: updated.close,
+      });
+    } else {
+      (mainSeriesRef.current as { update?: (row: unknown) => void })?.update?.({
+        time: updated.time as never,
+        value: updated.close,
+      });
+    }
+  }, [liveTickerPrice, priceData, chartType]);
 
   const hasChartData = priceData.length > 0;
   const shouldShowBlockingState = !chartReady || (!isLoadingPrices && !hasChartData);
@@ -634,7 +659,10 @@ export default function PriceChart({
       );
     }
 
-    (chartRef.current as { timeScale: () => { fitContent: () => void } }).timeScale().fitContent();
+    if (!hasFittedRef.current) {
+      (chartRef.current as { timeScale: () => { fitContent: () => void } }).timeScale().fitContent();
+      hasFittedRef.current = true;
+    }
   }, [chartReady, chartType, priceData]);
 
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   RefreshCw,
@@ -23,6 +23,7 @@ import { useNews, SourceFilter, SentimentFilter } from "@/hooks/useNews";
 import type { NewsItem, TickerQuote } from "@/lib/mock-data";
 import { getAllTradeLinks } from "@/lib/referral-links";
 import { useRealtimeSelector } from "@/lib/realtime-client";
+import { apiFetch } from "@/lib/api-client";
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 
@@ -218,14 +219,109 @@ function NewsCard({
 
 /* ── TradingView ───────────────────────────────────────────────────────────── */
 
-function TradingViewChart({ symbol }: { symbol: string }) {
+type MiniBar = { time: number; open: number; high: number; low: number; close: number; volume?: number };
+
+function NewsMiniChart({ symbol }: { symbol: string }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<unknown>(null);
+  const seriesRef = useRef<unknown>(null);
+  const resizeRef = useRef<ResizeObserver | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    const init = async () => {
+      if (!containerRef.current) return;
+      const lwc = await import("lightweight-charts");
+      if (disposed || !containerRef.current) return;
+      const chart = lwc.createChart(containerRef.current, {
+        width: containerRef.current.clientWidth || 640,
+        height: containerRef.current.clientHeight || 300,
+        layout: { background: { color: "#0B0B0B" }, textColor: "#6B6B6B", fontSize: 11 },
+        grid: {
+          vertLines: { color: "rgba(242,183,5,0.05)" },
+          horzLines: { color: "rgba(242,183,5,0.05)" },
+        },
+        rightPriceScale: { borderColor: "rgba(242,183,5,0.1)" },
+        timeScale: { borderColor: "rgba(242,183,5,0.1)", timeVisible: true },
+      });
+      const series = chart.addSeries(lwc.CandlestickSeries, {
+        upColor: "#0ecb81",
+        downColor: "#f6465d",
+        borderUpColor: "#0ecb81",
+        borderDownColor: "#f6465d",
+        wickUpColor: "#0ecb81",
+        wickDownColor: "#f6465d",
+      });
+      chartRef.current = chart;
+      seriesRef.current = series;
+      resizeRef.current = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          (chartRef.current as { applyOptions: (o: { width: number; height: number }) => void })?.applyOptions({
+            width: entry.contentRect.width,
+            height: entry.contentRect.height,
+          });
+        }
+      });
+      resizeRef.current.observe(containerRef.current);
+    };
+    init().catch(() => setError("Chart init failed"));
+    return () => {
+      disposed = true;
+      resizeRef.current?.disconnect();
+      resizeRef.current = null;
+      try {
+        (chartRef.current as { remove: () => void })?.remove();
+      } catch {
+        // ignore
+      }
+      chartRef.current = null;
+      seriesRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const ticker = symbol.replace("USDT", "");
+    const endpoint = `/api/prices?ticker=${ticker}&quote=USDT&interval=15m&limit=200`;
+    const load = async () => {
+      try {
+        const data = await apiFetch<MiniBar[]>(endpoint);
+        if (!active) return;
+        if (!Array.isArray(data) || data.length === 0) {
+          setError("No chart data");
+          return;
+        }
+        setError(null);
+        (seriesRef.current as { setData: (rows: unknown[]) => void })?.setData(
+          data.map((d) => ({
+            time: d.time as never,
+            open: d.open,
+            high: d.high,
+            low: d.low,
+            close: d.close,
+          })),
+        );
+        (chartRef.current as { timeScale: () => { fitContent: () => void } })?.timeScale().fitContent();
+      } catch {
+        if (active) setError("Chart data unavailable");
+      }
+    };
+    void load();
+    const id = window.setInterval(() => void load(), 20_000);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
+  }, [symbol]);
+
   return (
-    <iframe
-      key={symbol}
-      src={`https://www.tradingview.com/widgetembed/?symbol=BINANCE:${symbol}&interval=60&theme=dark&style=1&locale=en&toolbar_bg=%230B0B0B&hide_side_toolbar=1&hidetoptoolbar=1&hidevolume=1&allow_symbol_change=0&save_image=0&backgroundColor=0B0B0B&gridColor=rgba(242,183,5,0.04)`}
-      className="h-full w-full border-0"
-      title="TradingView Chart"
-    />
+    <div className="h-full w-full">
+      {error ? (
+        <div className="flex h-full items-center justify-center text-[11px] text-[#6B6B6B]">{error}</div>
+      ) : null}
+      <div ref={containerRef} className={`h-full w-full ${error ? "hidden" : ""}`} />
+    </div>
   );
 }
 
@@ -625,7 +721,7 @@ export default function NewsPage() {
 
           {/* Chart */}
           <div className="h-[300px] shrink-0 overflow-hidden">
-            <TradingViewChart symbol={chartSymbol} />
+            <NewsMiniChart symbol={chartSymbol} />
           </div>
 
           {/* Trending Topics */}
