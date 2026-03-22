@@ -1374,8 +1374,10 @@ const server = http.createServer(async (request, reply) => {
               primaryProvider,
               selectedProvider: packet.provider || "unknown",
               usedFallback: String(packet.provider || "") !== String(primaryProvider),
+              reason: packet.reason || "ok",
+              failures: packet.failures || undefined,
             });
-            reply.write(`data: ${JSON.stringify({ provider: packet.provider })}\n\n`);
+            reply.write(`data: ${JSON.stringify({ provider: packet.provider, reason: packet.reason || "ok" })}\n\n`);
             continue;
           }
           if (packet?.type === "chunk" && packet.text) {

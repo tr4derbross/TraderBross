@@ -232,6 +232,12 @@ async function callOpenRouter(config, payload) {
   } catch {
     // Fall through to global failure.
   }
+  try {
+    const freeText = await callOpenRouterModel(config, payload, "openrouter/free");
+    if (freeText) return freeText;
+  } catch {
+    // Fall through to global failure.
+  }
   throw new Error("openrouter_http_429:all_models_failed_or_unavailable");
 }
 
@@ -244,7 +250,7 @@ export async function* streamChat(config, payload, options = {}) {
   const consumerKey = String(options?.consumerKey || "global");
 
   if (!config?.ai?.allowExternal) {
-    yield { type: "meta", provider: "mock" };
+    yield { type: "meta", provider: "mock", reason: "external_disabled" };
     for (const chunk of toChunked(buildMockResponse(normalized))) {
       await new Promise((resolve) => setTimeout(resolve, 24));
       yield { type: "chunk", text: chunk };
@@ -254,7 +260,7 @@ export async function* streamChat(config, payload, options = {}) {
 
   const budget = takeBudget(config, consumerKey);
   if (!budget.ok) {
-    yield { type: "meta", provider: "mock" };
+    yield { type: "meta", provider: "mock", reason: budget.reason };
     for (const chunk of toChunked(buildMockResponse(normalized))) {
       await new Promise((resolve) => setTimeout(resolve, 18));
       yield { type: "chunk", text: chunk };
@@ -264,6 +270,8 @@ export async function* streamChat(config, payload, options = {}) {
 
   let text = "";
   let usedProvider = "mock";
+  let fallbackReason = "";
+  const failures = {};
   const now = Date.now();
   const attempts = [
     {
@@ -293,6 +301,7 @@ export async function* streamChat(config, payload, options = {}) {
       }
     } catch (error) {
       const message = String(error || "");
+      failures[attempt.id] = message.slice(0, 220);
       const cooldownMs = Math.max(60_000, Number(config?.ai?.quotaCooldownMs || 60 * 60 * 1000));
       if (isQuotaError(message)) {
         quotaCooldownUntil[attempt.id] = Date.now() + cooldownMs;
@@ -303,9 +312,15 @@ export async function* streamChat(config, payload, options = {}) {
   if (!text) {
     text = buildMockResponse(normalized);
     usedProvider = "mock";
+    fallbackReason = Object.keys(failures).length > 0 ? "provider_failure" : "no_provider_available";
   }
 
-  yield { type: "meta", provider: usedProvider };
+  yield {
+    type: "meta",
+    provider: usedProvider,
+    reason: fallbackReason || "ok",
+    failures: Object.keys(failures).length > 0 ? failures : undefined,
+  };
   for (const chunk of toChunked(text)) {
     await new Promise((resolve) => setTimeout(resolve, 18));
     yield { type: "chunk", text: chunk };
