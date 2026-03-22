@@ -129,6 +129,14 @@ function getClientIp(request) {
   return String(raw).split(",")[0].trim();
 }
 
+function getChatConsumerKey(request, clientIp) {
+  const session = String(request.headers["x-traderbross-session"] || "").trim();
+  if (/^[a-zA-Z0-9._:-]{8,120}$/.test(session)) {
+    return `session:${session}`;
+  }
+  return `ip:${clientIp || "unknown"}`;
+}
+
 async function enforceRateLimit(reply, key, limit, windowMs) {
   if (!(await rateLimiter.consume(key, limit, windowMs))) {
     json(reply, 429, { error: "Too many requests. Please try again shortly." });
@@ -1339,11 +1347,13 @@ const server = http.createServer(async (request, reply) => {
     if (request.method === "POST" && url.pathname === "/api/chat") {
       const body = await readJson(request);
       const clientIp = getClientIp(request);
+      const consumerKey = getChatConsumerKey(request, clientIp);
       const requestId = crypto.randomUUID();
       const primaryProvider = getPrimaryAiProvider(config);
       logger.info("ai.chat.request", {
         requestId,
         clientIp,
+        consumerKey,
         primaryProvider,
         externalEnabled: Boolean(config?.ai?.allowExternal),
       });
@@ -1356,7 +1366,7 @@ const server = http.createServer(async (request, reply) => {
 
       let hadError = false;
       try {
-        for await (const packet of streamChat(config, body, { consumerKey: clientIp })) {
+        for await (const packet of streamChat(config, body, { consumerKey })) {
           if (packet?.type === "meta") {
             logger.info("ai.chat.provider_selected", {
               requestId,
