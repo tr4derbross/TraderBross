@@ -32,7 +32,18 @@ jobs:
       - name: Start backend
         run: |
           nohup node backend/server.mjs > backend.log 2>&1 &
-          sleep 4
+          for i in {1..45}; do
+            if curl -fsS http://127.0.0.1:4001/health > /dev/null; then
+              echo "Backend is ready"
+              break
+            fi
+            if [ "$i" -eq 45 ]; then
+              echo "Backend failed to become ready in time"
+              tail -n 200 backend.log || true
+              exit 1
+            fi
+            sleep 1
+          done
 
       - name: Ops health check
         run: BACKEND_BASE_URL=http://127.0.0.1:4001 npm run ops:health
@@ -43,7 +54,27 @@ jobs:
       - name: Start frontend
         run: |
           nohup npm run start > frontend.log 2>&1 &
-          sleep 6
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:3000/api/health > /dev/null; then
+              echo "Frontend is ready"
+              break
+            fi
+            if [ "$i" -eq 60 ]; then
+              echo "Frontend failed to become ready in time"
+              tail -n 200 frontend.log || true
+              tail -n 200 backend.log || true
+              exit 1
+            fi
+            sleep 1
+          done
 
       - name: Terminal E2E flow
         run: FRONTEND_BASE_URL=http://127.0.0.1:3000 npm run e2e:terminal
+
+      - name: Dump logs on failure
+        if: failure()
+        run: |
+          echo "===== backend.log ====="
+          tail -n 300 backend.log || true
+          echo "===== frontend.log ====="
+          tail -n 300 frontend.log || true
