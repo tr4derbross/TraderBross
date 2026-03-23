@@ -13,6 +13,7 @@ import type {
 import { buildApiUrl } from "@/lib/runtime-env";
 
 const FETCH_TIMEOUT_MS = 20_000;
+const ENABLE_DIRECT_EXCHANGE_WS = process.env.NEXT_PUBLIC_ENABLE_DIRECT_EXCHANGE_WS === "true";
 
 export async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
   const signal = init?.signal ?? AbortSignal.timeout(FETCH_TIMEOUT_MS);
@@ -48,6 +49,10 @@ export function createPollingSubscribe(
 
     return () => window.clearInterval(intervalId);
   };
+}
+
+export function canUseDirectExchangeWs() {
+  return ENABLE_DIRECT_EXCHANGE_WS;
 }
 
 export function notEnabledAction<TInput = void>(message: string) {

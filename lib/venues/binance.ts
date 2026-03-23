@@ -1,6 +1,7 @@
 import type { VenueAdapter } from "@/lib/venues/types";
 import { buildApiUrl } from "@/lib/runtime-env";
 import {
+  canUseDirectExchangeWs,
   createPollingSubscribe,
   fetchJson,
   normalizeQuoteTicker,
@@ -18,7 +19,7 @@ const subscribeTicker: VenueAdapter["subscribeTicker"] = (symbol, onTick) => {
   const pair = `${symbol}USDT`.toLowerCase();
   const fallback = createPollingSubscribe(getTicker, 3000);
 
-  if (typeof WebSocket === "undefined") {
+  if (!canUseDirectExchangeWs() || typeof WebSocket === "undefined") {
     return fallback(symbol, onTick);
   }
 
