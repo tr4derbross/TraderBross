@@ -128,7 +128,7 @@ export const bybitAdapter: VenueAdapter = {
       const res = await fetch(buildApiUrl("/api/bybit/order"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(12_000),
+        signal: AbortSignal.timeout(25_000),
         body: JSON.stringify({
           type: "order",
           symbol: input.symbol,
@@ -146,7 +146,8 @@ export const bybitAdapter: VenueAdapter = {
       const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };
       return data.ok ? { ok: true, message: "Order submitted to Bybit." } : { ok: false, message: data.error || `HTTP ${res.status}` };
     } catch (error) {
-      return { ok: false, message: error instanceof Error ? error.message : "Bybit request timeout." };
+      const isTimeout = error instanceof Error && (error.name === "TimeoutError" || error.message === "signal timed out");
+      return { ok: false, message: isTimeout ? "Connection timeout — please retry." : (error instanceof Error ? error.message : "Request failed.") };
     }
   },
   cancelOrder: async (orderId, connection) => {

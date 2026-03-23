@@ -882,7 +882,16 @@ export default function TradingPanel({
             {submitState === "submitting" && <Loader2 className="mt-px h-3.5 w-3.5 shrink-0 animate-spin" />}
             {submitState === "success" && <CheckCircle2 className="mt-px h-3.5 w-3.5 shrink-0" />}
             {submitState === "failure" && <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />}
-            <span className="leading-relaxed">{submitMessage}</span>
+            <span className="flex-1 leading-relaxed">{submitMessage}</span>
+            {submitState === "failure" && (
+              <button
+                type="button"
+                onClick={executeOrder}
+                className="ml-1 shrink-0 rounded border border-red-400/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-300 hover:bg-red-500/20 active:scale-95 transition-all"
+              >
+                Retry
+              </button>
+            )}
           </div>
         )}
 

@@ -45,7 +45,7 @@ async function binanceOrderPost(body: Record<string, unknown>) {
     const res = await fetch(buildApiUrl("/api/binance/order"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(25_000),
       body: JSON.stringify(body),
     });
     const data = await res.json() as { ok?: boolean; error?: string; data?: unknown };
@@ -54,7 +54,8 @@ async function binanceOrderPost(body: Record<string, unknown>) {
     }
     return { ok: true as const, message: "Order submitted to Binance Futures." };
   } catch (error) {
-    return { ok: false as const, message: error instanceof Error ? error.message : "Binance request timeout." };
+    const isTimeout = error instanceof Error && (error.name === "TimeoutError" || error.message === "signal timed out");
+    return { ok: false as const, message: isTimeout ? "Connection timeout — please retry." : (error instanceof Error ? error.message : "Request failed.") };
   }
 }
 
