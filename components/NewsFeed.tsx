@@ -121,7 +121,8 @@ export default function NewsFeed({
   };
 
   const isSpecialFeed = sourceFilter === "whale" || sourceFilter === "liquidation";
-  const devSimEnabled = process.env.NEXT_PUBLIC_ENABLE_DEV_SIM_FEEDS === "true";
+  const devSimEnabled =
+    process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_DEV_SIM_FEEDS === "true";
   const hasSpecialLiveData = sourceFilter === "whale" ? counts.whale > 0 : sourceFilter === "liquidation" ? counts.liquidation > 0 : false;
 
   return (
