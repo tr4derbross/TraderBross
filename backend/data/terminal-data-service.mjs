@@ -34,6 +34,7 @@ import {
 import { fetchCoingeckoCoinMetadata } from "./adapters/coingecko-metadata.adapter.mjs";
 import { fetchCoinpaprikaCoinMetadata } from "./adapters/coinpaprika-metadata.adapter.mjs";
 import { fetchBinanceLargeTradeEvents } from "./adapters/whale-binance-trades.adapter.mjs";
+import { fetchCoinGlassLiquidationEvents } from "./adapters/coinglass-liquidations.adapter.mjs";
 import { createNewsIngestionEngine } from "./news/news-engine.mjs";
 import { createWhaleEventEngine } from "./onchain/whale-engine.mjs";
 import { createWatchlistRelevance } from "./core/watchlist-relevance.mjs";
@@ -705,6 +706,35 @@ export function createTerminalDataService({ config, logger }) {
     }
   }
 
+  async function refreshCoinGlassLiquidations() {
+    if (!featureFlags.enableCoinGlassLiquidations || !config.coinglassApiKey) return;
+    try {
+      const rows = await fetchCoinGlassLiquidationEvents({
+        apiKey: config.coinglassApiKey,
+        minUsd: 25_000,
+        limit: 60,
+      });
+      for (const rawEvent of rows) {
+        const normalized = whaleEngine.normalize(rawEvent);
+        if (!normalized) continue;
+        const relevance = relevanceEngine.score(normalized.relatedAssets, {
+          priorityScore: normalized.significance,
+        });
+        const enriched = {
+          ...normalized,
+          watchlistRelevance: relevance.score,
+          relevanceLabels: relevance.labels,
+          priorityLabel: relevance.priorityLabel,
+        };
+        const liquidation = toFrontendLiquidation(enriched);
+        state.liquidations = [liquidation, ...state.liquidations.filter((item) => item.id !== liquidation.id)].slice(0, 120);
+        publish("liquidation", liquidation);
+      }
+    } catch (error) {
+      logger?.warn?.("data.adapter.coinglass_liquidations.poll_failed", { error: String(error) });
+    }
+  }
+
   function startStreamingAdapters() {
     stopBinanceQuotes = createBinanceQuoteStream({
       logger,
@@ -953,6 +983,7 @@ export function createTerminalDataService({ config, logger }) {
       refreshDiscoveryLayer(),
       refreshNewsLayer(),
       refreshWhaleLayer(),
+      refreshCoinGlassLiquidations(),
       refreshSecondaryStats(),
     ]);
     if (state.quotes.length > 0) {
@@ -1081,6 +1112,7 @@ export function createTerminalDataService({ config, logger }) {
       setInterval(() => void refreshDiscoveryLayer().catch(() => {}), ttl.discoveryMs || 45_000),
       setInterval(() => void refreshNewsLayer().catch(() => {}), ttl.newsFeedMs || 60_000),
       setInterval(() => void refreshWhaleLayer().catch(() => {}), ttl.whaleScanMs || 75_000),
+      setInterval(() => void refreshCoinGlassLiquidations().catch(() => {}), ttl.liquidationPollMs || 90_000),
       setInterval(() => void refreshSecondaryStats().catch(() => {}), 30_000),
       setInterval(() => publish("heartbeat", { ok: true, ts: Date.now() }), 10_000),
     ];
