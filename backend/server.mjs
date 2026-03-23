@@ -31,6 +31,8 @@ const endpointCache = new MemoryCache();
 const upstashCache = createUpstashCache(config, logger);
 const clients = new Set();
 let bootstrapRefreshInFlight = false;
+let calendarEvents = [];
+let calendarRefreshTimer = null;
 const rateLimiter = createRateLimiter(config, logger);
 const SENSITIVE_ROUTES = new Set([
   "/api/vault/store",
@@ -572,6 +574,7 @@ function buildLiteSnapshot(snapshot) {
   const newsSnapshotItems = sliceRecent(snapshot.newsSnapshot?.items, 80);
   return {
     ...snapshot,
+    calendar: calendarEvents,
     news,
     social,
     whales,
@@ -585,6 +588,23 @@ function buildLiteSnapshot(snapshot) {
       count: snapshot.newsSnapshot?.count ?? newsSnapshotItems.length,
     },
   };
+}
+
+async function refreshCalendarEvents() {
+  try {
+    const rows = await getCalendarEvents(config);
+    if (Array.isArray(rows) && rows.length > 0) {
+      calendarEvents = rows;
+      broadcast("calendar", calendarEvents);
+      return;
+    }
+    if (Array.isArray(rows)) {
+      calendarEvents = rows;
+      broadcast("calendar", calendarEvents);
+    }
+  } catch (error) {
+    logger.warn("calendar.refresh_failed", { error: String(error) });
+  }
 }
 
 const server = http.createServer(async (request, reply) => {
@@ -704,7 +724,10 @@ const server = http.createServer(async (request, reply) => {
     }
 
     if (request.method === "GET" && url.pathname === "/api/calendar") {
-      json(reply, 200, await getCalendarEvents(config));
+      if (!Array.isArray(calendarEvents) || calendarEvents.length === 0) {
+        await refreshCalendarEvents();
+      }
+      json(reply, 200, Array.isArray(calendarEvents) ? calendarEvents : []);
       return;
     }
 
@@ -2662,6 +2685,10 @@ try {
 } catch (error) {
   logger.error("backend.bootstrap_failed", { error: String(error) });
 }
+await refreshCalendarEvents();
+calendarRefreshTimer = setInterval(() => {
+  void refreshCalendarEvents();
+}, 120_000);
 const unsubscribeStream = terminalData.events.subscribe("stream", (envelope) => {
   broadcast(envelope.type, envelope.payload);
 });
@@ -2676,6 +2703,7 @@ server.listen(config.apiPort, config.apiHost, () => {
 });
 
 process.on("SIGINT", () => {
+  if (calendarRefreshTimer) clearInterval(calendarRefreshTimer);
   unsubscribeStream();
   terminalData.stop();
   server.close(() => process.exit(0));

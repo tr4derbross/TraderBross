@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import PageWrapper from "@/components/PageWrapper";
 import { apiFetch } from "@/lib/api-client";
+import { useRealtimeSelector } from "@/lib/realtime-client";
 import type { CalendarEvent, EventCategory } from "@/types/calendar";
 import {
   Calendar,
@@ -386,6 +387,7 @@ export default function CalendarPage() {
   const [loading, setLoading]     = useState(true);
   const [catFilter, setCatFilter] = useState<EventCategory | "all">("all");
   const [showPast, setShowPast]   = useState(false);
+  const realtimeCalendar = useRealtimeSelector((state) => state.calendar || []);
 
   useEffect(() => {
     let active = true;
@@ -412,6 +414,12 @@ export default function CalendarPage() {
       window.clearInterval(id);
     };
   }, []);
+
+  useEffect(() => {
+    if (!Array.isArray(realtimeCalendar) || realtimeCalendar.length === 0) return;
+    setEvents(realtimeCalendar);
+    setLoading(false);
+  }, [realtimeCalendar]);
 
   const filtered = events
     .filter((e) => catFilter === "all" || e.category === catFilter)

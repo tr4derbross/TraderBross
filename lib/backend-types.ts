@@ -1,4 +1,5 @@
 import type { NewsItem, TickerQuote } from "@/lib/mock-data";
+import type { CalendarEvent } from "@/types/calendar";
 
 export type FearGreedData = {
   value: number;
@@ -105,6 +106,7 @@ export type BackendSnapshot = {
     priorityLabel?: string;
   }>;
   social: NewsItem[];
+  calendar?: CalendarEvent[];
   newsSnapshot?: {
     generatedAt: string;
     count: number;
@@ -240,6 +242,7 @@ export type RealtimeEnvelope =
       eventType: string;
     }; timestamp: string }
   | { type: "social"; payload: NewsItem[]; timestamp: string }
+  | { type: "calendar"; payload: CalendarEvent[]; timestamp: string }
   | { type: "whales"; payload: NewsItem[]; timestamp: string }
   | { type: "whaleEvents"; payload: NonNullable<BackendSnapshot["whaleEvents"]>; timestamp: string }
   | { type: "heartbeat"; payload: { ok: boolean; ts: number }; timestamp: string };

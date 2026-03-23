@@ -37,6 +37,7 @@ const fallbackSnapshot: RealtimeStore = {
   whales: [],
   whaleEvents: [],
   social: [],
+  calendar: [],
   coinMetadata: {},
   discovery: [],
   providerState: {},
@@ -121,6 +122,9 @@ function applyEnvelope(envelope: RealtimeEnvelope) {
       return;
     case "social":
       setState({ social: envelope.payload });
+      return;
+    case "calendar":
+      setState({ calendar: envelope.payload });
       return;
     case "whales":
       setState({ whales: envelope.payload });
