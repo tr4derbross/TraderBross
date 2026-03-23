@@ -1,4 +1,5 @@
 import { MemoryCache } from "./cache.mjs";
+import { fetchExchangeAnnouncements } from "../data/adapters/news-exchange-announcements.adapter.mjs";
 
 const cache = new MemoryCache();
 
@@ -60,6 +61,30 @@ const PLACEHOLDER_EVENTS = [
   },
 ];
 
+function normalizeDateOnly(value) {
+  const date = new Date(value || Date.now());
+  if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 10);
+  return date.toISOString().slice(0, 10);
+}
+
+function inferCategoryFromText(text = "") {
+  const lower = String(text || "").toLowerCase();
+  if (/(token unlock|vesting|unlock)/i.test(lower)) return "tokenUnlock";
+  if (/(hard fork|fork)/i.test(lower)) return "hardFork";
+  if (/(conference|summit|event)/i.test(lower)) return "conference";
+  if (/(listing|list|pair|market added)/i.test(lower)) return "listing";
+  if (/(mainnet|launch)/i.test(lower)) return "mainnet";
+  if (/(regulation|sec|policy|legal)/i.test(lower)) return "regulation";
+  if (/(airdrop)/i.test(lower)) return "airdrop";
+  return "upgrade";
+}
+
+function inferImportanceFromAnnouncementLevel(level = "") {
+  if (level === "breaking") return "high";
+  if (level === "market-moving") return "medium";
+  return "low";
+}
+
 function toCategory(name = "") {
   const cat = name.toLowerCase();
   if (cat.includes("token unlock") || cat.includes("vesting")) return "tokenUnlock";
@@ -109,9 +134,57 @@ async function fetchCoinMarketCal(apiKey) {
   }
 }
 
+async function fetchExchangeAnnouncementEvents(limit = 40) {
+  try {
+    const rows = await fetchExchangeAnnouncements({ limit });
+    if (!Array.isArray(rows) || rows.length === 0) return [];
+    return rows.map((row, index) => {
+      const combinedText = `${row.title || ""} ${row.summary || ""}`;
+      const primaryTicker = Array.isArray(row.tickers) && row.tickers.length > 0 ? row.tickers[0] : "BTC";
+      return {
+        id: `ann-${row.id || index}`,
+        title: String(row.title || "Exchange Announcement"),
+        coin: primaryTicker || "Market",
+        coinSymbol: String(primaryTicker || "BTC").toUpperCase(),
+        date: normalizeDateOnly(row.timestamp),
+        category: inferCategoryFromText(combinedText),
+        description: String(row.summary || "").trim(),
+        source: String(row.url || ""),
+        importance: inferImportanceFromAnnouncementLevel(row.importance),
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+function mergeAndSortEvents(primary = [], fallback = []) {
+  const map = new Map();
+  for (const event of [...primary, ...fallback]) {
+    if (!event || !event.id) continue;
+    if (!map.has(event.id)) map.set(event.id, event);
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    const at = new Date(a.date).getTime();
+    const bt = new Date(b.date).getTime();
+    return at - bt;
+  });
+}
+
 export async function getCalendarEvents(config) {
-  return cache.remember("calendar:v1", 60 * 60 * 1000, async () => {
-    const live = await fetchCoinMarketCal(config.coinMarketCalApiKey);
-    return Array.isArray(live) && live.length > 0 ? live : PLACEHOLDER_EVENTS;
+  return cache.remember("calendar:v2", 10 * 60 * 1000, async () => {
+    const [coinMarketCalEvents, exchangeAnnouncementEvents] = await Promise.all([
+      fetchCoinMarketCal(config.coinMarketCalApiKey),
+      fetchExchangeAnnouncementEvents(50),
+    ]);
+
+    const primary = Array.isArray(coinMarketCalEvents) ? coinMarketCalEvents : [];
+    const secondary = Array.isArray(exchangeAnnouncementEvents) ? exchangeAnnouncementEvents : [];
+    const merged = mergeAndSortEvents(primary, secondary);
+
+    if (merged.length > 0) {
+      return merged.slice(0, 180);
+    }
+    return PLACEHOLDER_EVENTS;
   });
 }

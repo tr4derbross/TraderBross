@@ -388,10 +388,29 @@ export default function CalendarPage() {
   const [showPast, setShowPast]   = useState(false);
 
   useEffect(() => {
-    apiFetch<CalendarEvent[]>("/api/calendar")
-      .then((data: CalendarEvent[]) => setEvents(data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    let active = true;
+    const load = async (isInitial = false) => {
+      if (isInitial) setLoading(true);
+      try {
+        const data = await apiFetch<CalendarEvent[]>("/api/calendar");
+        if (!active || !Array.isArray(data)) return;
+        setEvents(data);
+      } catch {
+        // Keep previous events on transient failures.
+      } finally {
+        if (isInitial && active) setLoading(false);
+      }
+    };
+
+    void load(true);
+    const id = window.setInterval(() => {
+      void load(false);
+    }, 120_000);
+
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
   }, []);
 
   const filtered = events
