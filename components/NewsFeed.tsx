@@ -146,7 +146,7 @@ export default function NewsFeed({
               title="Live liquidation data"
             />
           )}
-          {/* Live / Mock badge */}
+          {/* Live / sync badge */}
           {!isSpecialFeed && (
             isLive ? (
               <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/8 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400">
@@ -154,9 +154,9 @@ export default function NewsFeed({
                 LIVE
               </span>
             ) : (
-              <span className="mock-badge inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold">
+              <span className="mock-badge inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold" title="Waiting for live stream">
                 <Database className="h-2.5 w-2.5" />
-                DEMO
+                SYNCING
               </span>
             )
           )}
