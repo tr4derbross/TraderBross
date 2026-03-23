@@ -70,6 +70,28 @@ function normalizeVenueTicker(value: string) {
     .replace(/(USDT|USDC|USD)$/i, "");
 }
 
+function extractApiErrorMessage(payload: unknown, fallback = "Unknown error") {
+  if (!payload || typeof payload !== "object") return fallback;
+  const data = payload as {
+    error?: unknown;
+    message?: unknown;
+    detail?: unknown;
+    data?: { message?: unknown; msg?: unknown; error?: unknown };
+  };
+  const candidates = [
+    data.error,
+    data.message,
+    data.detail,
+    data.data?.message,
+    data.data?.msg,
+    data.data?.error,
+  ];
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return fallback;
+}
+
 
 /* ─── Order Book Mini ────────────────────────────────────────────────────────── */
 type OBEntry = [string, string, string, string]; // [price, qty, ?, ?]
@@ -1151,10 +1173,17 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                 sessionToken: connection?.sessionToken,
               }),
             });
-            const data = await res.json() as { ok?: boolean; error?: string };
-            if (!data.ok) {
-              console.error(`[ClosePosition] ${venueId} error:`, data.error);
-              window.alert(`Close position failed: ${data.error ?? "Unknown error"}`);
+            const data = await res.json().catch(() => ({})) as {
+              ok?: boolean;
+              error?: string;
+              message?: string;
+              detail?: string;
+              data?: { msg?: string; error?: string; message?: string };
+            };
+            if (!res.ok || !data.ok) {
+              const reason = extractApiErrorMessage(data, `HTTP ${res.status}`);
+              console.error(`[ClosePosition] ${venueId} error:`, reason, data);
+              window.alert(`Close position failed: ${reason}`);
               return;
             }
           } catch (err) {
@@ -1206,9 +1235,16 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                 sessionToken: connection?.sessionToken,
               }),
           });
-          const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };
+          const data = await res.json().catch(() => ({})) as {
+            ok?: boolean;
+            error?: string;
+            message?: string;
+            detail?: string;
+            data?: { msg?: string; error?: string; message?: string };
+          };
           if (!res.ok || data.ok === false) {
-            window.alert(`TP/SL update failed: ${data.error ?? `HTTP ${res.status}`}`);
+            const reason = extractApiErrorMessage(data, `HTTP ${res.status}`);
+            window.alert(`TP/SL update failed: ${reason}`);
             return;
           }
           setVenueTpSlMap((prev) => ({
