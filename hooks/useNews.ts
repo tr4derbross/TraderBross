@@ -52,9 +52,11 @@ export function useNews({
   const loading = (connectionStatus === "connecting" || connectionStatus === "reconnecting") && newsItems.length === 0;
   const previousHeadlines = useRef<Set<string>>(new Set());
 
+  // Keep "All" focused on general news/social flow.
+  // Whale and liquidation have their own dedicated tabs/feeds.
   const allItems = useMemo(
-    () => [...newsItems, ...whaleItems, ...socialItems],
-    [newsItems, whaleItems, socialItems],
+    () => [...newsItems, ...socialItems],
+    [newsItems, socialItems],
   );
 
   const filtered = useMemo(() => {

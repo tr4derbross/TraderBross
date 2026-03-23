@@ -160,6 +160,164 @@ export function createBinanceLargeTradeStream({
   };
 }
 
+export function createBybitLargeTradeStream({
+  logger,
+  onEvent,
+  symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"],
+  minUsd = 250_000,
+} = {}) {
+  let socket = null;
+  let closed = false;
+  let reconnectTimer = null;
+  const topics = (Array.isArray(symbols) ? symbols : [])
+    .map((s) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, ""))
+    .filter(Boolean)
+    .slice(0, 12)
+    .map((symbol) => `publicTrade.${symbol}`);
+  if (topics.length === 0) return () => {};
+
+  const connect = () => {
+    if (closed) return;
+    socket = new WebSocket("wss://stream.bybit.com/v5/public/linear");
+
+    socket.on("open", () => {
+      logger?.info?.("data.adapter.bybit_whale_tape.connected", { topics: topics.length });
+      socket?.send(JSON.stringify({ op: "subscribe", args: topics }));
+    });
+    socket.on("message", (raw) => {
+      try {
+        const payload = JSON.parse(raw.toString());
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        for (const row of rows) {
+          const symbol = String(row?.s || row?.symbol || "").toUpperCase();
+          const token = symbol.replace(/USDT$|USDC$/i, "");
+          const price = Number(row?.p || row?.price || 0);
+          const qty = Number(row?.v || row?.q || row?.size || 0);
+          const sideRaw = String(row?.S || row?.side || "").toLowerCase();
+          const usdValue = price * qty;
+          if (!symbol || !Number.isFinite(usdValue) || usdValue < Number(minUsd || 0)) continue;
+          onEvent?.({
+            id: `bybit-trade-${symbol}-${row?.i || row?.T || Date.now()}`,
+            chain: "bybit_futures",
+            txHash: null,
+            token,
+            amount: qty,
+            usdValue,
+            fromLabel: sideRaw === "sell" ? "Aggressive Seller" : "Aggressive Buyer",
+            fromOwnerType: "smart_money",
+            toLabel: "Perp Tape",
+            toOwnerType: "derivatives",
+            eventType: "smart_money_watch",
+            timestamp: new Date(Number(row?.T || Date.now())).toISOString(),
+            relatedAssets: [token],
+            provider: "bybit_ws_large_trades",
+            rawText: `${symbol} large trade @ ${price}`,
+            price,
+          });
+        }
+      } catch (error) {
+        logger?.warn?.("data.adapter.bybit_whale_tape.parse_error", { error: String(error) });
+      }
+    });
+    socket.on("error", (error) => {
+      logger?.warn?.("data.adapter.bybit_whale_tape.error", { error: String(error) });
+      socket?.close();
+    });
+    socket.on("close", () => {
+      socket = null;
+      if (closed) return;
+      logger?.warn?.("data.adapter.bybit_whale_tape.disconnected");
+      reconnectTimer = setTimeout(connect, 3000);
+    });
+  };
+
+  connect();
+  return () => {
+    closed = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (socket) socket.terminate();
+  };
+}
+
+export function createOkxLargeTradeStream({
+  logger,
+  onEvent,
+  symbols = ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "BNB-USDT-SWAP", "XRP-USDT-SWAP"],
+  minUsd = 250_000,
+} = {}) {
+  let socket = null;
+  let closed = false;
+  let reconnectTimer = null;
+  const args = (Array.isArray(symbols) ? symbols : [])
+    .map((instId) => String(instId || "").toUpperCase().replace(/[^A-Z0-9-]/g, ""))
+    .filter(Boolean)
+    .slice(0, 12)
+    .map((instId) => ({ channel: "trades", instId }));
+  if (args.length === 0) return () => {};
+
+  const connect = () => {
+    if (closed) return;
+    socket = new WebSocket("wss://ws.okx.com:8443/ws/v5/public");
+
+    socket.on("open", () => {
+      logger?.info?.("data.adapter.okx_whale_tape.connected", { args: args.length });
+      socket?.send(JSON.stringify({ op: "subscribe", args }));
+    });
+    socket.on("message", (raw) => {
+      try {
+        const payload = JSON.parse(raw.toString());
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        for (const row of rows) {
+          const instId = String(row?.instId || "");
+          const token = instId.split("-")[0] || "";
+          const price = Number(row?.px || row?.price || 0);
+          const qty = Number(row?.sz || row?.size || 0);
+          const sideRaw = String(row?.side || "").toLowerCase();
+          const usdValue = price * qty;
+          if (!token || !Number.isFinite(usdValue) || usdValue < Number(minUsd || 0)) continue;
+          onEvent?.({
+            id: `okx-trade-${instId}-${row?.tradeId || row?.ts || Date.now()}`,
+            chain: "okx_futures",
+            txHash: null,
+            token,
+            amount: qty,
+            usdValue,
+            fromLabel: sideRaw === "sell" ? "Aggressive Seller" : "Aggressive Buyer",
+            fromOwnerType: "smart_money",
+            toLabel: "Perp Tape",
+            toOwnerType: "derivatives",
+            eventType: "smart_money_watch",
+            timestamp: new Date(Number(row?.ts || Date.now())).toISOString(),
+            relatedAssets: [token],
+            provider: "okx_ws_large_trades",
+            rawText: `${instId} large trade @ ${price}`,
+            price,
+          });
+        }
+      } catch (error) {
+        logger?.warn?.("data.adapter.okx_whale_tape.parse_error", { error: String(error) });
+      }
+    });
+    socket.on("error", (error) => {
+      logger?.warn?.("data.adapter.okx_whale_tape.error", { error: String(error) });
+      socket?.close();
+    });
+    socket.on("close", () => {
+      socket = null;
+      if (closed) return;
+      logger?.warn?.("data.adapter.okx_whale_tape.disconnected");
+      reconnectTimer = setTimeout(connect, 3000);
+    });
+  };
+
+  connect();
+  return () => {
+    closed = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (socket) socket.terminate();
+  };
+}
+
 export function createBybitLiquidationEventStream({
   logger,
   onEvent,

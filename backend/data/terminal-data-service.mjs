@@ -24,8 +24,10 @@ import { createTreeOfAlphaNewsStream } from "./adapters/news-treeofalpha.adapter
 import { fetchNinjaNewsBundle } from "./adapters/news-ninjanews.adapter.mjs";
 import {
   createBinanceLargeTradeStream,
+  createBybitLargeTradeStream,
   createBybitLiquidationEventStream,
   createLiquidationEventStream,
+  createOkxLargeTradeStream,
   createOkxLiquidationEventStream,
   fetchOnchainWhaleEvents,
 } from "./adapters/onchain-whale-events.adapter.mjs";
@@ -163,6 +165,8 @@ export function createTerminalDataService({ config, logger }) {
   let stopBybitLiquidations = null;
   let stopOkxLiquidations = null;
   let stopWhaleTape = null;
+  let stopBybitWhaleTape = null;
+  let stopOkxWhaleTape = null;
   let stopTreeNews = null;
   let intervals = [];
 
@@ -814,6 +818,49 @@ export function createTerminalDataService({ config, logger }) {
         publish("whaleEvents", state.whaleEvents);
       },
     });
+    stopBybitWhaleTape = createBybitLargeTradeStream({
+      logger,
+      symbols: (config.whaleFallback?.symbols || ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"])
+        .map((s) => String(s || "").toUpperCase()),
+      minUsd: config.whaleFallback?.minUsd || 250_000,
+      onEvent(rawEvent) {
+        const normalized = whaleEngine.normalize(rawEvent);
+        if (!normalized) return;
+        const relevance = relevanceEngine.score(normalized.relatedAssets, { priorityScore: normalized.significance });
+        const enriched = {
+          ...normalized,
+          watchlistRelevance: relevance.score,
+          relevanceLabels: relevance.labels,
+          priorityLabel: relevance.priorityLabel,
+        };
+        const whale = toFrontendWhaleItem(enriched);
+        state.whales = [whale, ...state.whales.filter((item) => item.id !== whale.id)].slice(0, 80);
+        state.whaleEvents = [enriched, ...state.whaleEvents.filter((item) => item.id !== enriched.id)].slice(0, 120);
+        publish("whales", state.whales);
+        publish("whaleEvents", state.whaleEvents);
+      },
+    });
+    stopOkxWhaleTape = createOkxLargeTradeStream({
+      logger,
+      symbols: ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "BNB-USDT-SWAP", "XRP-USDT-SWAP"],
+      minUsd: config.whaleFallback?.minUsd || 250_000,
+      onEvent(rawEvent) {
+        const normalized = whaleEngine.normalize(rawEvent);
+        if (!normalized) return;
+        const relevance = relevanceEngine.score(normalized.relatedAssets, { priorityScore: normalized.significance });
+        const enriched = {
+          ...normalized,
+          watchlistRelevance: relevance.score,
+          relevanceLabels: relevance.labels,
+          priorityLabel: relevance.priorityLabel,
+        };
+        const whale = toFrontendWhaleItem(enriched);
+        state.whales = [whale, ...state.whales.filter((item) => item.id !== whale.id)].slice(0, 80);
+        state.whaleEvents = [enriched, ...state.whaleEvents.filter((item) => item.id !== enriched.id)].slice(0, 120);
+        publish("whales", state.whales);
+        publish("whaleEvents", state.whaleEvents);
+      },
+    });
 
     if (featureFlags.enableNewsTreeWs !== false && config.treeNewsApiKey) {
       stopTreeNews = createTreeOfAlphaNewsStream({
@@ -1026,6 +1073,8 @@ export function createTerminalDataService({ config, logger }) {
     if (stopBybitLiquidations) stopBybitLiquidations();
     if (stopOkxLiquidations) stopOkxLiquidations();
     if (stopWhaleTape) stopWhaleTape();
+    if (stopBybitWhaleTape) stopBybitWhaleTape();
+    if (stopOkxWhaleTape) stopOkxWhaleTape();
     if (stopTreeNews) stopTreeNews();
     stopHyperliquid = null;
     stopBinanceQuotes = null;
@@ -1035,6 +1084,8 @@ export function createTerminalDataService({ config, logger }) {
     stopBybitLiquidations = null;
     stopOkxLiquidations = null;
     stopWhaleTape = null;
+    stopBybitWhaleTape = null;
+    stopOkxWhaleTape = null;
     stopTreeNews = null;
     intervals.forEach(clearInterval);
     intervals = [];
