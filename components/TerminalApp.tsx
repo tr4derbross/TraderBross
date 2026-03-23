@@ -1164,10 +1164,12 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
             const res = await fetch(buildApiUrl(orderEndpoint), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+              signal: AbortSignal.timeout(12_000),
               body: JSON.stringify({
                 type: "closePosition",
                 symbol: pos.ticker,
                 side: pos.side,
+                positionSize: pos.amount,
                 marginMode: pos.marginMode,
                 closePercent,
                 sessionToken: connection?.sessionToken,

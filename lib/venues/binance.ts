@@ -45,7 +45,7 @@ async function binanceOrderPost(body: Record<string, unknown>) {
     const res = await fetch(buildApiUrl("/api/binance/order"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(25_000),
+      signal: AbortSignal.timeout(12_000),
       body: JSON.stringify(body),
     });
     const data = await res.json() as { ok?: boolean; error?: string; data?: unknown };

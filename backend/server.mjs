@@ -1780,22 +1780,17 @@ const server = http.createServer(async (request, reply) => {
         }
         if (body.type === "closePosition") {
           const closePercent = Math.max(1, Math.min(100, Number(body.closePercent) || 100));
-          // 1. Cancel all open conditional orders (TP/SL) for this symbol first
-          try {
-            const qs0 = binanceSignedQuery(apiSecret, { symbol });
-            await fetch(`${base}/fapi/v1/allOpenOrders?${qs0}`, {
-              method: "DELETE", headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(5000)
+          // Prefer UI-supplied size to avoid an extra upstream call on the hot path.
+          let posAmt = finitePositiveNumber(body.positionSize);
+          if (!posAmt) {
+            const qsPos = binanceSignedQuery(apiSecret, { symbol });
+            const posRes = await fetch(`${base}/fapi/v2/positionRisk?${qsPos}`, {
+              headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(5000)
             });
-          } catch { /* ignore — no open orders is fine */ }
-
-          // 2. Fetch current position size from Binance for accurate quantity
-          const qsPos = binanceSignedQuery(apiSecret, { symbol });
-          const posRes = await fetch(`${base}/fapi/v2/positionRisk?${qsPos}`, {
-            headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(5000)
-          });
-          const posData = await posRes.json();
-          const posEntry = Array.isArray(posData) ? posData.find((p) => p.symbol === symbol) : null;
-          const posAmt = posEntry ? Math.abs(parseFloat(posEntry.positionAmt)) : null;
+            const posData = await posRes.json();
+            const posEntry = Array.isArray(posData) ? posData.find((p) => p.symbol === symbol) : null;
+            posAmt = posEntry ? Math.abs(parseFloat(posEntry.positionAmt)) : null;
+          }
           if (!posAmt || posAmt === 0) {
             json(reply, 200, { ok: true, data: { msg: "No open position found" } });
             return;
@@ -1807,12 +1802,29 @@ const server = http.createServer(async (request, reply) => {
             return;
           }
 
-          // 3. Market order with reduceOnly=true + exact quantity (closePosition=true is NOT valid for MARKET type)
+          // Market order with reduceOnly=true + exact quantity (closePosition=true is NOT valid for MARKET type)
           const closeSide = body.side === "long" ? "SELL" : "BUY";
           const result = await binancePost("/fapi/v1/order", {
             symbol, side: closeSide, type: "MARKET",
             quantity, reduceOnly: "true",
           });
+
+          // Cleanup stale open/algo orders in background; do not block market close response.
+          Promise.resolve().then(async () => {
+            try {
+              const qs0 = binanceSignedQuery(apiSecret, { symbol });
+              await fetch(`${base}/fapi/v1/allOpenOrders?${qs0}`, {
+                method: "DELETE", headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(3500)
+              });
+            } catch {}
+            try {
+              const qsAlgo = binanceSignedQuery(apiSecret, { symbol, algoType: "CONDITIONAL" });
+              await fetch(`${base}/fapi/v1/algoOpenOrders?${qsAlgo}`, {
+                method: "DELETE", headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(3500)
+              });
+            } catch {}
+          }).catch(() => {});
+
           json(reply, 200, { ok: true, data: result });
           return;
         }
@@ -1880,8 +1892,10 @@ const server = http.createServer(async (request, reply) => {
           }
           // Pre-set margin type and leverage before placing
           const marginType = body.marginMode === "cross" ? "CROSSED" : "ISOLATED";
-          await binancePost("/fapi/v1/marginType", { symbol, marginType }).catch(() => {});
-          await binancePost("/fapi/v1/leverage", { symbol, leverage: String(leverage) });
+          await Promise.all([
+            binancePost("/fapi/v1/marginType", { symbol, marginType }).catch(() => {}),
+            binancePost("/fapi/v1/leverage", { symbol, leverage: String(leverage) }),
+          ]);
           // Fetch mark price
           const mpRes = await fetch(`${base}/fapi/v1/premiumIndex?symbol=${symbol}`, { signal: AbortSignal.timeout(5000) });
           const mpData = await mpRes.json();
