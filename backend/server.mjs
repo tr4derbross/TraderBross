@@ -947,16 +947,19 @@ const server = http.createServer(async (request, reply) => {
             json(reply, 400, { ok: false, error: "Wallet address is required for this action." });
             return;
           }
-          const account = await getHyperliquidAccount(accountAddress);
-          const pos = Array.isArray(account?.positions)
-            ? account.positions.find((row) => canonicalTickerParam(row.coin, "") === symbol)
-            : null;
-          if (!pos || !finitePositiveNumber(pos.size)) {
-            json(reply, 200, { ok: true, data: { message: "No open position found." } });
-            return;
+          let posSize = finitePositiveNumber(body.positionSize);
+          const closeIsBuy = String(body.side || "").toLowerCase() === "short";
+          if (!posSize) {
+            const account = await getHyperliquidAccount(accountAddress);
+            const pos = Array.isArray(account?.positions)
+              ? account.positions.find((row) => canonicalTickerParam(row.coin, "") === symbol)
+              : null;
+            if (!pos || !finitePositiveNumber(pos.size)) {
+              json(reply, 200, { ok: true, data: { message: "No open position found." } });
+              return;
+            }
+            posSize = Number(pos.size);
           }
-          const posSize = Number(pos.size);
-          const closeIsBuy = String(pos.side || "").toLowerCase() === "short";
           if (body.type === "closePosition") {
             const closeSize = posSize * (closePercent / 100);
             const px = closeIsBuy ? markPrice * 1.03 : markPrice * 0.97;
@@ -2338,11 +2341,14 @@ const server = http.createServer(async (request, reply) => {
         if (body.type === "closePosition") {
           const closePercent = Math.max(1, Math.min(100, Number(body.closePercent) || 100));
           const side = body.side === "short" ? "Buy" : "Sell";
-          const posData = await requestBybit("GET", "/v5/position/list", `category=linear&symbol=${encodeURIComponent(symbol)}`);
-          const pos = Array.isArray(posData?.result?.list)
-            ? posData.result.list.find((row) => String(row.symbol || "").toUpperCase() === symbol)
-            : null;
-          const size = Math.abs(parseFloat(pos?.size || "0"));
+          let size = finitePositiveNumber(body.positionSize);
+          if (!size) {
+            const posData = await requestBybit("GET", "/v5/position/list", `category=linear&symbol=${encodeURIComponent(symbol)}`);
+            const pos = Array.isArray(posData?.result?.list)
+              ? posData.result.list.find((row) => String(row.symbol || "").toUpperCase() === symbol)
+              : null;
+            size = Math.abs(parseFloat(pos?.size || "0"));
+          }
           if (!size) {
             json(reply, 200, { ok: true, data: { message: "No open position found." } });
             return;
@@ -2516,15 +2522,18 @@ const server = http.createServer(async (request, reply) => {
         }
         if (body.type === "closePosition") {
           const closePercent = Math.max(1, Math.min(100, Number(body.closePercent) || 100));
-          const posData = await requestOkx("GET", `/api/v5/account/positions?instType=SWAP&instId=${encodeURIComponent(instId)}`);
-          const rows = Array.isArray(posData?.data) ? posData.data : [];
-          const row = rows.find((item) => {
-            const itemSide = String(item?.posSide || item?.direction || "").toLowerCase();
-            const signedPos = parseFloat(item?.pos || "0");
-            const normalizedSide = itemSide === "short" || (itemSide !== "long" && signedPos < 0) ? "short" : "long";
-            return normalizedSide === (body.side === "short" ? "short" : "long");
-          }) || rows[0] || null;
-          const contracts = Math.abs(parseFloat(row?.pos || "0"));
+          let contracts = finitePositiveNumber(body.positionSize);
+          if (!contracts) {
+            const posData = await requestOkx("GET", `/api/v5/account/positions?instType=SWAP&instId=${encodeURIComponent(instId)}`);
+            const rows = Array.isArray(posData?.data) ? posData.data : [];
+            const row = rows.find((item) => {
+              const itemSide = String(item?.posSide || item?.direction || "").toLowerCase();
+              const signedPos = parseFloat(item?.pos || "0");
+              const normalizedSide = itemSide === "short" || (itemSide !== "long" && signedPos < 0) ? "short" : "long";
+              return normalizedSide === (body.side === "short" ? "short" : "long");
+            }) || rows[0] || null;
+            contracts = Math.abs(parseFloat(row?.pos || "0"));
+          }
           if (!contracts) {
             json(reply, 200, { ok: true, data: { message: "No open position found." } });
             return;

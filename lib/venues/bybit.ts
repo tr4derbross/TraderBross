@@ -128,7 +128,7 @@ export const bybitAdapter: VenueAdapter = {
       const res = await fetch(buildApiUrl("/api/bybit/order"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(25_000),
+        signal: AbortSignal.timeout(12_000),
         body: JSON.stringify({
           type: "order",
           symbol: input.symbol,
