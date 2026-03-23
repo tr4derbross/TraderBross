@@ -3,13 +3,14 @@ import { fetchJson } from "../../services/http.mjs";
 import { mapWhaleAlertEvmEvents } from "./onchain-evm.adapter.mjs";
 import { mapWhaleAlertSolanaEvents } from "./onchain-solana.adapter.mjs";
 
-export async function fetchOnchainWhaleEvents({ whaleAlertKey = "" } = {}) {
+export async function fetchOnchainWhaleEvents({ whaleAlertKey = "", minUsd = 10_000_000 } = {}) {
   if (!whaleAlertKey) {
     return [];
   }
 
+  const safeMinUsd = Math.max(100_000, Number(minUsd || 10_000_000));
   const payload = await fetchJson(
-    `https://api.whale-alert.io/v1/transactions?api_key=${whaleAlertKey}&min_value=5000000`,
+    `https://api.whale-alert.io/v1/transactions?api_key=${whaleAlertKey}&min_value=${Math.floor(safeMinUsd)}`,
     { timeoutMs: 7000 },
   );
 

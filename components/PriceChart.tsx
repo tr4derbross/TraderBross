@@ -1204,8 +1204,7 @@ export default function PriceChart({
               <div className="truncate text-[10px] font-semibold text-zinc-100">
                 {recentRelatedEvent.type === "whale" ? "Whale trigger" : "News trigger"}: {recentRelatedEvent.headline}
               </div>
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <span className="truncate text-[9px] text-zinc-500">{recentRelatedEvent.source}</span>
+              <div className="mt-1 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => focusOnEvent(recentRelatedEvent)}

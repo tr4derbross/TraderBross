@@ -170,7 +170,8 @@ export function createTerminalDataService({ config, logger }) {
   let stopTreeNews = null;
   let intervals = [];
   const whaleEventThrottle = new Map();
-  const whaleMinIntervalMs = Math.max(500, Number(config.whaleFallback?.minIntervalMs || 2500));
+  const whaleMinIntervalMs = Math.max(500, Number(config.whaleFallback?.minIntervalMs || 8000));
+  const whaleMinUsd = Math.max(10_000_000, Number(config.whaleFallback?.minUsd || 10_000_000));
 
   function publish(type, payload) {
     events.publish("stream", {
@@ -669,10 +670,10 @@ export function createTerminalDataService({ config, logger }) {
     }
     const canUseWhaleAlert = featureFlags.enableWhaleApi !== false && Boolean(config.whaleAlertKey);
     const whalePrimary = canUseWhaleAlert
-      ? () => fetchOnchainWhaleEvents({ whaleAlertKey: config.whaleAlertKey })
+      ? () => fetchOnchainWhaleEvents({ whaleAlertKey: config.whaleAlertKey, minUsd: whaleMinUsd })
       : () =>
           fetchBinanceLargeTradeEvents({
-            minUsd: config.whaleFallback?.minUsd || 500_000,
+            minUsd: whaleMinUsd,
             symbols: config.whaleFallback?.symbols,
           });
     const result = await callWithFallback({
@@ -805,7 +806,7 @@ export function createTerminalDataService({ config, logger }) {
       logger,
       symbols: (config.whaleFallback?.symbols || ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"])
         .map((s) => String(s || "").toLowerCase()),
-      minUsd: config.whaleFallback?.minUsd || 250_000,
+      minUsd: whaleMinUsd,
       onEvent(rawEvent) {
         const normalized = whaleEngine.normalize(rawEvent);
         if (!normalized) return;
@@ -828,7 +829,7 @@ export function createTerminalDataService({ config, logger }) {
       logger,
       symbols: (config.whaleFallback?.symbols || ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"])
         .map((s) => String(s || "").toUpperCase()),
-      minUsd: config.whaleFallback?.minUsd || 250_000,
+      minUsd: whaleMinUsd,
       onEvent(rawEvent) {
         const normalized = whaleEngine.normalize(rawEvent);
         if (!normalized) return;
@@ -850,7 +851,7 @@ export function createTerminalDataService({ config, logger }) {
     stopOkxWhaleTape = createOkxLargeTradeStream({
       logger,
       symbols: ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "BNB-USDT-SWAP", "XRP-USDT-SWAP"],
-      minUsd: config.whaleFallback?.minUsd || 250_000,
+      minUsd: whaleMinUsd,
       onEvent(rawEvent) {
         const normalized = whaleEngine.normalize(rawEvent);
         if (!normalized) return;
