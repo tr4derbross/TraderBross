@@ -1,6 +1,8 @@
 export class MemoryCache {
   constructor() {
     this.store = new Map();
+    /** Inflight deduplication: same key = same Promise, factory() called only once */
+    this.inflight = new Map();
   }
 
   get(key) {
@@ -30,8 +32,22 @@ export class MemoryCache {
       return cached;
     }
 
-    const value = await factory();
-    this.set(key, value, ttlMs);
-    return value;
+    // If another request is already fetching this key, reuse that Promise
+    if (this.inflight.has(key)) {
+      return this.inflight.get(key);
+    }
+
+    const promise = (async () => {
+      try {
+        const value = await factory();
+        this.set(key, value, ttlMs);
+        return value;
+      } finally {
+        this.inflight.delete(key);
+      }
+    })();
+
+    this.inflight.set(key, promise);
+    return promise;
   }
 }
