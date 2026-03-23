@@ -5,6 +5,7 @@ import { refreshRealtimeSnapshot, useRealtimeSelector } from "@/lib/realtime-cli
 import type { LiquidationEvent } from "@/lib/backend-types";
 import { Zap } from "lucide-react";
 import { formatCompact, formatPrice, timeAgo } from "@/lib/format-utils";
+import { apiFetch } from "@/lib/api-client";
 
 const DEV_SIM_ENABLED =
   process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_DEV_SIM_FEEDS === "true";
@@ -15,6 +16,20 @@ type LiqStats = {
   longUSD: number;
   shortUSD: number;
   count: number;
+};
+
+type LiquidationApiResponse = {
+  liquidations?: Array<{
+    id?: string;
+    symbol?: string;
+    displaySymbol?: string;
+    side?: string;
+    quantity?: number;
+    price?: number;
+    sizeUSD?: number;
+    timestamp?: string;
+    exchange?: string;
+  }>;
 };
 
 function randomFrom<T>(arr: T[]): T {
@@ -102,16 +117,68 @@ export default function LiquidationFeed({
 }) {
   const realtimeLiquidations = useRealtimeSelector((state) => state.liquidations ?? []);
   const connectionStatus = useRealtimeSelector((state) => state.connectionStatus);
+  const [apiFeed, setApiFeed] = useState<LiquidationEvent[]>([]);
   const [devFeed, setDevFeed] = useState<LiquidationEvent[]>([]);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const latestRealtimeIdRef = useRef<string | null>(null);
   const counterRef = useRef(0);
 
+  useEffect(() => {
+    let mounted = true;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const mapApiRows = (rows: NonNullable<LiquidationApiResponse["liquidations"]>): LiquidationEvent[] =>
+      rows
+        .map((row) => {
+          const side = String(row.side || "").toUpperCase() === "LONG" ? "long" : "short";
+          const symbol = String(row.displaySymbol || row.symbol || "").replace(/USDT$/i, "");
+          const usdValue = Number(row.sizeUSD || 0);
+          const price = Number(row.price || 0);
+          const qty = Number(row.quantity || 0);
+          if (!symbol || !Number.isFinite(usdValue) || usdValue <= 0) return null;
+          return {
+            id: String(row.id || `api-liq-${symbol}-${row.timestamp || Date.now()}`),
+            symbol,
+            side,
+            qty: Number.isFinite(qty) ? qty : 0,
+            price: Number.isFinite(price) ? price : 0,
+            usdValue,
+            timestamp: String(row.timestamp || new Date().toISOString()),
+            provider: row.exchange ? `${String(row.exchange).toLowerCase()}_liquidations` : "liquidations_api",
+          } as LiquidationEvent & { provider?: string };
+        })
+        .filter((item): item is LiquidationEvent => Boolean(item))
+        .slice(0, 50);
+
+    const fetchFromApi = async () => {
+      try {
+        const payload = await apiFetch<LiquidationApiResponse>("/api/liquidations?limit=50");
+        const next = mapApiRows(Array.isArray(payload?.liquidations) ? payload.liquidations : []);
+        if (!mounted) return;
+        setApiFeed(next);
+      } catch {
+        if (!mounted) return;
+        // Keep last successful API fallback feed.
+      }
+    };
+
+    void fetchFromApi();
+    intervalId = setInterval(() => {
+      void fetchFromApi();
+    }, 9000);
+
+    return () => {
+      mounted = false;
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, []);
+
   const feed = useMemo(() => {
     if (realtimeLiquidations.length > 0) return realtimeLiquidations.slice(0, 50);
+    if (apiFeed.length > 0) return apiFeed;
     if (DEV_SIM_ENABLED) return devFeed;
     return [];
-  }, [devFeed, realtimeLiquidations]);
+  }, [apiFeed, devFeed, realtimeLiquidations]);
 
   const stats = useMemo(
     () =>

@@ -169,6 +169,8 @@ export function createTerminalDataService({ config, logger }) {
   let stopOkxWhaleTape = null;
   let stopTreeNews = null;
   let intervals = [];
+  const whaleEventThrottle = new Map();
+  const whaleMinIntervalMs = Math.max(500, Number(config.whaleFallback?.minIntervalMs || 2500));
 
   function publish(type, payload) {
     events.publish("stream", {
@@ -184,6 +186,15 @@ export function createTerminalDataService({ config, logger }) {
       bySymbol.set(tick.symbol, toFrontendQuote(tick));
     });
     state.quotes = Array.from(bySymbol.values()).sort((a, b) => a.symbol.localeCompare(b.symbol));
+  }
+
+  function canPublishWhaleEvent(event) {
+    const key = `${String(event?.provider || "unknown")}::${String(event?.token || "UNK")}::${String(event?.eventType || "event")}`;
+    const now = Date.now();
+    const last = whaleEventThrottle.get(key) || 0;
+    if (now - last < whaleMinIntervalMs) return false;
+    whaleEventThrottle.set(key, now);
+    return true;
   }
 
   function mergeVenueQuotePatch(venue, quotes) {
@@ -749,19 +760,13 @@ export function createTerminalDataService({ config, logger }) {
         const liquidation = toFrontendLiquidation(enriched);
         state.liquidations = [liquidation, ...state.liquidations.filter((item) => item.id !== liquidation.id)].slice(0, 120);
         publish("liquidation", liquidation);
-
-        const whale = toFrontendWhaleItem(enriched);
-        state.whales = [whale, ...state.whales.filter((item) => item.id !== whale.id)].slice(0, 80);
-        state.whaleEvents = [enriched, ...state.whaleEvents.filter((item) => item.id !== enriched.id)].slice(0, 120);
-        publish("whales", state.whales);
-        publish("whaleEvents", state.whaleEvents);
       },
     });
     stopBybitLiquidations = createBybitLiquidationEventStream({
       logger,
       symbols: (config.whaleFallback?.symbols || ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"])
         .map((s) => String(s || "").toUpperCase()),
-      minUsd: 10_000,
+      minUsd: 5_000,
       onEvent(rawEvent) {
         const normalized = whaleEngine.normalize(rawEvent);
         if (!normalized) return;
@@ -779,7 +784,7 @@ export function createTerminalDataService({ config, logger }) {
     });
     stopOkxLiquidations = createOkxLiquidationEventStream({
       logger,
-      minUsd: 10_000,
+      minUsd: 5_000,
       onEvent(rawEvent) {
         const normalized = whaleEngine.normalize(rawEvent);
         if (!normalized) return;
@@ -804,6 +809,7 @@ export function createTerminalDataService({ config, logger }) {
       onEvent(rawEvent) {
         const normalized = whaleEngine.normalize(rawEvent);
         if (!normalized) return;
+        if (!canPublishWhaleEvent(normalized)) return;
         const relevance = relevanceEngine.score(normalized.relatedAssets, { priorityScore: normalized.significance });
         const enriched = {
           ...normalized,
@@ -826,6 +832,7 @@ export function createTerminalDataService({ config, logger }) {
       onEvent(rawEvent) {
         const normalized = whaleEngine.normalize(rawEvent);
         if (!normalized) return;
+        if (!canPublishWhaleEvent(normalized)) return;
         const relevance = relevanceEngine.score(normalized.relatedAssets, { priorityScore: normalized.significance });
         const enriched = {
           ...normalized,
@@ -847,6 +854,7 @@ export function createTerminalDataService({ config, logger }) {
       onEvent(rawEvent) {
         const normalized = whaleEngine.normalize(rawEvent);
         if (!normalized) return;
+        if (!canPublishWhaleEvent(normalized)) return;
         const relevance = relevanceEngine.score(normalized.relatedAssets, { priorityScore: normalized.significance });
         const enriched = {
           ...normalized,
