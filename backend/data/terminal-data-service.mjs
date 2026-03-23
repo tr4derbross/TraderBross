@@ -22,7 +22,13 @@ import { fetchExchangeAnnouncements } from "./adapters/news-exchange-announcemen
 import { fetchTreeOfAlphaNews } from "./adapters/news-treeofalpha.adapter.mjs";
 import { createTreeOfAlphaNewsStream } from "./adapters/news-treeofalpha.adapter.mjs";
 import { fetchNinjaNewsBundle } from "./adapters/news-ninjanews.adapter.mjs";
-import { createBinanceLargeTradeStream, createLiquidationEventStream, fetchOnchainWhaleEvents } from "./adapters/onchain-whale-events.adapter.mjs";
+import {
+  createBinanceLargeTradeStream,
+  createBybitLiquidationEventStream,
+  createLiquidationEventStream,
+  createOkxLiquidationEventStream,
+  fetchOnchainWhaleEvents,
+} from "./adapters/onchain-whale-events.adapter.mjs";
 import { fetchCoingeckoCoinMetadata } from "./adapters/coingecko-metadata.adapter.mjs";
 import { fetchCoinpaprikaCoinMetadata } from "./adapters/coinpaprika-metadata.adapter.mjs";
 import { fetchBinanceLargeTradeEvents } from "./adapters/whale-binance-trades.adapter.mjs";
@@ -154,6 +160,8 @@ export function createTerminalDataService({ config, logger }) {
   let stopOkxQuotes = null;
   let stopBybitQuotes = null;
   let stopLiquidations = null;
+  let stopBybitLiquidations = null;
+  let stopOkxLiquidations = null;
   let stopWhaleTape = null;
   let stopTreeNews = null;
   let intervals = [];
@@ -745,6 +753,44 @@ export function createTerminalDataService({ config, logger }) {
         publish("whaleEvents", state.whaleEvents);
       },
     });
+    stopBybitLiquidations = createBybitLiquidationEventStream({
+      logger,
+      symbols: (config.whaleFallback?.symbols || ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"])
+        .map((s) => String(s || "").toUpperCase()),
+      minUsd: 10_000,
+      onEvent(rawEvent) {
+        const normalized = whaleEngine.normalize(rawEvent);
+        if (!normalized) return;
+        const relevance = relevanceEngine.score(normalized.relatedAssets, { priorityScore: normalized.significance });
+        const enriched = {
+          ...normalized,
+          watchlistRelevance: relevance.score,
+          relevanceLabels: relevance.labels,
+          priorityLabel: relevance.priorityLabel,
+        };
+        const liquidation = toFrontendLiquidation(enriched);
+        state.liquidations = [liquidation, ...state.liquidations.filter((item) => item.id !== liquidation.id)].slice(0, 120);
+        publish("liquidation", liquidation);
+      },
+    });
+    stopOkxLiquidations = createOkxLiquidationEventStream({
+      logger,
+      minUsd: 10_000,
+      onEvent(rawEvent) {
+        const normalized = whaleEngine.normalize(rawEvent);
+        if (!normalized) return;
+        const relevance = relevanceEngine.score(normalized.relatedAssets, { priorityScore: normalized.significance });
+        const enriched = {
+          ...normalized,
+          watchlistRelevance: relevance.score,
+          relevanceLabels: relevance.labels,
+          priorityLabel: relevance.priorityLabel,
+        };
+        const liquidation = toFrontendLiquidation(enriched);
+        state.liquidations = [liquidation, ...state.liquidations.filter((item) => item.id !== liquidation.id)].slice(0, 120);
+        publish("liquidation", liquidation);
+      },
+    });
 
     stopWhaleTape = createBinanceLargeTradeStream({
       logger,
@@ -977,6 +1023,8 @@ export function createTerminalDataService({ config, logger }) {
     if (stopOkxQuotes) stopOkxQuotes();
     if (stopBybitQuotes) stopBybitQuotes();
     if (stopLiquidations) stopLiquidations();
+    if (stopBybitLiquidations) stopBybitLiquidations();
+    if (stopOkxLiquidations) stopOkxLiquidations();
     if (stopWhaleTape) stopWhaleTape();
     if (stopTreeNews) stopTreeNews();
     stopHyperliquid = null;
@@ -984,6 +1032,8 @@ export function createTerminalDataService({ config, logger }) {
     stopOkxQuotes = null;
     stopBybitQuotes = null;
     stopLiquidations = null;
+    stopBybitLiquidations = null;
+    stopOkxLiquidations = null;
     stopWhaleTape = null;
     stopTreeNews = null;
     intervals.forEach(clearInterval);

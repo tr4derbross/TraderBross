@@ -8,6 +8,7 @@ const DEFAULT_THRESHOLDS = {
       USDC: 5_000_000,
     },
     byEventType: {
+      liquidation: 50_000,
       exchange_inflow: 1_000_000,
       exchange_outflow: 1_000_000,
       stablecoin_mint: 3_000_000,
@@ -25,6 +26,7 @@ const DEFAULT_THRESHOLDS = {
       USDT: 2_000_000,
     },
     byEventType: {
+      liquidation: 30_000,
       exchange_inflow: 600_000,
       exchange_outflow: 600_000,
       stablecoin_mint: 1_000_000,

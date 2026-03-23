@@ -159,3 +159,166 @@ export function createBinanceLargeTradeStream({
     if (socket) socket.terminate();
   };
 }
+
+export function createBybitLiquidationEventStream({
+  logger,
+  onEvent,
+  symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"],
+  minUsd = 10_000,
+} = {}) {
+  let socket = null;
+  let closed = false;
+  let reconnectTimer = null;
+  const topics = (Array.isArray(symbols) ? symbols : [])
+    .map((s) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, ""))
+    .filter(Boolean)
+    .slice(0, 12)
+    .map((symbol) => `allLiquidation.${symbol}`);
+  if (topics.length === 0) return () => {};
+
+  const connect = () => {
+    if (closed) return;
+    socket = new WebSocket("wss://stream.bybit.com/v5/public/linear");
+
+    socket.on("open", () => {
+      logger?.info?.("data.adapter.bybit_liquidations.connected", { topics: topics.length });
+      socket?.send(JSON.stringify({ op: "subscribe", args: topics }));
+    });
+
+    socket.on("message", (raw) => {
+      try {
+        const payload = JSON.parse(raw.toString());
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        for (const row of rows) {
+          const symbol = String(row?.symbol || "").toUpperCase();
+          const token = symbol.replace(/USDT$|USDC$/i, "");
+          const sideRaw = String(row?.side || "").toLowerCase();
+          const side = sideRaw === "buy" ? "bullish" : "bearish";
+          const qty = Number(row?.size || row?.qty || 0);
+          const price = Number(row?.price || row?.execPrice || 0);
+          const usdValue = qty * price;
+          if (!symbol || !Number.isFinite(usdValue) || usdValue < Number(minUsd || 0)) continue;
+          onEvent?.({
+            id: `bybit-liq-${symbol}-${row?.updatedTime || row?.T || Date.now()}`,
+            token,
+            amount: qty,
+            usdValue,
+            fromLabel: "Bybit Perp Position",
+            fromOwnerType: "derivatives",
+            toLabel: "Liquidated",
+            toOwnerType: "derivatives",
+            txHash: null,
+            chain: "bybit_futures",
+            eventType: "liquidation",
+            sentiment: side,
+            timestamp: new Date(Number(row?.updatedTime || row?.time || Date.now())).toISOString(),
+            provider: "bybit_liquidations",
+            rawText: `${symbol} liquidation @ ${price}`,
+            price,
+          });
+        }
+      } catch (error) {
+        logger?.warn?.("data.adapter.bybit_liquidations.parse_error", { error: String(error) });
+      }
+    });
+
+    socket.on("error", (error) => {
+      logger?.warn?.("data.adapter.bybit_liquidations.error", { error: String(error) });
+      socket?.close();
+    });
+    socket.on("close", () => {
+      socket = null;
+      if (closed) return;
+      logger?.warn?.("data.adapter.bybit_liquidations.disconnected");
+      reconnectTimer = setTimeout(connect, 3000);
+    });
+  };
+
+  connect();
+  return () => {
+    closed = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (socket) socket.terminate();
+  };
+}
+
+export function createOkxLiquidationEventStream({
+  logger,
+  onEvent,
+  minUsd = 10_000,
+} = {}) {
+  let socket = null;
+  let closed = false;
+  let reconnectTimer = null;
+
+  const connect = () => {
+    if (closed) return;
+    socket = new WebSocket("wss://ws.okx.com:8443/ws/v5/public");
+
+    socket.on("open", () => {
+      logger?.info?.("data.adapter.okx_liquidations.connected");
+      socket?.send(
+        JSON.stringify({
+          op: "subscribe",
+          args: [{ channel: "liquidation-orders", instType: "SWAP" }],
+        }),
+      );
+    });
+
+    socket.on("message", (raw) => {
+      try {
+        const payload = JSON.parse(raw.toString());
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        for (const row of rows) {
+          const instId = String(row?.instId || row?.instFamily || "");
+          const symbol = instId.split("-")[0] || "";
+          if (!symbol) continue;
+          const sideRaw = String(row?.side || "").toLowerCase();
+          const side = sideRaw === "buy" ? "bullish" : "bearish";
+          const qty = Number(row?.sz || row?.size || 0);
+          const price = Number(row?.bkPx || row?.px || row?.price || 0);
+          const usdValue = qty * price;
+          if (!Number.isFinite(usdValue) || usdValue < Number(minUsd || 0)) continue;
+          onEvent?.({
+            id: `okx-liq-${instId}-${row?.ts || Date.now()}`,
+            token: symbol,
+            amount: qty,
+            usdValue,
+            fromLabel: "OKX Perp Position",
+            fromOwnerType: "derivatives",
+            toLabel: "Liquidated",
+            toOwnerType: "derivatives",
+            txHash: null,
+            chain: "okx_futures",
+            eventType: "liquidation",
+            sentiment: side,
+            timestamp: new Date(Number(row?.ts || Date.now())).toISOString(),
+            provider: "okx_liquidations",
+            rawText: `${instId} liquidation @ ${price}`,
+            price,
+          });
+        }
+      } catch (error) {
+        logger?.warn?.("data.adapter.okx_liquidations.parse_error", { error: String(error) });
+      }
+    });
+
+    socket.on("error", (error) => {
+      logger?.warn?.("data.adapter.okx_liquidations.error", { error: String(error) });
+      socket?.close();
+    });
+    socket.on("close", () => {
+      socket = null;
+      if (closed) return;
+      logger?.warn?.("data.adapter.okx_liquidations.disconnected");
+      reconnectTimer = setTimeout(connect, 3000);
+    });
+  };
+
+  connect();
+  return () => {
+    closed = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (socket) socket.terminate();
+  };
+}

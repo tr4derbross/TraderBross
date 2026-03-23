@@ -33,6 +33,7 @@ function normalizeEventType(input) {
     "large_transfer",
     "exchange_inflow",
     "exchange_outflow",
+    "liquidation",
     "stablecoin_mint",
     "stablecoin_burn",
     "treasury_movement",

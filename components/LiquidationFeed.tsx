@@ -42,6 +42,9 @@ function LiquidationRow({ event, isNew }: { event: LiquidationEvent; isNew: bool
   const isLong = event.side === "long";
   const isBig = event.usdValue >= 1_000_000;
   const sideColor = isLong ? "#0ecb81" : "#f6465d";
+  const source = String((event as unknown as { provider?: string }).provider || "").toLowerCase();
+  const venueLabel =
+    source.includes("bybit") ? "Bybit" : source.includes("okx") ? "OKX" : "Binance";
 
   return (
     <div
@@ -65,7 +68,7 @@ function LiquidationRow({ event, isNew }: { event: LiquidationEvent; isNew: bool
         <div className="text-[9px] text-zinc-600">@ ${formatPrice(event.price)}</div>
       </div>
       <div className="shrink-0 text-right">
-        <div className="text-[9px] font-semibold text-zinc-400">Binance</div>
+        <div className="text-[9px] font-semibold text-zinc-400">{venueLabel}</div>
         <div className="text-[9px] text-zinc-600 tabular-nums">{timeAgo(event.timestamp)}</div>
       </div>
     </div>
