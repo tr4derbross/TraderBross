@@ -766,48 +766,56 @@ export function createTerminalDataService({ config, logger }) {
         publish("liquidation", liquidation);
       },
     });
-    stopBybitLiquidations = createBybitLiquidationEventStream({
-      logger,
-      symbols: (config.whaleFallback?.symbols || ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"])
-        .map((s) => String(s || "").toUpperCase()),
-      minUsd: 25_000,
-      reconnectBaseMs: 12_000,
-      reconnectMaxMs: 90_000,
-      onEvent(rawEvent) {
-        const normalized = whaleEngine.normalize(rawEvent);
-        if (!normalized) return;
-        const relevance = relevanceEngine.score(normalized.relatedAssets, { priorityScore: normalized.significance });
-        const enriched = {
-          ...normalized,
-          watchlistRelevance: relevance.score,
-          relevanceLabels: relevance.labels,
-          priorityLabel: relevance.priorityLabel,
-        };
-        const liquidation = toFrontendLiquidation(enriched);
-        state.liquidations = [liquidation, ...state.liquidations.filter((item) => item.id !== liquidation.id)].slice(0, 120);
-        publish("liquidation", liquidation);
-      },
-    });
-    stopOkxLiquidations = createOkxLiquidationEventStream({
-      logger,
-      minUsd: 25_000,
-      reconnectBaseMs: 12_000,
-      reconnectMaxMs: 90_000,
-      onEvent(rawEvent) {
-        const normalized = whaleEngine.normalize(rawEvent);
-        if (!normalized) return;
-        const relevance = relevanceEngine.score(normalized.relatedAssets, { priorityScore: normalized.significance });
-        const enriched = {
-          ...normalized,
-          watchlistRelevance: relevance.score,
-          relevanceLabels: relevance.labels,
-          priorityLabel: relevance.priorityLabel,
-        };
-        const liquidation = toFrontendLiquidation(enriched);
-        state.liquidations = [liquidation, ...state.liquidations.filter((item) => item.id !== liquidation.id)].slice(0, 120);
-        publish("liquidation", liquidation);
-      },
-    });
+    if (featureFlags.enableBybitLiquidations) {
+      stopBybitLiquidations = createBybitLiquidationEventStream({
+        logger,
+        symbols: (config.whaleFallback?.symbols || ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"])
+          .map((s) => String(s || "").toUpperCase()),
+        minUsd: 25_000,
+        reconnectBaseMs: 12_000,
+        reconnectMaxMs: 90_000,
+        onEvent(rawEvent) {
+          const normalized = whaleEngine.normalize(rawEvent);
+          if (!normalized) return;
+          const relevance = relevanceEngine.score(normalized.relatedAssets, { priorityScore: normalized.significance });
+          const enriched = {
+            ...normalized,
+            watchlistRelevance: relevance.score,
+            relevanceLabels: relevance.labels,
+            priorityLabel: relevance.priorityLabel,
+          };
+          const liquidation = toFrontendLiquidation(enriched);
+          state.liquidations = [liquidation, ...state.liquidations.filter((item) => item.id !== liquidation.id)].slice(0, 120);
+          publish("liquidation", liquidation);
+        },
+      });
+    } else {
+      stopBybitLiquidations = null;
+    }
+    if (featureFlags.enableOkxLiquidations) {
+      stopOkxLiquidations = createOkxLiquidationEventStream({
+        logger,
+        minUsd: 25_000,
+        reconnectBaseMs: 12_000,
+        reconnectMaxMs: 90_000,
+        onEvent(rawEvent) {
+          const normalized = whaleEngine.normalize(rawEvent);
+          if (!normalized) return;
+          const relevance = relevanceEngine.score(normalized.relatedAssets, { priorityScore: normalized.significance });
+          const enriched = {
+            ...normalized,
+            watchlistRelevance: relevance.score,
+            relevanceLabels: relevance.labels,
+            priorityLabel: relevance.priorityLabel,
+          };
+          const liquidation = toFrontendLiquidation(enriched);
+          state.liquidations = [liquidation, ...state.liquidations.filter((item) => item.id !== liquidation.id)].slice(0, 120);
+          publish("liquidation", liquidation);
+        },
+      });
+    } else {
+      stopOkxLiquidations = null;
+    }
 
     stopWhaleTape = createBinanceLargeTradeStream({
       logger,

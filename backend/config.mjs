@@ -142,6 +142,8 @@ export function loadConfig() {
       enableNewsNinja: toBoolean(process.env.FEATURE_NEWS_NINJA, true),
       enableWhaleApi: toBoolean(process.env.FEATURE_WHALE_ALERT, true),
       enableWhaleEngine: toBoolean(process.env.FEATURE_WHALE_ENGINE, true),
+      enableBybitLiquidations: toBoolean(process.env.FEATURE_BYBIT_LIQUIDATIONS, false),
+      enableOkxLiquidations: toBoolean(process.env.FEATURE_OKX_LIQUIDATIONS, false),
       enableHyperliquidWs: toBoolean(process.env.FEATURE_HYPERLIQUID_WS, true),
       enableBinanceFunding: toBoolean(process.env.FEATURE_BINANCE_FUNDING, true),
       enableCoincap: toBoolean(process.env.FEATURE_COINCAP, true),
