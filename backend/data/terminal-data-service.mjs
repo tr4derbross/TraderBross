@@ -125,6 +125,7 @@ export function createTerminalDataService({ config, logger }) {
     whales: { status: "idle", providerCalls: 0, cacheHits: 0, staleServed: 0, lastSuccessAt: null, lastErrorAt: null, lastError: null },
   };
   const providerCooldownUntil = new Map();
+  const providerRateLimitState = new Map();
 
   function isRateLimitedError(error) {
     const message = String(error || "").toLowerCase();
@@ -302,12 +303,26 @@ export function createTerminalDataService({ config, logger }) {
         providerHealth[providerName].providerCalls += 1;
         const value = await runRateLimited(limiter, limiterKey, primary);
         providerCooldownUntil.set(providerName, 0);
+        providerRateLimitState.set(providerName, { streak: 0, lastCooldownMs: 0 });
         markProvider(providerName, "ok");
         return value;
       } catch (primaryError) {
         if (isRateLimitedError(primaryError)) {
-          const cooldownMs = Math.max(30_000, Number(ttl.marketSnapshotMs) || 20_000) * 6;
+          const previous = providerRateLimitState.get(providerName) || { streak: 0, lastCooldownMs: 0 };
+          const nextStreak = Math.max(1, Number(previous.streak) + 1);
+          // Keep cooldown bounded for free-tier resilience:
+          // starts around 60s and grows exponentially up to 15 minutes.
+          const baseCooldownMs = Math.min(5 * 60_000, Math.max(60_000, Number(ttlMs) || 20_000));
+          const exponentialCooldown = Math.min(15 * 60_000, baseCooldownMs * (2 ** (nextStreak - 1)));
+          const jitter = Math.floor(Math.random() * Math.max(1000, exponentialCooldown * 0.15));
+          const cooldownMs = Math.min(15 * 60_000, exponentialCooldown + jitter);
+          providerRateLimitState.set(providerName, { streak: nextStreak, lastCooldownMs: cooldownMs });
           providerCooldownUntil.set(providerName, Date.now() + cooldownMs);
+          logger?.warn?.("data.provider.rate_limited_backoff", {
+            provider: providerName,
+            streak: nextStreak,
+            cooldownMs,
+          });
         }
         if (!fallback) {
           markProvider(providerName, "degraded", primaryError);
