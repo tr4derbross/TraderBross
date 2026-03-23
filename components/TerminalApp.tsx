@@ -71,64 +71,6 @@ function normalizeVenueTicker(value: string) {
 }
 
 
-/* ─── Funding Stats Bar ─────────────────────────────────────────────────────── */
-function _StatChip({ label, value, valueClass = "text-zinc-400" }: { label: string; value: string; valueClass?: string }) {
-  return (
-    <div className="flex items-center gap-1.5 shrink-0">
-      <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-zinc-600">{label}</span>
-      <span className={`text-[10px] font-semibold tabular-nums ${valueClass}`}>{value}</span>
-    </div>
-  );
-}
-
-function FundingStatsBar({ ticker }: { ticker: string }) {
-  const [funding, setFunding] = useState<number | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    apiFetch<Array<{ symbol?: string; fundingRate?: string | number | null }> | { rates?: { venue: string; rate: number | null }[] }>(`/api/funding?ticker=${ticker}`)
-      .then((d) => {
-        if (!active) return;
-        if (Array.isArray(d)) {
-          const normalizedTicker = String(ticker || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-          const match =
-            d.find((row) => String(row.symbol || "").toUpperCase() === `${normalizedTicker}USDT`) ??
-            d.find((row) => String(row.symbol || "").toUpperCase() === `${normalizedTicker}USDC`) ??
-            d[0];
-          const value = Number(match?.fundingRate ?? NaN);
-          setFunding(Number.isFinite(value) ? value : null);
-          return;
-        }
-        const item = d.rates?.find((r) => r.venue === "Binance") ?? d.rates?.[0];
-        setFunding(item?.rate ?? null);
-      })
-      .catch(() => {});
-    return () => { active = false; };
-  }, [ticker]);
-
-  const fmtFund = funding !== null
-    ? `${funding >= 0 ? "+" : ""}${(funding * 100).toFixed(4)}%`
-    : "—";
-  const fundColor = funding === null ? "text-zinc-600" : funding >= 0 ? "text-emerald-400" : "text-red-400";
-
-  return (
-    <div
-      className="shrink-0 flex items-center gap-4 px-3 py-1 border-b overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      style={{ borderColor: "rgba(212,161,31,0.1)", background: "rgba(8,7,6,0.9)", minHeight: 28 }}
-    >
-      <_StatChip label="FUNDING" value={fmtFund} valueClass={fundColor} />
-      <span className="text-zinc-800 text-[8px]">·</span>
-      <_StatChip label="OI" value="—" />
-      <span className="text-zinc-800 text-[8px]">·</span>
-      <_StatChip label="L/S" value="—" />
-      <span className="text-zinc-800 text-[8px]">·</span>
-      <_StatChip label="LIQD 24H" value="—" />
-      <span className="text-zinc-800 text-[8px]">·</span>
-      <_StatChip label="CVD" value="—" />
-    </div>
-  );
-}
-
 /* ─── Order Book Mini ────────────────────────────────────────────────────────── */
 type OBEntry = [string, string, string, string]; // [price, qty, ?, ?]
 
@@ -139,6 +81,7 @@ function OrderBookMini({ ticker }: { ticker: string }) {
   useEffect(() => {
     let active = true;
     const poll = async () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       try {
         const res = await apiFetch<{ bids: OBEntry[]; asks: OBEntry[] }>(
           `/api/okx/orderbook?ticker=${ticker}&sz=4`
@@ -149,7 +92,7 @@ function OrderBookMini({ ticker }: { ticker: string }) {
       } catch {}
     };
     poll();
-    const id = setInterval(poll, 2500);
+    const id = setInterval(poll, 5000);
     return () => { active = false; clearInterval(id); };
   }, [ticker]);
 
@@ -779,16 +722,24 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       }
     };
 
-    void fetchVenueData();
+    const shouldPollVenue =
+      activeVenueState.connectionStatus === "connected" ||
+      activeVenueState.connectionStatus === "saved_locally";
 
-    // Poll every 10s while connected
-    const pollInterval = setInterval(() => {
+    if (shouldPollVenue) {
       void fetchVenueData();
-    }, 10_000);
+    }
+
+    // Poll every 15s only when a venue connection exists
+    const pollInterval = shouldPollVenue
+      ? setInterval(() => {
+          void fetchVenueData();
+        }, 15_000)
+      : null;
 
     return () => {
       cancelled = true;
-      clearInterval(pollInterval);
+      if (pollInterval) clearInterval(pollInterval);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeVenueState.venueId, activeVenueState.connectionStatus, hlVaultToken, vaultTokens, venueRefreshTick]);

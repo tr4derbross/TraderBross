@@ -135,7 +135,13 @@ export default function TradingPanel({
 
   useEffect(() => {
     let active = true;
-    setVenueFallbackMark(null);
+    const hasLivePrice = Number.isFinite(prices[ticker]) && prices[ticker] > 0;
+    if (hasLivePrice) {
+      setVenueFallbackMark(null);
+      return () => {
+        active = false;
+      };
+    }
 
     const endpoint =
       activeVenueState.venueId === "okx"
@@ -163,12 +169,12 @@ export default function TradingPanel({
     };
 
     void loadMark();
-    const id = setInterval(loadMark, 8_000);
+    const id = setInterval(loadMark, 20_000);
     return () => {
       active = false;
       clearInterval(id);
     };
-  }, [activeVenueState.venueId, quoteAsset, ticker]);
+  }, [activeVenueState.venueId, prices, quoteAsset, ticker]);
 
   useEffect(() => {
     setTicker(activeVenueState.activeSymbol);
