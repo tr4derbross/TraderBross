@@ -84,3 +84,78 @@ export function createLiquidationEventStream({ logger, onEvent }) {
     if (socket) socket.terminate();
   };
 }
+
+export function createBinanceLargeTradeStream({
+  logger,
+  onEvent,
+  symbols = ["btcusdt", "ethusdt", "solusdt", "bnbusdt", "xrpusdt", "dogeusdt"],
+  minUsd = 250_000,
+} = {}) {
+  let socket = null;
+  let closed = false;
+  let reconnectTimer = null;
+  const safeSymbols = (Array.isArray(symbols) ? symbols : [])
+    .map((s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""))
+    .filter(Boolean)
+    .slice(0, 12);
+  if (safeSymbols.length === 0) return () => {};
+  const streamPath = safeSymbols.map((s) => `${s}@aggTrade`).join("/");
+  const WS_URL = `wss://fstream.binance.com/stream?streams=${streamPath}`;
+
+  const connect = () => {
+    if (closed) return;
+    socket = new WebSocket(WS_URL);
+
+    socket.on("open", () => logger?.info?.("data.adapter.whale_tape.connected", { streams: safeSymbols.length }));
+    socket.on("message", (raw) => {
+      try {
+        const payload = JSON.parse(raw.toString());
+        const trade = payload?.data || payload;
+        const symbol = String(trade?.s || "").toUpperCase();
+        const price = Number(trade?.p || 0);
+        const qty = Number(trade?.q || 0);
+        const usdValue = price * qty;
+        if (!symbol || !Number.isFinite(usdValue) || usdValue < Number(minUsd || 0)) return;
+        const token = symbol.replace(/USDT$|USDC$/i, "");
+        onEvent?.({
+          id: `binance-ws-trade-${symbol}-${trade?.a ?? trade?.T ?? Date.now()}`,
+          chain: "binance_futures",
+          txHash: null,
+          token,
+          amount: qty,
+          usdValue,
+          fromLabel: trade?.m ? "Aggressive Seller" : "Aggressive Buyer",
+          fromOwnerType: "smart_money",
+          toLabel: "Perp Tape",
+          toOwnerType: "derivatives",
+          eventType: "smart_money_watch",
+          timestamp: new Date(Number(trade?.T || Date.now())).toISOString(),
+          relatedAssets: [token],
+          provider: "binance_ws_large_trades",
+          rawText: `${symbol} large aggTrade @ ${price}`,
+          price,
+        });
+      } catch (error) {
+        logger?.warn?.("data.adapter.whale_tape.parse_error", { error: String(error) });
+      }
+    });
+
+    socket.on("error", (error) => {
+      logger?.warn?.("data.adapter.whale_tape.error", { error: String(error) });
+      socket?.close();
+    });
+    socket.on("close", () => {
+      socket = null;
+      if (closed) return;
+      logger?.warn?.("data.adapter.whale_tape.disconnected");
+      reconnectTimer = setTimeout(connect, 3000);
+    });
+  };
+
+  connect();
+  return () => {
+    closed = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (socket) socket.terminate();
+  };
+}

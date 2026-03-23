@@ -5,7 +5,8 @@ import { refreshRealtimeSnapshot, useRealtimeSelector } from "@/lib/realtime-cli
 import type { NewsItem } from "@/lib/mock-data";
 import { formatCompact, timeAgo } from "@/lib/format-utils";
 
-const DEV_SIM_ENABLED = process.env.NEXT_PUBLIC_ENABLE_DEV_SIM_FEEDS === "true";
+const DEV_SIM_ENABLED =
+  process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_DEV_SIM_FEEDS === "true";
 
 const DEV_TOKENS = ["BTC", "ETH", "SOL", "BNB", "XRP", "USDT"];
 const DEV_EXCHANGES = ["Binance", "Coinbase", "Kraken", "OKX", "Bybit"];
@@ -155,4 +156,3 @@ export default function WhaleFeed({ onPulse }: { onPulse?: () => void }) {
     </div>
   );
 }
-
