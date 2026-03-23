@@ -300,6 +300,24 @@ async function normalizeBinancePrice(baseUrl, symbol, value) {
   return toWireDecimal(floored, precision);
 }
 
+async function getBinanceMarkPrice(baseUrl, symbol) {
+  const cacheKey = `binance:mark:${baseUrl}:${String(symbol || "").toUpperCase()}`;
+  return endpointCache.remember(cacheKey, 1500, async () => {
+    const res = await fetch(`${baseUrl}/fapi/v1/premiumIndex?symbol=${encodeURIComponent(symbol)}`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload?.msg || `Binance mark price error ${res.status}`);
+    }
+    const markPrice = parseFloat(payload?.markPrice || "0");
+    if (!Number.isFinite(markPrice) || markPrice <= 0) {
+      throw new Error(`Could not fetch mark price for ${symbol}`);
+    }
+    return markPrice;
+  });
+}
+
 function concatBytes(parts) {
   const total = parts.reduce((sum, part) => sum + part.length, 0);
   const merged = new Uint8Array(total);
@@ -1757,13 +1775,57 @@ const server = http.createServer(async (request, reply) => {
           if (!res.ok) throw new Error(data.msg || `Binance algo error ${res.status}`);
           return data;
         };
-        const cancelExistingBinanceTpSl = async () => {
+        const isExistingCloseTpSlConflict = (errorMessage) => {
+          const msg = String(errorMessage || "").toLowerCase();
+          return msg.includes("closeposition") && msg.includes("existing");
+        };
+        const cancelExistingBinanceTpSl = async (sideFilter = "") => {
+          // 1) Regular conditional orders (STOP_MARKET / TAKE_PROFIT_MARKET with closePosition=true)
+          try {
+            const qsOpen = binanceSignedQuery(apiSecret, { symbol });
+            const openRes = await fetch(`${base}/fapi/v1/openOrders?${qsOpen}`, {
+              headers: { "X-MBX-APIKEY": apiKey },
+              signal: AbortSignal.timeout(6000),
+            });
+            const openRows = await openRes.json().catch(() => []);
+            if (openRes.ok && Array.isArray(openRows) && openRows.length > 0) {
+              const candidates = openRows.filter((row) => {
+                const ordType = String(row?.type || "").toUpperCase();
+                if (ordType !== "STOP_MARKET" && ordType !== "TAKE_PROFIT_MARKET") return false;
+                const closePosition = String(row?.closePosition || "").toLowerCase() === "true";
+                const reduceOnly = String(row?.reduceOnly || "").toLowerCase() === "true";
+                const matchesSide = sideFilter ? String(row?.side || "").toUpperCase() === sideFilter : true;
+                return matchesSide && (closePosition || reduceOnly);
+              });
+              if (candidates.length > 0) {
+                await Promise.allSettled(
+                  candidates.map((row) =>
+                    binanceDelete("/fapi/v1/order", { symbol, orderId: String(row?.orderId || "") }).catch(() => null),
+                  ),
+                );
+              }
+            }
+          } catch {
+            // best effort
+          }
+          // 2) Algo conditional orders endpoint
           const qs = binanceSignedQuery(apiSecret, { symbol, algoType: "CONDITIONAL" });
           await fetch(`${base}/fapi/v1/algoOpenOrders?${qs}`, {
             method: "DELETE",
             headers: { "X-MBX-APIKEY": apiKey },
             signal: AbortSignal.timeout(6000),
           }).catch(() => null);
+        };
+        const safeBinanceAlgoPost = async (params) => {
+          try {
+            return await binanceAlgoPost(params);
+          } catch (error) {
+            if (!isExistingCloseTpSlConflict(String(error))) {
+              throw error;
+            }
+            await cancelExistingBinanceTpSl(String(params?.side || ""));
+            return binanceAlgoPost(params);
+          }
         };
         if (body.type === "leverage") {
           const leverage = Math.max(1, Math.min(125, Math.round(Number(body.leverage) || 1)));
@@ -1834,7 +1896,7 @@ const server = http.createServer(async (request, reply) => {
         if (body.type === "tpsl") {
           // Place TP and/or SL conditional orders with closePosition=true
           const tpslSide = body.side === "long" ? "SELL" : "BUY";
-          await cancelExistingBinanceTpSl();
+          await cancelExistingBinanceTpSl(tpslSide);
           const normalizedTp = body.tpPrice ? await normalizeBinancePrice(base, symbol, body.tpPrice) : null;
           if (body.tpPrice && !normalizedTp) {
             json(reply, 400, { ok: false, error: "Invalid TP price." });
@@ -1849,7 +1911,7 @@ const server = http.createServer(async (request, reply) => {
           const tasks = [];
           if (normalizedTp) {
             tasks.push(
-              binanceAlgoPost({
+              safeBinanceAlgoPost({
                 algoType: "CONDITIONAL",
                 symbol,
                 side: tpslSide,
@@ -1862,7 +1924,7 @@ const server = http.createServer(async (request, reply) => {
           }
           if (normalizedSl) {
             tasks.push(
-              binanceAlgoPost({
+              safeBinanceAlgoPost({
                 algoType: "CONDITIONAL",
                 symbol,
                 side: tpslSide,
@@ -1897,10 +1959,7 @@ const server = http.createServer(async (request, reply) => {
             binancePost("/fapi/v1/leverage", { symbol, leverage: String(leverage) }),
           ]);
           // Fetch mark price
-          const mpRes = await fetch(`${base}/fapi/v1/premiumIndex?symbol=${symbol}`, { signal: AbortSignal.timeout(5000) });
-          const mpData = await mpRes.json();
-          const markPrice = parseFloat(mpData.markPrice || "0");
-          if (!markPrice) throw new Error(`Could not fetch mark price for ${symbol}`);
+          const markPrice = await getBinanceMarkPrice(base, symbol);
           const qty = (marginAmount * leverage) / markPrice;
           const quantity = await normalizeBinanceQuantity(base, symbol, qty);
           if (!quantity) {
@@ -1945,7 +2004,7 @@ const server = http.createServer(async (request, reply) => {
           const tpslTasks = [];
           if (normalizedTp) {
             tpslTasks.push(
-              binanceAlgoPost({
+              safeBinanceAlgoPost({
                 algoType: "CONDITIONAL",
                 symbol,
                 side: tpslSide,
@@ -1958,7 +2017,7 @@ const server = http.createServer(async (request, reply) => {
           }
           if (normalizedSl) {
             tpslTasks.push(
-              binanceAlgoPost({
+              safeBinanceAlgoPost({
                 algoType: "CONDITIONAL",
                 symbol,
                 side: tpslSide,
