@@ -510,6 +510,7 @@ export default function BottomPanel({
                   const breakEvenPrice = calcBreakEvenPrice(pos);
                   const marginRatio = calcMarginRatio(pos);
                   const fundingEstimate = calcEstimatedFunding(pos);
+                  const sizeNotional = Math.max(pos.amount * pos.currentPrice, 0);
                   const liqDistancePct = Math.abs((pos.currentPrice - pos.liquidationPrice) / Math.max(pos.currentPrice, 0.000001)) * 100;
                   const liqRiskLevel = liqDistancePct <= 2 ? "critical" : liqDistancePct <= 5 ? "warning" : "normal";
 
@@ -565,8 +566,12 @@ export default function BottomPanel({
 
                       {/* Size */}
                       <td className="px-3 py-2.5">
-                        <div className="tabular-nums text-emerald-300">{pos.amount.toFixed(4)} USDT</div>
-                        <div className="tabular-nums text-[10px] text-zinc-500">{pos.leverage}x</div>
+                        <div className="tabular-nums text-emerald-300">
+                          {sizeNotional.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 })} USDT
+                        </div>
+                        <div className="tabular-nums text-[10px] text-zinc-500">
+                          {pos.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} {pos.ticker} · {pos.leverage}x
+                        </div>
                       </td>
 
                       {/* Entry */}
