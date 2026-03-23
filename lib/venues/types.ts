@@ -18,9 +18,14 @@ export type VenuePosition = {
   side: "long" | "short";
   size: number;
   entryPrice: number;
+  breakEvenPrice?: number;
+  markPrice?: number;
   pnl?: number;
   liquidationPrice?: number | null;
   leverage?: number;
+  margin?: number;
+  marginRatio?: number;
+  estimatedFundingFee?: number;
   marginMode?: "isolated" | "cross";
   tpPrice?: number;
   slPrice?: number;

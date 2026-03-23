@@ -14,8 +14,11 @@ export type Position = {
   amount: number;
   entryPrice: number;
   currentPrice: number;
+  breakEvenPrice?: number;
   leverage: number;
   margin: number;
+  marginRatio?: number;
+  estimatedFundingFee?: number;
   marginMode: MarginMode;
   liquidationPrice: number;
   tpPrice?: number;

@@ -775,14 +775,16 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const displayPositions: Position[] = useMemo(() => {
     if (!venuePositions) return positions;
     return venuePositions.map((p): Position => {
-      // Derive current mark price: use live ws price if available, else back-compute from pnl
-      const markPrice = wsPrices[p.symbol] ??
+      // Prefer exchange-native mark/break-even when available for 1:1 venue parity.
+      const markPrice = p.markPrice ??
+        wsPrices[p.symbol] ??
         (p.size > 0
           ? p.side === "long"
             ? p.entryPrice + (p.pnl ?? 0) / p.size
             : p.entryPrice - (p.pnl ?? 0) / p.size
           : p.entryPrice);
       const lev = p.leverage ?? 1;
+      const margin = Number.isFinite(Number(p.margin)) ? Number(p.margin) : (p.size * p.entryPrice) / lev;
       return {
         id: `${p.symbol}_${p.side}`,
         ticker: p.symbol,
@@ -790,8 +792,11 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         amount: p.size,
         entryPrice: p.entryPrice,
         currentPrice: markPrice,
+        breakEvenPrice: Number.isFinite(Number(p.breakEvenPrice)) ? Number(p.breakEvenPrice) : undefined,
         leverage: lev,
-        margin: (p.size * p.entryPrice) / lev,
+        margin,
+        marginRatio: Number.isFinite(Number(p.marginRatio)) ? Number(p.marginRatio) : undefined,
+        estimatedFundingFee: Number.isFinite(Number(p.estimatedFundingFee)) ? Number(p.estimatedFundingFee) : undefined,
         marginMode: p.marginMode ?? "isolated",
         liquidationPrice: p.liquidationPrice ?? 0,
         tpPrice: venueTpSlMap[`${p.symbol}_${p.side}`]?.tpPrice ?? p.tpPrice ?? undefined,

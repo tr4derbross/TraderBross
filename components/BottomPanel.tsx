@@ -48,17 +48,26 @@ function calcPriceFromPercent(position: Position, percent: string, target: "tp" 
 }
 
 function calcBreakEvenPrice(position: Position) {
+  if (Number.isFinite(Number(position.breakEvenPrice)) && Number(position.breakEvenPrice) > 0) {
+    return Number(position.breakEvenPrice);
+  }
   const feeRate = 0.0005 * 2;
   if (position.side === "long") return position.entryPrice * (1 + feeRate);
   return Math.max(0, position.entryPrice * (1 - feeRate));
 }
 
 function calcMarginRatio(position: Position) {
+  if (Number.isFinite(Number(position.marginRatio))) {
+    return Number(position.marginRatio);
+  }
   const notional = Math.max(position.amount * position.currentPrice, 0.000001);
   return (position.margin / notional) * 100;
 }
 
 function calcEstimatedFunding(position: Position) {
+  if (Number.isFinite(Number(position.estimatedFundingFee))) {
+    return Number(position.estimatedFundingFee);
+  }
   const notional = Math.max(position.amount * position.currentPrice, 0);
   return notional * 0.0001;
 }

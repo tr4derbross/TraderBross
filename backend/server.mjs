@@ -1610,27 +1610,65 @@ const server = http.createServer(async (request, reply) => {
             tpslByKey.set(key, current);
           }
           const data = positionResp;
-          const positions = data
-            .filter((p) => parseFloat(p.positionAmt) !== 0)
-            .map((p) => {
-              const size = parseFloat(p.positionAmt);
-              const coin = p.symbol.replace(/USDT$/, "");
-              const side = size > 0 ? "long" : "short";
-              const key = `${coin}_${side}`;
-              const tpsl = tpslByKey.get(key) || {};
-              return {
-                coin,
-                side,
-                size: Math.abs(size),
-                entryPx: parseFloat(p.entryPrice),
-                pnl: parseFloat(p.unRealizedProfit),
-                liquidationPx: parseFloat(p.liquidationPrice) || null,
-                leverage: parseInt(p.leverage) || 1,
-                marginMode: p.marginType === "cross" ? "cross" : "isolated",
-                tpPrice: tpsl.tpPrice,
-                slPrice: tpsl.slPrice,
-              };
-            });
+          const activeRows = data.filter((p) => parseFloat(p.positionAmt) !== 0);
+          const fundingBySymbol = new Map();
+          await Promise.allSettled(
+            activeRows.map(async (p) => {
+              const symbol = String(p.symbol || "").toUpperCase();
+              if (!symbol || fundingBySymbol.has(symbol)) return;
+              const res = await fetch(`${base}/fapi/v1/premiumIndex?symbol=${encodeURIComponent(symbol)}`, {
+                signal: AbortSignal.timeout(3000),
+              });
+              const payload = await res.json().catch(() => ({}));
+              const rate = Number(payload?.lastFundingRate || 0);
+              if (Number.isFinite(rate)) {
+                fundingBySymbol.set(symbol, rate);
+              }
+            }),
+          );
+
+          const positions = activeRows.map((p) => {
+            const size = parseFloat(p.positionAmt);
+            const absSize = Math.abs(size);
+            const symbol = String(p.symbol || "").toUpperCase();
+            const coin = symbol.replace(/USDT$|USDC$/i, "");
+            const side = size > 0 ? "long" : "short";
+            const key = `${coin}_${side}`;
+            const tpsl = tpslByKey.get(key) || {};
+            const entryPx = parseFloat(p.entryPrice || "0") || 0;
+            const markPx = parseFloat(p.markPrice || "0") || 0;
+            const breakEvenPrice = parseFloat(p.breakEvenPrice || "0") || entryPx;
+            const notional = Math.abs(parseFloat(p.notional || "0")) || absSize * markPx;
+            const isolatedWallet = Math.abs(parseFloat(p.isolatedWallet || "0"));
+            const isolatedMargin = Math.abs(parseFloat(p.isolatedMargin || "0"));
+            const initialMargin = Math.abs(parseFloat(p.positionInitialMargin || "0"));
+            const leverage = parseInt(p.leverage, 10) || 1;
+            const margin = isolatedWallet || isolatedMargin || initialMargin || (entryPx > 0 && leverage > 0 ? (absSize * entryPx) / leverage : 0);
+            const maintMargin = Math.abs(parseFloat(p.maintMargin || "0"));
+            const marginRatio = margin > 0 && maintMargin > 0 ? (maintMargin / margin) * 100 : null;
+            const fundingRate = Number(fundingBySymbol.get(symbol) || 0);
+            const estimatedFundingFee =
+              Number.isFinite(fundingRate) && Number.isFinite(notional)
+                ? notional * fundingRate * (side === "long" ? -1 : 1)
+                : 0;
+            return {
+              coin,
+              side,
+              size: absSize,
+              entryPx,
+              breakEvenPrice,
+              markPx,
+              pnl: parseFloat(p.unRealizedProfit || "0"),
+              liquidationPx: parseFloat(p.liquidationPrice) || null,
+              leverage,
+              margin,
+              marginRatio,
+              estimatedFundingFee,
+              marginMode: p.marginType === "cross" ? "cross" : "isolated",
+              tpPrice: tpsl.tpPrice,
+              slPrice: tpsl.slPrice,
+            };
+          });
           json(reply, 200, { positions });
           return;
         }
