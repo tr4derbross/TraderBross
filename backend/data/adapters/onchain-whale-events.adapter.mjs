@@ -3,6 +3,13 @@ import { fetchJson } from "../../services/http.mjs";
 import { mapWhaleAlertEvmEvents } from "./onchain-evm.adapter.mjs";
 import { mapWhaleAlertSolanaEvents } from "./onchain-solana.adapter.mjs";
 
+function wsReconnectDelayMs(attempt) {
+  const safeAttempt = Math.max(1, Number(attempt) || 1);
+  const base = Math.min(30_000, 2_000 * (2 ** (safeAttempt - 1)));
+  const jitter = Math.floor(Math.random() * Math.max(300, base * 0.2));
+  return Math.min(35_000, base + jitter);
+}
+
 export async function fetchOnchainWhaleEvents({ whaleAlertKey = "", minUsd = 10_000_000 } = {}) {
   if (!whaleAlertKey) {
     return [];
@@ -22,13 +29,17 @@ export function createLiquidationEventStream({ logger, onEvent }) {
   let socket = null;
   let closed = false;
   let reconnectTimer = null;
+  let reconnectAttempt = 0;
   const WS_URL = "wss://fstream.binance.com/ws/!forceOrder@arr";
 
   const connect = () => {
     if (closed) return;
     socket = new WebSocket(WS_URL);
 
-    socket.on("open", () => logger?.info?.("data.adapter.liquidations.connected"));
+    socket.on("open", () => {
+      reconnectAttempt = 0;
+      logger?.info?.("data.adapter.liquidations.connected");
+    });
     socket.on("message", (raw) => {
       try {
         const payload = JSON.parse(raw.toString());
@@ -73,7 +84,8 @@ export function createLiquidationEventStream({ logger, onEvent }) {
       socket = null;
       if (closed) return;
       logger?.warn?.("data.adapter.liquidations.disconnected");
-      reconnectTimer = setTimeout(connect, 3000);
+      reconnectAttempt += 1;
+      reconnectTimer = setTimeout(connect, wsReconnectDelayMs(reconnectAttempt));
     });
   };
 
@@ -328,6 +340,7 @@ export function createBybitLiquidationEventStream({
   let socket = null;
   let closed = false;
   let reconnectTimer = null;
+  let reconnectAttempt = 0;
   const topics = (Array.isArray(symbols) ? symbols : [])
     .map((s) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, ""))
     .filter(Boolean)
@@ -340,6 +353,7 @@ export function createBybitLiquidationEventStream({
     socket = new WebSocket("wss://stream.bybit.com/v5/public/linear");
 
     socket.on("open", () => {
+      reconnectAttempt = 0;
       logger?.info?.("data.adapter.bybit_liquidations.connected", { topics: topics.length });
       socket?.send(JSON.stringify({ op: "subscribe", args: topics }));
     });
@@ -389,7 +403,8 @@ export function createBybitLiquidationEventStream({
       socket = null;
       if (closed) return;
       logger?.warn?.("data.adapter.bybit_liquidations.disconnected");
-      reconnectTimer = setTimeout(connect, 3000);
+      reconnectAttempt += 1;
+      reconnectTimer = setTimeout(connect, wsReconnectDelayMs(reconnectAttempt));
     });
   };
 
@@ -409,12 +424,14 @@ export function createOkxLiquidationEventStream({
   let socket = null;
   let closed = false;
   let reconnectTimer = null;
+  let reconnectAttempt = 0;
 
   const connect = () => {
     if (closed) return;
     socket = new WebSocket("wss://ws.okx.com:8443/ws/v5/public");
 
     socket.on("open", () => {
+      reconnectAttempt = 0;
       logger?.info?.("data.adapter.okx_liquidations.connected");
       socket?.send(
         JSON.stringify({
@@ -470,7 +487,8 @@ export function createOkxLiquidationEventStream({
       socket = null;
       if (closed) return;
       logger?.warn?.("data.adapter.okx_liquidations.disconnected");
-      reconnectTimer = setTimeout(connect, 3000);
+      reconnectAttempt += 1;
+      reconnectTimer = setTimeout(connect, wsReconnectDelayMs(reconnectAttempt));
     });
   };
 

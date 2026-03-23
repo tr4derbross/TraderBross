@@ -74,7 +74,8 @@ export function createTerminalDataService({ config, logger }) {
   const events = createEventBus();
   const featureFlags = config.featureFlags || {};
   const ttl = config.dataTtl || {};
-  const coreSymbols = CORE_SYMBOLS.slice(0, 22);
+  // Keep CoinGecko payload lean to reduce free-tier 429 pressure.
+  const coreSymbols = CORE_SYMBOLS.slice(0, 12);
   const newsEngine = createNewsIngestionEngine({
     watchlistTickers: config.watchlistTickers,
     logger,

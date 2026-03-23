@@ -149,7 +149,7 @@ export function loadConfig() {
       enableCoinlore: toBoolean(process.env.FEATURE_COINLORE, true),
     },
     dataTtl: {
-      marketSnapshotMs: toNumber(process.env.TTL_MARKET_SNAPSHOT_MS, 20_000),
+      marketSnapshotMs: toNumber(process.env.TTL_MARKET_SNAPSHOT_MS, 60_000),
       coinMetadataMs: toNumber(process.env.TTL_COIN_METADATA_MS, 6 * 60 * 60 * 1000),
       newsFeedMs: toNumber(process.env.TTL_NEWS_FEED_MS, 45_000),
       exchangeAnnouncementsLimit: toNumber(process.env.EXCHANGE_ANNOUNCEMENTS_LIMIT, 30),
