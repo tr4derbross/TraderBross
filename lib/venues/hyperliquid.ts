@@ -7,6 +7,8 @@ import {
   normalizeQuoteTicker,
 } from "@/lib/venues/shared";
 
+const VENUE_MUTATION_TIMEOUT_MS = 30_000;
+
 const getTicker: VenueAdapter["getTicker"] = async (symbol) => {
   const market = await fetchJson<{ assets: Array<{ name: string; markPx: number }> }>(
     "/api/hyperliquid?type=market"
@@ -59,7 +61,7 @@ async function hlOrderPost(body: Record<string, unknown>): Promise<VenueActionRe
     const res = await fetch(buildApiUrl("/api/hyperliquid/order"), {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(VENUE_MUTATION_TIMEOUT_MS),
       body:    JSON.stringify(body),
     });
     const data = await res.json() as { ok?: boolean; error?: string; data?: unknown };

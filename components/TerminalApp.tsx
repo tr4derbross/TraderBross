@@ -63,6 +63,8 @@ import {
   Zap,
 } from "lucide-react";
 
+const EXECUTION_REQUEST_TIMEOUT_MS = 30_000;
+
 function normalizeVenueTicker(value: string) {
   return String(value || "")
     .toUpperCase()
@@ -1164,7 +1166,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
             const res = await fetch(buildApiUrl(orderEndpoint), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              signal: AbortSignal.timeout(12_000),
+              signal: AbortSignal.timeout(EXECUTION_REQUEST_TIMEOUT_MS),
               body: JSON.stringify({
                 type: "closePosition",
                 symbol: pos.ticker,
@@ -1227,7 +1229,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           const res = await fetch(buildApiUrl(orderEndpoint), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            signal: AbortSignal.timeout(12_000),
+            signal: AbortSignal.timeout(EXECUTION_REQUEST_TIMEOUT_MS),
               body: JSON.stringify({
                 type: "tpsl",
                 symbol: pos.ticker,

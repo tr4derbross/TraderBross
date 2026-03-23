@@ -6,6 +6,8 @@ import {
   normalizeQuoteTicker,
 } from "@/lib/venues/shared";
 
+const VENUE_MUTATION_TIMEOUT_MS = 30_000;
+
 const PERP_MAP: Record<string, string> = {
   BTC: "BTC-USDT-SWAP",
   ETH: "ETH-USDT-SWAP",
@@ -128,7 +130,7 @@ export const okxAdapter: VenueAdapter = {
       const res = await fetch(buildApiUrl("/api/okx/order"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(12_000),
+        signal: AbortSignal.timeout(VENUE_MUTATION_TIMEOUT_MS),
         body: JSON.stringify({
           type: "order",
           symbol: input.symbol,
@@ -155,7 +157,7 @@ export const okxAdapter: VenueAdapter = {
     const res = await fetch(buildApiUrl("/api/okx/order"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(VENUE_MUTATION_TIMEOUT_MS),
       body: JSON.stringify({ type: "cancel", symbol, orderId: oid, sessionToken: connection?.sessionToken }),
     });
     const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };
@@ -165,7 +167,7 @@ export const okxAdapter: VenueAdapter = {
     const res = await fetch(buildApiUrl("/api/okx/order"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(VENUE_MUTATION_TIMEOUT_MS),
       body: JSON.stringify({ type: "leverage", symbol: input.symbol, leverage: input.leverage, sessionToken: connection?.sessionToken }),
     });
     const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };
@@ -175,7 +177,7 @@ export const okxAdapter: VenueAdapter = {
     const res = await fetch(buildApiUrl("/api/okx/order"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(VENUE_MUTATION_TIMEOUT_MS),
       body: JSON.stringify({ type: "marginType", symbol: input.symbol, marginMode: input.marginMode, sessionToken: connection?.sessionToken }),
     });
     const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };

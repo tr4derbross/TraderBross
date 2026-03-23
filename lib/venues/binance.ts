@@ -6,6 +6,8 @@ import {
   normalizeQuoteTicker,
 } from "@/lib/venues/shared";
 
+const VENUE_MUTATION_TIMEOUT_MS = 30_000;
+
 const getTicker: VenueAdapter["getTicker"] = async (symbol) => {
   const quotes = await fetchJson<Array<{ symbol: string; price: number }>>("/api/prices?type=quotes");
   const quote = quotes.find((item) => item.symbol === symbol);
@@ -45,7 +47,7 @@ async function binanceOrderPost(body: Record<string, unknown>) {
     const res = await fetch(buildApiUrl("/api/binance/order"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(VENUE_MUTATION_TIMEOUT_MS),
       body: JSON.stringify(body),
     });
     const data = await res.json() as { ok?: boolean; error?: string; data?: unknown };

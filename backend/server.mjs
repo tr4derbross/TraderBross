@@ -1734,7 +1734,7 @@ const server = http.createServer(async (request, reply) => {
       try {
         const binancePost = async (path, params) => {
           const qs = binanceSignedQuery(apiSecret, params);
-          const res = await fetch(`${base}${path}?${qs}`, { method: "POST", headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(8000) });
+          const res = await fetch(`${base}${path}?${qs}`, { method: "POST", headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(12_000) });
           const data = await res.json();
           if (!res.ok && data.code !== -4046) throw new Error(data.msg || `Binance error ${res.status}`);
           return data;
@@ -1751,7 +1751,7 @@ const server = http.createServer(async (request, reply) => {
           const res = await fetch(`${base}/fapi/v1/algoOrder?${qs}`, {
             method: "POST",
             headers: { "X-MBX-APIKEY": apiKey },
-            signal: AbortSignal.timeout(8000),
+            signal: AbortSignal.timeout(12_000),
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.msg || `Binance algo error ${res.status}`);
@@ -1835,16 +1835,21 @@ const server = http.createServer(async (request, reply) => {
           // Place TP and/or SL conditional orders with closePosition=true
           const tpslSide = body.side === "long" ? "SELL" : "BUY";
           await cancelExistingBinanceTpSl();
-          const results = [];
-          const errors = [];
-          if (body.tpPrice) {
-            const normalizedTp = await normalizeBinancePrice(base, symbol, body.tpPrice);
-            if (!normalizedTp) {
-              json(reply, 400, { ok: false, error: "Invalid TP price." });
-              return;
-            }
-            try {
-              const r = await binanceAlgoPost({
+          const normalizedTp = body.tpPrice ? await normalizeBinancePrice(base, symbol, body.tpPrice) : null;
+          if (body.tpPrice && !normalizedTp) {
+            json(reply, 400, { ok: false, error: "Invalid TP price." });
+            return;
+          }
+          const normalizedSl = body.slPrice ? await normalizeBinancePrice(base, symbol, body.slPrice) : null;
+          if (body.slPrice && !normalizedSl) {
+            json(reply, 400, { ok: false, error: "Invalid SL price." });
+            return;
+          }
+
+          const tasks = [];
+          if (normalizedTp) {
+            tasks.push(
+              binanceAlgoPost({
                 algoType: "CONDITIONAL",
                 symbol,
                 side: tpslSide,
@@ -1852,20 +1857,12 @@ const server = http.createServer(async (request, reply) => {
                 triggerPrice: normalizedTp,
                 closePosition: "true",
                 workingType: "CONTRACT_PRICE",
-              });
-              results.push({ tp: r });
-            } catch (e) {
-              errors.push(`TP failed: ${String(e)}`);
-            }
+              }).then((r) => ({ tag: "tp", ok: true, data: r })).catch((e) => ({ tag: "tp", ok: false, error: String(e) })),
+            );
           }
-          if (body.slPrice) {
-            const normalizedSl = await normalizeBinancePrice(base, symbol, body.slPrice);
-            if (!normalizedSl) {
-              json(reply, 400, { ok: false, error: "Invalid SL price." });
-              return;
-            }
-            try {
-              const r = await binanceAlgoPost({
+          if (normalizedSl) {
+            tasks.push(
+              binanceAlgoPost({
                 algoType: "CONDITIONAL",
                 symbol,
                 side: tpslSide,
@@ -1873,12 +1870,12 @@ const server = http.createServer(async (request, reply) => {
                 triggerPrice: normalizedSl,
                 closePosition: "true",
                 workingType: "CONTRACT_PRICE",
-              });
-              results.push({ sl: r });
-            } catch (e) {
-              errors.push(`SL failed: ${String(e)}`);
-            }
+              }).then((r) => ({ tag: "sl", ok: true, data: r })).catch((e) => ({ tag: "sl", ok: false, error: String(e) })),
+            );
           }
+          const settled = tasks.length > 0 ? await Promise.all(tasks) : [];
+          const results = settled.filter((row) => row.ok).map((row) => ({ [row.tag]: row.data }));
+          const errors = settled.filter((row) => !row.ok).map((row) => `${String(row.tag).toUpperCase()} failed: ${row.error}`);
           if (errors.length > 0) {
             json(reply, 400, { ok: false, error: errors.join(" | "), data: results });
             return;
@@ -1935,16 +1932,20 @@ const server = http.createServer(async (request, reply) => {
           const result = await binancePost("/fapi/v1/order", params);
           // Place TP / SL conditional orders if provided
           const tpslSide = body.side === "long" ? "SELL" : "BUY";
-          const tpslResults = [];
-          const tpslErrors = [];
-          if (body.tpPrice) {
-            const normalizedTp = await normalizeBinancePrice(base, symbol, body.tpPrice);
-            if (!normalizedTp) {
-              json(reply, 400, { ok: false, error: "Invalid TP price." });
-              return;
-            }
-            try {
-              const r = await binanceAlgoPost({
+          const normalizedTp = body.tpPrice ? await normalizeBinancePrice(base, symbol, body.tpPrice) : null;
+          if (body.tpPrice && !normalizedTp) {
+            json(reply, 400, { ok: false, error: "Invalid TP price." });
+            return;
+          }
+          const normalizedSl = body.slPrice ? await normalizeBinancePrice(base, symbol, body.slPrice) : null;
+          if (body.slPrice && !normalizedSl) {
+            json(reply, 400, { ok: false, error: "Invalid SL price." });
+            return;
+          }
+          const tpslTasks = [];
+          if (normalizedTp) {
+            tpslTasks.push(
+              binanceAlgoPost({
                 algoType: "CONDITIONAL",
                 symbol,
                 side: tpslSide,
@@ -1952,20 +1953,12 @@ const server = http.createServer(async (request, reply) => {
                 triggerPrice: normalizedTp,
                 closePosition: "true",
                 workingType: "CONTRACT_PRICE",
-              });
-              tpslResults.push({ tp: r });
-            } catch (e) {
-              tpslErrors.push(`TP failed: ${String(e)}`);
-            }
+              }).then((r) => ({ tag: "tp", ok: true, data: r })).catch((e) => ({ tag: "tp", ok: false, error: String(e) })),
+            );
           }
-          if (body.slPrice) {
-            const normalizedSl = await normalizeBinancePrice(base, symbol, body.slPrice);
-            if (!normalizedSl) {
-              json(reply, 400, { ok: false, error: "Invalid SL price." });
-              return;
-            }
-            try {
-              const r = await binanceAlgoPost({
+          if (normalizedSl) {
+            tpslTasks.push(
+              binanceAlgoPost({
                 algoType: "CONDITIONAL",
                 symbol,
                 side: tpslSide,
@@ -1973,12 +1966,12 @@ const server = http.createServer(async (request, reply) => {
                 triggerPrice: normalizedSl,
                 closePosition: "true",
                 workingType: "CONTRACT_PRICE",
-              });
-              tpslResults.push({ sl: r });
-            } catch (e) {
-              tpslErrors.push(`SL failed: ${String(e)}`);
-            }
+              }).then((r) => ({ tag: "sl", ok: true, data: r })).catch((e) => ({ tag: "sl", ok: false, error: String(e) })),
+            );
           }
+          const tpslSettled = tpslTasks.length > 0 ? await Promise.all(tpslTasks) : [];
+          const tpslResults = tpslSettled.filter((row) => row.ok).map((row) => ({ [row.tag]: row.data }));
+          const tpslErrors = tpslSettled.filter((row) => !row.ok).map((row) => `${String(row.tag).toUpperCase()} failed: ${row.error}`);
           if (tpslErrors.length > 0) {
             json(reply, 400, { ok: false, error: tpslErrors.join(" | "), data: result, tpsl: tpslResults });
             return;
@@ -2308,7 +2301,7 @@ const server = http.createServer(async (request, reply) => {
           body: bodyStr,
         });
         const url = `${base}${path}${query ? `?${query}` : ""}`;
-        const res = await fetch(url, { method, headers, body: bodyStr || undefined, signal: AbortSignal.timeout(8_000) });
+        const res = await fetch(url, { method, headers, body: bodyStr || undefined, signal: AbortSignal.timeout(12_000) });
         const data = await res.json();
         if (!res.ok || Number(data?.retCode) !== 0) throw new Error(data?.retMsg || `Bybit error ${res.status}`);
         return data;
@@ -2491,7 +2484,7 @@ const server = http.createServer(async (request, reply) => {
           method,
           headers,
           body: bodyStr || undefined,
-          signal: AbortSignal.timeout(10_000),
+          signal: AbortSignal.timeout(12_000),
         });
         const data = await res.json();
         if (!res.ok || data?.code !== "0") throw new Error(data?.msg || `OKX error ${res.status}`);
