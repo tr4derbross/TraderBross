@@ -749,6 +749,8 @@ export function createTerminalDataService({ config, logger }) {
 
     stopLiquidations = createLiquidationEventStream({
       logger,
+      reconnectBaseMs: 10_000,
+      reconnectMaxMs: 90_000,
       onEvent(rawEvent) {
         const normalized = whaleEngine.normalize(rawEvent);
         if (!normalized) return;
@@ -768,7 +770,9 @@ export function createTerminalDataService({ config, logger }) {
       logger,
       symbols: (config.whaleFallback?.symbols || ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"])
         .map((s) => String(s || "").toUpperCase()),
-      minUsd: 5_000,
+      minUsd: 25_000,
+      reconnectBaseMs: 12_000,
+      reconnectMaxMs: 90_000,
       onEvent(rawEvent) {
         const normalized = whaleEngine.normalize(rawEvent);
         if (!normalized) return;
@@ -786,7 +790,9 @@ export function createTerminalDataService({ config, logger }) {
     });
     stopOkxLiquidations = createOkxLiquidationEventStream({
       logger,
-      minUsd: 5_000,
+      minUsd: 25_000,
+      reconnectBaseMs: 12_000,
+      reconnectMaxMs: 90_000,
       onEvent(rawEvent) {
         const normalized = whaleEngine.normalize(rawEvent);
         if (!normalized) return;

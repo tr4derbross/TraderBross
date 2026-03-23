@@ -3,11 +3,11 @@ import { fetchJson } from "../../services/http.mjs";
 import { mapWhaleAlertEvmEvents } from "./onchain-evm.adapter.mjs";
 import { mapWhaleAlertSolanaEvents } from "./onchain-solana.adapter.mjs";
 
-function wsReconnectDelayMs(attempt) {
+function wsReconnectDelayMs(attempt, baseMs = 2000, maxMs = 35_000) {
   const safeAttempt = Math.max(1, Number(attempt) || 1);
-  const base = Math.min(30_000, 2_000 * (2 ** (safeAttempt - 1)));
+  const base = Math.min(maxMs, Math.max(500, Number(baseMs) || 2000) * (2 ** (safeAttempt - 1)));
   const jitter = Math.floor(Math.random() * Math.max(300, base * 0.2));
-  return Math.min(35_000, base + jitter);
+  return Math.min(maxMs, base + jitter);
 }
 
 export async function fetchOnchainWhaleEvents({ whaleAlertKey = "", minUsd = 10_000_000 } = {}) {
@@ -25,7 +25,7 @@ export async function fetchOnchainWhaleEvents({ whaleAlertKey = "", minUsd = 10_
   return [...mapWhaleAlertEvmEvents(rows), ...mapWhaleAlertSolanaEvents(rows)];
 }
 
-export function createLiquidationEventStream({ logger, onEvent }) {
+export function createLiquidationEventStream({ logger, onEvent, reconnectBaseMs = 10_000, reconnectMaxMs = 90_000 }) {
   let socket = null;
   let closed = false;
   let reconnectTimer = null;
@@ -85,7 +85,7 @@ export function createLiquidationEventStream({ logger, onEvent }) {
       if (closed) return;
       logger?.warn?.("data.adapter.liquidations.disconnected");
       reconnectAttempt += 1;
-      reconnectTimer = setTimeout(connect, wsReconnectDelayMs(reconnectAttempt));
+      reconnectTimer = setTimeout(connect, wsReconnectDelayMs(reconnectAttempt, reconnectBaseMs, reconnectMaxMs));
     });
   };
 
@@ -336,6 +336,8 @@ export function createBybitLiquidationEventStream({
   onEvent,
   symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"],
   minUsd = 10_000,
+  reconnectBaseMs = 12_000,
+  reconnectMaxMs = 90_000,
 } = {}) {
   let socket = null;
   let closed = false;
@@ -404,7 +406,7 @@ export function createBybitLiquidationEventStream({
       if (closed) return;
       logger?.warn?.("data.adapter.bybit_liquidations.disconnected");
       reconnectAttempt += 1;
-      reconnectTimer = setTimeout(connect, wsReconnectDelayMs(reconnectAttempt));
+      reconnectTimer = setTimeout(connect, wsReconnectDelayMs(reconnectAttempt, reconnectBaseMs, reconnectMaxMs));
     });
   };
 
@@ -420,6 +422,8 @@ export function createOkxLiquidationEventStream({
   logger,
   onEvent,
   minUsd = 10_000,
+  reconnectBaseMs = 12_000,
+  reconnectMaxMs = 90_000,
 } = {}) {
   let socket = null;
   let closed = false;
@@ -488,7 +492,7 @@ export function createOkxLiquidationEventStream({
       if (closed) return;
       logger?.warn?.("data.adapter.okx_liquidations.disconnected");
       reconnectAttempt += 1;
-      reconnectTimer = setTimeout(connect, wsReconnectDelayMs(reconnectAttempt));
+      reconnectTimer = setTimeout(connect, wsReconnectDelayMs(reconnectAttempt, reconnectBaseMs, reconnectMaxMs));
     });
   };
 
