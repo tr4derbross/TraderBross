@@ -2163,9 +2163,27 @@ const server = http.createServer(async (request, reply) => {
           }
           const instIds = Array.from(new Set(rows.map((row) => String(row.instId || "")).filter(Boolean)));
           const contractValueMap = new Map();
+          const fundingRateMap = new Map();
           await Promise.all(
             instIds.map(async (instId) => {
-              contractValueMap.set(instId, await getOkxContractValue(instId));
+              const [contractValue, fundingRate] = await Promise.all([
+                getOkxContractValue(instId),
+                (async () => {
+                  try {
+                    const res = await fetch(`https://www.okx.com/api/v5/public/funding-rate?instId=${encodeURIComponent(instId)}`, {
+                      signal: AbortSignal.timeout(3500),
+                    });
+                    const payload = await res.json().catch(() => ({}));
+                    const row = Array.isArray(payload?.data) ? payload.data[0] : null;
+                    const rate = Number(row?.fundingRate || 0);
+                    return Number.isFinite(rate) ? rate : 0;
+                  } catch {
+                    return 0;
+                  }
+                })(),
+              ]);
+              contractValueMap.set(instId, contractValue);
+              fundingRateMap.set(instId, fundingRate);
             }),
           );
 
@@ -2181,14 +2199,39 @@ const server = http.createServer(async (request, reply) => {
             const side = sideRaw === "short" || (sideRaw !== "long" && signedPos < 0) ? "short" : "long";
             const tpslKey = `${instId}_${side}`;
             const algoTpSl = tpslByKey.get(tpslKey);
+            const entryPx = parseFloat(row.avgPx || "0");
+            const markPx = parseFloat(row.markPx || row.last || "0");
+            const breakEvenPrice = parseFloat(row.bePx || "0") || entryPx;
+            const leverage = parseInt(row.lever || "1", 10) || 1;
+            const notional = Math.abs(parseFloat(row.notionalUsd || "0")) || Math.abs(size * markPx);
+            const margin =
+              Math.abs(parseFloat(row.margin || "0")) ||
+              Math.abs(parseFloat(row.imr || "0")) ||
+              Math.abs(parseFloat(row.imrCcy || "0")) ||
+              (entryPx > 0 && leverage > 0 ? (size * entryPx) / leverage : 0);
+            const ratioRaw = Number(row.mgnRatio);
+            const marginRatio =
+              Number.isFinite(ratioRaw) && ratioRaw > 0
+                ? (ratioRaw <= 1 ? ratioRaw * 100 : ratioRaw)
+                : null;
+            const fundingRate = Number(fundingRateMap.get(instId) || 0);
+            const estimatedFundingFee =
+              Number.isFinite(fundingRate) && Number.isFinite(notional)
+                ? notional * fundingRate * (side === "long" ? -1 : 1)
+                : 0;
             return {
               coin: symbol,
               side,
               size,
-              entryPx: parseFloat(row.avgPx || "0"),
+              entryPx,
+              breakEvenPrice,
+              markPx,
               pnl: parseFloat(row.upl || "0"),
               liquidationPx: parseFloat(row.liqPx || "0") || null,
-              leverage: parseInt(row.lever || "1", 10) || 1,
+              leverage,
+              margin,
+              marginRatio,
+              estimatedFundingFee,
               marginMode: String(row.mgnMode || "").toLowerCase() === "cross" ? "cross" : "isolated",
               tpPrice: algoTpSl?.tpPrice || finitePositiveNumber(row.tpTriggerPx || row.tpOrdPx),
               slPrice: algoTpSl?.slPrice || finitePositiveNumber(row.slTriggerPx || row.slOrdPx),
@@ -2314,20 +2357,68 @@ const server = http.createServer(async (request, reply) => {
         if (body.type === "positions") {
           const data = await requestBybit("GET", "/v5/position/list", "category=linear&settleCoin=USDT");
           const rows = Array.isArray(data?.result?.list) ? data.result.list : [];
+          const symbols = Array.from(
+            new Set(
+              rows
+                .filter((row) => Math.abs(parseFloat(row?.size || "0")) > 0)
+                .map((row) => String(row?.symbol || "").toUpperCase())
+                .filter(Boolean),
+            ),
+          );
+          const fundingRateMap = new Map();
+          await Promise.allSettled(
+            symbols.map(async (symbol) => {
+              const payload = await requestBybit("GET", "/v5/market/tickers", `category=linear&symbol=${encodeURIComponent(symbol)}`);
+              const row = Array.isArray(payload?.result?.list) ? payload.result.list[0] : null;
+              const rate = Number(row?.fundingRate || 0);
+              fundingRateMap.set(symbol, Number.isFinite(rate) ? rate : 0);
+            }),
+          );
           const positions = rows
             .filter((row) => Math.abs(parseFloat(row.size || "0")) > 0)
-            .map((row) => ({
-              coin: String(row.symbol || "").replace(/USDT$/i, ""),
-              side: String(row.side || "").toLowerCase() === "sell" ? "short" : "long",
-              size: Math.abs(parseFloat(row.size || "0")),
-              entryPx: parseFloat(row.avgPrice || "0"),
-              pnl: parseFloat(row.unrealisedPnl || "0"),
-              liquidationPx: parseFloat(row.liqPrice || "0") || null,
-              leverage: parseInt(row.leverage || "1", 10) || 1,
-              marginMode: String(row.tradeMode || row.positionIM || "").toLowerCase().includes("cross") ? "cross" : "isolated",
-              tpPrice: finitePositiveNumber(row.takeProfit),
-              slPrice: finitePositiveNumber(row.stopLoss),
-            }));
+            .map((row) => {
+              const symbolRaw = String(row.symbol || "").toUpperCase();
+              const side = String(row.side || "").toLowerCase() === "sell" ? "short" : "long";
+              const size = Math.abs(parseFloat(row.size || "0"));
+              const entryPx = parseFloat(row.avgPrice || "0");
+              const markPx = parseFloat(row.markPrice || "0");
+              const leverage = parseInt(row.leverage || "1", 10) || 1;
+              const notional = Math.abs(parseFloat(row.positionValue || "0")) || Math.abs(size * markPx);
+              const positionIM = Math.abs(parseFloat(row.positionIM || "0"));
+              const positionBalance = Math.abs(parseFloat(row.positionBalance || "0"));
+              const margin = positionIM || positionBalance || (entryPx > 0 && leverage > 0 ? (size * entryPx) / leverage : 0);
+              const mm = Math.abs(parseFloat(row.positionMM || "0"));
+              const marginRatio = margin > 0 && mm > 0 ? (mm / margin) * 100 : null;
+              const fundingRate = Number(fundingRateMap.get(symbolRaw) || 0);
+              const estimatedFundingFee =
+                Number.isFinite(fundingRate) && Number.isFinite(notional)
+                  ? notional * fundingRate * (side === "long" ? -1 : 1)
+                  : 0;
+              const tradeMode = String(row.tradeMode || "").trim();
+              const marginMode =
+                tradeMode === "0" || String(row.positionIdx || "") === "0"
+                  ? "cross"
+                  : tradeMode === "1"
+                    ? "isolated"
+                    : "isolated";
+              return {
+                coin: symbolRaw.replace(/USDT$/i, ""),
+                side,
+                size,
+                entryPx,
+                breakEvenPrice: finitePositiveNumber(row.bustPrice || row.sessionAvgPrice) || entryPx,
+                markPx,
+                pnl: parseFloat(row.unrealisedPnl || "0"),
+                liquidationPx: parseFloat(row.liqPrice || "0") || null,
+                leverage,
+                margin,
+                marginRatio,
+                estimatedFundingFee,
+                marginMode,
+                tpPrice: finitePositiveNumber(row.takeProfit),
+                slPrice: finitePositiveNumber(row.stopLoss),
+              };
+            });
           json(reply, 200, { positions });
           return;
         }

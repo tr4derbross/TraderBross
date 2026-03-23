@@ -93,24 +93,42 @@ export const hyperliquidAdapter: VenueAdapter = {
 
   getPositions: async (connection) => {
     if (!connection?.walletAddress) return [];
-    const account = await fetchJson<{
-      positions: Array<{
-        coin: string;
-        side: "long" | "short";
-        size: number;
-        entryPx: number;
-        pnl: number;
-        liquidationPx: number | null;
-      }>;
-    }>(`/api/hyperliquid?type=account&address=${connection.walletAddress}`);
-    return account.positions.map((p) => ({
-      symbol:           p.coin,
-      side:             p.side,
-      size:             p.size,
-      entryPrice:       p.entryPx,
-      pnl:              p.pnl,
-      liquidationPrice: p.liquidationPx,
-    }));
+    const [account, market] = await Promise.all([
+      fetchJson<{
+        positions: Array<{
+          coin: string;
+          side: "long" | "short";
+          size: number;
+          entryPx: number;
+          pnl: number;
+          margin?: number;
+          liquidationPx: number | null;
+        }>;
+      }>(`/api/hyperliquid?type=account&address=${connection.walletAddress}`),
+      fetchJson<{ name: string; markPx: number; fundingRate?: number }[]>("/api/hyperliquid?type=market").catch(() => []),
+    ]);
+    const marketByCoin = new Map((Array.isArray(market) ? market : []).map((row) => [String(row?.name || "").toUpperCase(), row]));
+    return account.positions.map((p) => {
+      const mkt = marketByCoin.get(String(p.coin || "").toUpperCase());
+      const markPrice = Number(mkt?.markPx || 0) || undefined;
+      const notional = Number.isFinite(Number(markPrice)) ? Number(markPrice) * Number(p.size || 0) : 0;
+      const fundingRate = Number(mkt?.fundingRate || 0);
+      const estimatedFundingFee =
+        Number.isFinite(fundingRate) && Number.isFinite(notional)
+          ? notional * fundingRate * (p.side === "long" ? -1 : 1)
+          : undefined;
+      return {
+        symbol: p.coin,
+        side: p.side,
+        size: p.size,
+        entryPrice: p.entryPx,
+        markPrice,
+        pnl: p.pnl,
+        margin: Number.isFinite(Number(p.margin)) ? Number(p.margin) : undefined,
+        estimatedFundingFee,
+        liquidationPrice: p.liquidationPx,
+      };
+    });
   },
 
   placeOrder: async (input, connection) => {

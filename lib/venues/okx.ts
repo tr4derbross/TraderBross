@@ -97,9 +97,14 @@ export const okxAdapter: VenueAdapter = {
           side: "long" | "short";
           size: number;
           entryPx: number;
+          breakEvenPrice?: number;
+          markPx?: number;
           pnl: number;
           liquidationPx: number | null;
           leverage: number;
+          margin?: number;
+          marginRatio?: number;
+          estimatedFundingFee?: number;
           marginMode: "isolated" | "cross";
           tpPrice?: number;
           slPrice?: number;
@@ -114,9 +119,14 @@ export const okxAdapter: VenueAdapter = {
         side: p.side,
         size: p.size,
         entryPrice: p.entryPx,
+        breakEvenPrice: p.breakEvenPrice,
+        markPrice: p.markPx,
         pnl: p.pnl,
         liquidationPrice: p.liquidationPx,
         leverage: p.leverage,
+        margin: p.margin,
+        marginRatio: p.marginRatio,
+        estimatedFundingFee: p.estimatedFundingFee,
         marginMode: p.marginMode,
         tpPrice: p.tpPrice,
         slPrice: p.slPrice,
