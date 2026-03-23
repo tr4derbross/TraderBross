@@ -28,9 +28,12 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     }
   }
 
+  const MUTATION_TIMEOUT_MS = 25_000;
   const requestPromise = (async () => {
+    const signal = isGet ? init?.signal : (init?.signal ?? AbortSignal.timeout(MUTATION_TIMEOUT_MS));
     const response = await fetch(buildApiUrl(path), {
       ...init,
+      signal,
       cache: init?.cache ?? "no-store",
       headers: {
         "content-type": "application/json",

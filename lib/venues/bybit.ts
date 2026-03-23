@@ -154,6 +154,7 @@ export const bybitAdapter: VenueAdapter = {
     const res = await fetch(buildApiUrl("/api/bybit/order"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(12_000),
       body: JSON.stringify({ type: "cancel", symbol, orderId: oid, sessionToken: connection?.sessionToken }),
     });
     const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };
@@ -163,6 +164,7 @@ export const bybitAdapter: VenueAdapter = {
     const res = await fetch(buildApiUrl("/api/bybit/order"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(12_000),
       body: JSON.stringify({ type: "leverage", symbol: input.symbol, leverage: input.leverage, sessionToken: connection?.sessionToken }),
     });
     const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };
@@ -172,6 +174,7 @@ export const bybitAdapter: VenueAdapter = {
     const res = await fetch(buildApiUrl("/api/bybit/order"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(12_000),
       body: JSON.stringify({ type: "marginType", symbol: input.symbol, marginMode: input.marginMode, sessionToken: connection?.sessionToken }),
     });
     const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };

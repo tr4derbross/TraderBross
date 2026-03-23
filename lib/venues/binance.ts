@@ -62,6 +62,7 @@ async function binanceDataPost<T>(type: string, sessionToken: string): Promise<T
   const res = await fetch(buildApiUrl("/api/binance"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(20_000),
     body: JSON.stringify({ type, sessionToken }),
   });
   if (!res.ok) {

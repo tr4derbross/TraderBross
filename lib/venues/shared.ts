@@ -12,10 +12,21 @@ import type {
 } from "@/lib/venues/types";
 import { buildApiUrl } from "@/lib/runtime-env";
 
+const FETCH_TIMEOUT_MS = 20_000;
+
 export async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(buildApiUrl(input), init);
+  const signal = init?.signal ?? AbortSignal.timeout(FETCH_TIMEOUT_MS);
+  const response = await fetch(buildApiUrl(input), { ...init, signal });
   if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
+    let detail = "";
+    try {
+      const ct = response.headers.get("content-type") || "";
+      if (ct.includes("application/json")) {
+        const body = await response.json() as { error?: string; message?: string };
+        detail = body?.message || body?.error || "";
+      }
+    } catch { /* ignore */ }
+    throw new Error(detail || `${response.status} ${response.statusText}`);
   }
   return (await response.json()) as T;
 }
