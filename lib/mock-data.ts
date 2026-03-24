@@ -505,7 +505,7 @@ export const AVAILABLE_TICKERS = [
   "NEAR", "INJ", "DOT", "APT", "SUI", "TIA", "SEI", "ATOM", "AAVE", "UNI",
   // Mid-caps on HL
   "LTC", "FIL", "WLD", "RNDR", "PENDLE", "JTO", "GMX", "SNX", "CRV", "LDO",
-  "RUNE", "ETC", "BLUR", "PYTH", "WIF", "HYPE", "STX", "TRB", "DYDX", "GRT",
+  "RUNE", "ETC", "BLUR", "PYTH", "WIF", "HYPE", "STX", "TRB", "GRT",
   // Additional HL perps
   "FET", "MAGIC", "COMP", "MKR", "YFI", "1INCH", "ZRX", "SUSHI", "IMX", "SAND",
 ];

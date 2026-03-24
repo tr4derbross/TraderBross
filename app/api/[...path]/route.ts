@@ -454,12 +454,17 @@ async function fetchEmergencyVenueSymbols(venueId: string, quoteAsset: string) {
     return normalizeSymbols((payload?.universe || []).map((row: any) => row?.name || ""));
   }
 
-  if (venue === "dydx") {
-    const payload = await fetch("https://indexer.dydx.trade/v4/perpetualMarkets", {
+  if (venue === "aster") {
+    const payload = await fetch("https://fapi.asterdex.com/fapi/v1/ticker/24hr", {
       cache: "no-store",
       signal: AbortSignal.timeout(9000),
     }).then((res) => res.json());
-    return normalizeSymbols(Object.keys(payload?.markets || {}).map((market) => String(market).split("-")[0]));
+    return normalizeSymbols(
+      (Array.isArray(payload) ? payload : [])
+        .map((row: any) => String(row?.symbol || ""))
+        .filter((symbol: string) => symbol.endsWith("USDT"))
+        .map((symbol: string) => symbol.replace(/USDT$/i, "")),
+    );
   }
 
   const payload = await fetch("https://fapi.binance.com/fapi/v1/exchangeInfo", {
@@ -512,7 +517,7 @@ async function emergencyResponse(path: string[], request: NextRequest) {
     writeEmergencyCache(cacheKey, payload, 10_000);
     return json(payload);
   }
-  if (key === "okx" || key === "bybit" || key === "hyperliquid" || key === "dydx") {
+  if (key === "okx" || key === "bybit" || key === "hyperliquid" || key === "aster") {
     const type = request.nextUrl.searchParams.get("type") || "";
     if (type === "ohlcv" || !type) {
       const payload = await fetchEmergencyCandles({
@@ -639,7 +644,7 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
   }
   if (method === "GET" && upstream.ok) {
     const primary = (normalizedPath?.[0] || "").toLowerCase();
-    if (["bootstrap", "news", "market", "screener", "prices", "okx", "bybit", "hyperliquid", "dydx", "symbols", "venues"].includes(primary)) {
+    if (["bootstrap", "news", "market", "screener", "prices", "okx", "bybit", "hyperliquid", "aster", "symbols", "venues"].includes(primary)) {
       try {
         const clone = upstream.clone();
         const payload = await clone.json();
@@ -655,7 +660,7 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
         const looksEmptyMarket = primary === "market" && (!payload || (!payload.marketCapUsd && !payload.total24hVolume));
         const type = request.nextUrl.searchParams.get("type") || "";
         const looksEmptyCandles =
-          ["prices", "okx", "bybit", "hyperliquid", "dydx"].includes(primary) &&
+          ["prices", "okx", "bybit", "hyperliquid", "aster"].includes(primary) &&
           (type === "ohlcv" || type === "" || primary === "prices") &&
           Array.isArray(payload) &&
           payload.length === 0;

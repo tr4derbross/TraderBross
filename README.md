@@ -38,7 +38,7 @@ This proxy forwards requests to backend, applies emergency fallback behavior for
 - `GET /api/feargreed`
 - `GET /api/hyperliquid`
 - `POST /api/hyperliquid/order`
-- `GET /api/dydx`
+- `GET /api/aster`
 - `POST /api/chat`
 - `POST /api/sentiment`
 - `POST|DELETE /api/vault/clear`
@@ -63,7 +63,7 @@ backend/
     ai-service.mjs
     cache.mjs
     calendar-service.mjs
-    dydx-service.mjs
+    aster-service.mjs
     http.mjs
     hyperliquid-service.mjs
     market-service.mjs

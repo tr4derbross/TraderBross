@@ -7,7 +7,7 @@ import { encode as msgpackEncode } from "@msgpack/msgpack";
 import { loadConfig } from "./config.mjs";
 import { createLogger } from "./logger.mjs";
 import { getCalendarEvents } from "./services/calendar-service.mjs";
-import { getDydxAccount, getDydxCandles, getDydxMarkets } from "./services/dydx-service.mjs";
+import { getAsterAccount, getAsterCandles, getAsterMarkets } from "./services/aster-service.mjs";
 import { getHyperliquidAccount, getHyperliquidCandles, getHyperliquidMarket } from "./services/hyperliquid-service.mjs";
 import {
   getBinanceCandles,
@@ -507,12 +507,14 @@ async function getVenueSymbols(venueId, quoteAsset = "USDT") {
       return uniqueSortedSymbols(symbols);
     }
 
-    if (venue === "dydx") {
-      const payload = await fetch("https://indexer.dydx.trade/v4/perpetualMarkets", {
+    if (venue === "aster") {
+      const payload = await fetch("https://fapi.asterdex.com/fapi/v1/ticker/24hr", {
         signal: AbortSignal.timeout(7000),
       }).then((res) => res.json());
-      const markets = payload?.markets || {};
-      const symbols = Object.keys(markets).map((market) => String(market).split("-")[0]);
+      const symbols = (Array.isArray(payload) ? payload : [])
+        .map((row) => String(row?.symbol || ""))
+        .filter((symbol) => symbol.endsWith("USDT"))
+        .map((symbol) => symbol.replace(/USDT$/i, ""));
       return uniqueSortedSymbols(symbols);
     }
 
@@ -1124,21 +1126,21 @@ const server = http.createServer(async (request, reply) => {
       return;
     }
 
-    if (request.method === "GET" && url.pathname === "/api/dydx") {
+    if (request.method === "GET" && url.pathname === "/api/aster") {
       const type = url.searchParams.get("type");
       if (type === "markets") {
-        json(reply, 200, await getDydxMarkets());
+        json(reply, 200, await getAsterMarkets());
         return;
       }
       if (type === "account") {
-        json(reply, 200, await getDydxAccount(url.searchParams.get("address") || ""));
+        json(reply, 200, await getAsterAccount(url.searchParams.get("address") || ""));
         return;
       }
       if (type === "ohlcv") {
         const ticker = canonicalTickerParam(url.searchParams.get("ticker"), "BTC");
         const interval = url.searchParams.get("interval") || "1h";
         const limit = Math.min(Number(url.searchParams.get("limit") || 120), 500);
-        json(reply, 200, await getDydxCandles(ticker, interval, limit));
+        json(reply, 200, await getAsterCandles(ticker, interval, limit));
         return;
       }
     }

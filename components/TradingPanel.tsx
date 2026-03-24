@@ -150,8 +150,8 @@ export default function TradingPanel({
           ? `/api/bybit?type=ohlcv&ticker=${ticker}&quote=${quoteAsset}&interval=1m&limit=2`
           : activeVenueState.venueId === "hyperliquid"
             ? `/api/hyperliquid?type=ohlcv&ticker=${ticker}&interval=1m&limit=2`
-            : activeVenueState.venueId === "dydx"
-              ? `/api/dydx?type=ohlcv&ticker=${ticker}&interval=1m&limit=2`
+            : activeVenueState.venueId === "aster"
+              ? `/api/aster?type=ohlcv&ticker=${ticker}&interval=1m&limit=2`
               : `/api/prices?ticker=${ticker}&quote=${quoteAsset}&interval=1m&limit=2`;
 
     const loadMark = async () => {

@@ -90,6 +90,6 @@ Removed unreferenced files to reduce confusion and maintenance risk:
 
 ## Recommended Next Phase
 1. Wallet connection security hardening checklist and implementation.
-2. Exchange-by-exchange integration certification (Binance, OKX, Bybit, Hyperliquid, dYdX).
+2. Exchange-by-exchange integration certification (Binance, OKX, Bybit, Hyperliquid, Aster).
 3. Production observability panel (provider errors, stale windows, reconnect metrics).
 4. Canary deploy + synthetic monitoring on `/api/bootstrap`, `/api/news/snapshot`, `/ws`.

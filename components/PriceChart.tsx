@@ -582,8 +582,8 @@ export default function PriceChart({
           ? `/api/bybit?type=ohlcv&ticker=${ticker}&quote=${quoteAsset}&interval=${interval}&limit=${limit}`
           : activeVenue === "hyperliquid"
             ? `/api/hyperliquid?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
-            : activeVenue === "dydx"
-              ? `/api/dydx?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
+            : activeVenue === "aster"
+              ? `/api/aster?type=ohlcv&ticker=${ticker}&interval=${interval}&limit=${limit}`
               : `/api/prices?ticker=${ticker}&quote=${quoteAsset}&interval=${interval}&limit=${limit}`;
 
     const fetchCandles = async (mode: "initial" | "refresh") => {

@@ -5,6 +5,7 @@ import Link from "next/link";
 import PageWrapper from "@/components/PageWrapper";
 import { apiFetch } from "@/lib/api-client";
 import type { ScreenerCoin } from "@/types/screener";
+import { TierGate } from "@/components/TierGate";
 import {
   TrendingUp,
   TrendingDown,
@@ -538,6 +539,25 @@ export default function ScreenerPage() {
 
   return (
     <PageWrapper>
+      <TierGate
+        requires="full"
+        fallback={
+          <div className="mx-auto w-full max-w-3xl px-4 py-16 text-center">
+            <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-8">
+              <h2 className="text-xl font-bold text-amber-100">Full Plan Required</h2>
+              <p className="mt-2 text-sm text-zinc-300">
+                Advanced screener access is available on the Full tier.
+              </p>
+              <Link
+                href="/pricing"
+                className="mt-5 inline-flex rounded-lg bg-amber-400 px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] text-black"
+              >
+                Get Full Plan — $50/mo
+              </Link>
+            </div>
+          </div>
+        }
+      >
       <div className="relative mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {/* Background watermark */}
         <div className="pointer-events-none fixed inset-0 flex items-center justify-center z-0 overflow-hidden">
@@ -768,6 +788,7 @@ export default function ScreenerPage() {
           </div>
         </div>
       </div>
+      </TierGate>
     </PageWrapper>
   );
 }

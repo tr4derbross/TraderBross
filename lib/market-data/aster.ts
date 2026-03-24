@@ -1,10 +1,10 @@
 import { createNormalizedTicker, createPollingMarketDataAdapter } from "@/lib/market-data/shared";
 
-export const dydxMarketDataAdapter = createPollingMarketDataAdapter(
-  "dydx",
+export const asterMarketDataAdapter = createPollingMarketDataAdapter(
+  "aster",
   (symbol, connectionState, price, timestamp) =>
     createNormalizedTicker(
-      "dydx",
+      "aster",
       symbol,
       {
         markPrice: price,

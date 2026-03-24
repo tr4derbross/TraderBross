@@ -15,11 +15,12 @@ import TradingPanel from "@/components/TradingPanel";
 import BottomPanel from "@/components/BottomPanel";
 import TradingActivityDrawer from "@/components/TradingActivityDrawer";
 import HyperliquidPanel from "@/components/HyperliquidPanel";
-import DydxPanel from "@/components/DydxPanel";
+import AsterPanel from "@/components/AsterPanel";
 import SignalsPanel from "@/components/SignalsPanel";
 import WatchlistPanel from "@/components/WatchlistPanel";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { FearGreedPill } from "@/components/FearGreedWidget";
+import { TierGate } from "@/components/TierGate";
 import { apiFetch } from "@/lib/api-client";
 import { buildApiUrl } from "@/lib/runtime-env";
 import { useRealtimeSelector } from "@/lib/realtime-client";
@@ -34,6 +35,7 @@ import { getVenueAdapter } from "@/lib/venues";
 import type { VenueBalance, VenueConnectionInput, VenuePosition } from "@/lib/venues/types";
 import { validateExecutionRequest } from "@/lib/execution-validation";
 import type { NewsTradePreset } from "@/lib/news-trade";
+import { useTier } from "@/hooks/useTier";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 import {
@@ -170,9 +172,9 @@ function OrderBookMini({ ticker }: { ticker: string }) {
 }
 
 type RightTab = "trade" | "dex" | "signals" | "watch";
-type DexSubTab = "hl" | "dydx";
+type DexSubTab = "hl" | "aster";
 type WorkspaceTab = "news" | "chart" | "tools";
-type HeaderPlatform = "hyperliquid" | "dydx" | "okx" | "bybit" | "binance";
+type HeaderPlatform = "hyperliquid" | "aster" | "okx" | "bybit" | "binance";
 type HeaderPlatformMeta = {
   id: HeaderPlatform;
   label: string;
@@ -232,15 +234,14 @@ const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
     wallets: ["MetaMask", "Rabby", "Coinbase Wallet", "Phantom", "Solflare"],
   },
   {
-    id: "dydx",
-    label: "dYdX",
+    id: "aster",
+    label: "Aster",
     type: "wallet",
     eyebrow: "DEX · Live",
-    description: "dYdX v4 trading with Keplr wallet and STARK key signing is coming soon.",
+    description: "Aster DEX perpetuals with wallet-based trading access in the terminal flow.",
     primaryAction: "Connect Wallet",
     secondaryAction: "Wallet Menu",
     wallets: ["MetaMask", "Rabby", "Coinbase Wallet", "Phantom", "Solflare"],
-    comingSoon: true,
   },
   {
     id: "okx",
@@ -370,6 +371,7 @@ function ResizeDivider({ onDrag }: { onDrag: (dx: number) => void }) {
 
 export default function TerminalApp({ initialTicker }: { initialTicker?: string } = {}) {
   const initialSymbol = normalizeVenueTicker(initialTicker || "BTC") || "BTC";
+  const { canUseDEX, canUseCEX } = useTier();
   const [secureStorageScope, setSecureStorageScope] = useState<string>("anon");
   const [secureCexStateReady, setSecureCexStateReady] = useState(false);
   const secureCexStorage = useEncryptedLocalStorage<SecureStoredCexState>(`traderbross:cex:${secureStorageScope}`);
@@ -384,11 +386,11 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const [hlKeyStatus, setHlKeyStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [viewportWidth, setViewportWidth] = useState(1440);
   const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<WorkspaceTab>("chart");
-  const [headerPlatform, setHeaderPlatform] = useState<HeaderPlatform>("binance");
+  const [headerPlatform, setHeaderPlatform] = useState<HeaderPlatform>("hyperliquid");
   const [headerConnectOpen, setHeaderConnectOpen] = useState(false);
   const [headerConnection, setHeaderConnection] = useState<HeaderConnectionState>({
     status: "disconnected",
-    platform: "binance",
+    platform: "hyperliquid",
   });
   const [headerActionMessage, setHeaderActionMessage] = useState("");
   const [headerCexCredentials, setHeaderCexCredentials] = useState<HeaderCexCredentialMap>(
@@ -627,7 +629,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       okx: Object.fromEntries(backendVenueQuotes.OKX.map((quote) => [quote.symbol, quote.price])),
       bybit: Object.fromEntries(backendVenueQuotes.Bybit.map((quote) => [quote.symbol, quote.price])),
       hyperliquid: wsPrices,
-      dydx: wsPrices,
+      aster: wsPrices,
     }),
     [backendVenueQuotes.Bybit, backendVenueQuotes.OKX, wsPrices],
   );
@@ -1088,6 +1090,12 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       tpPrice?: number,
       slPrice?: number
     ) => {
+      if (activeVenueState.venueType === "wallet" && !canUseDEX) {
+        return { ok: false, message: "DEX order execution requires the DEX plan." };
+      }
+      if (activeVenueState.venueType === "cex" && !canUseCEX) {
+        return { ok: false, message: "CEX order execution requires the Full plan." };
+      }
       const adapter = getVenueAdapter(activeVenueState.venueId);
       const validation = validateExecutionRequest(activeVenueState, adapter, {
         ticker,
@@ -1144,7 +1152,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         ? { ok: true, message: `${adapter.id.toUpperCase()} accepted the order request.` }
         : { ok: false, message: result.message };
     },
-    [activeVenueState, displayBalance, buildActiveVenueConnection]
+    [activeVenueState, canUseCEX, canUseDEX, displayBalance, buildActiveVenueConnection]
   );
 
   // Close a real venue position (Binance: reduceOnly market order opposite side)
@@ -1301,6 +1309,10 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
   const connectHeaderWallet = useCallback(
     async (walletLabel: SupportedWalletLabel) => {
+      if (!canUseDEX) {
+        setHeaderActionMessage("DEX wallet connection requires the DEX plan.");
+        return;
+      }
       setHeaderActionMessage("");
       setHeaderConnection({
         status: "testing",
@@ -1371,7 +1383,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         });
       }
     },
-    [headerPlatform]
+    [canUseDEX, headerPlatform]
   );
 
   const saveHlPrivateKey = async () => {
@@ -1397,6 +1409,10 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   };
 
   const runHeaderCexAction = useCallback(async () => {
+    if (!canUseCEX) {
+      setHeaderActionMessage("CEX API keys require the Full plan.");
+      return;
+    }
     if (selectedHeaderPlatform.type !== "cex") return;
 
     const cexPlatform = selectedHeaderPlatform.id as HeaderCexPlatform;
@@ -1455,7 +1471,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       );
       setHeaderConnection({ status: "failed", platform: headerPlatform, error: message });
     }
-  }, [cexTestnetMode, headerCexCredentials, headerPlatform, selectedHeaderPlatform]);
+  }, [canUseCEX, cexTestnetMode, headerCexCredentials, headerPlatform, selectedHeaderPlatform]);
 
   const removeHeaderCexCredentials = useCallback(() => {
     if (selectedHeaderPlatform.type !== "cex") return;
@@ -1483,6 +1499,10 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   }, [headerPlatform, selectedHeaderPlatform, vaultTokens]);
 
   const testHeaderCexConnection = useCallback(async () => {
+    if (!canUseCEX) {
+      setHeaderActionMessage("CEX API testing requires the Full plan.");
+      return;
+    }
     if (!selectedHeaderCexPlatform) return;
 
     const token = vaultTokens[selectedHeaderCexPlatform];
@@ -1568,6 +1588,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     selectedHeaderCredentials,
     selectedHeaderCexPlatform,
     selectedHeaderPlatform.label,
+    canUseCEX,
     cexTestnetMode,
     vaultTokens,
   ]);
@@ -1589,22 +1610,45 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   /* Mobile-only trade panel — no tab bar overhead, just the form */
   const renderMobileTradePanel = () => (
     <div className="panel-shell soft-divider flex h-full min-h-0 flex-col overflow-hidden border">
-      <TradingPanel
-        activeVenueState={activeVenueState}
-        selectedNews={selectedItem}
-        newsTradeIntent={newsTradeIntent}
-        availableTickers={tradableSymbols}
-        quoteAsset={quoteAsset}
-        onQuoteAssetChange={setQuoteAsset}
-        balance={displayBalance}
-        isDemoMode={venueBalance === null}
-        positions={displayPositions}
-        prices={activeVenuePriceMap}
-        marketDataSourceLabel={activeVenueMarketLabel}
-        onActiveSymbolChange={setActiveSymbol}
-        onPlaceOrder={routeOrderThroughVenue}
-        onConsumeNewsTradeIntent={() => setNewsTradeIntent(null)}
-      />
+      <div className="relative min-h-0 flex-1">
+        {activeVenueState.venueType === "cex" ? (
+          <TierGate requires="full">
+            <TradingPanel
+              activeVenueState={activeVenueState}
+              selectedNews={selectedItem}
+              newsTradeIntent={newsTradeIntent}
+              availableTickers={tradableSymbols}
+              quoteAsset={quoteAsset}
+              onQuoteAssetChange={setQuoteAsset}
+              balance={displayBalance}
+              isDemoMode={venueBalance === null}
+              positions={displayPositions}
+              prices={activeVenuePriceMap}
+              marketDataSourceLabel={activeVenueMarketLabel}
+              onActiveSymbolChange={setActiveSymbol}
+              onPlaceOrder={routeOrderThroughVenue}
+              onConsumeNewsTradeIntent={() => setNewsTradeIntent(null)}
+            />
+          </TierGate>
+        ) : (
+          <TradingPanel
+            activeVenueState={activeVenueState}
+            selectedNews={selectedItem}
+            newsTradeIntent={newsTradeIntent}
+            availableTickers={tradableSymbols}
+            quoteAsset={quoteAsset}
+            onQuoteAssetChange={setQuoteAsset}
+            balance={displayBalance}
+            isDemoMode={venueBalance === null}
+            positions={displayPositions}
+            prices={activeVenuePriceMap}
+            marketDataSourceLabel={activeVenueMarketLabel}
+            onActiveSymbolChange={setActiveSymbol}
+            onPlaceOrder={routeOrderThroughVenue}
+            onConsumeNewsTradeIntent={() => setNewsTradeIntent(null)}
+          />
+        )}
+      </div>
     </div>
   );
 
@@ -1674,22 +1718,45 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       </div>
 
       {rightTab === "trade" && (
-        <TradingPanel
-          activeVenueState={activeVenueState}
-          selectedNews={selectedItem}
-          newsTradeIntent={newsTradeIntent}
-          availableTickers={tradableSymbols}
-          quoteAsset={quoteAsset}
-          onQuoteAssetChange={setQuoteAsset}
-          balance={displayBalance}
-          isDemoMode={venueBalance === null}
-          positions={displayPositions}
-          prices={activeVenuePriceMap}
-          marketDataSourceLabel={activeVenueMarketLabel}
-          onActiveSymbolChange={setActiveSymbol}
-          onPlaceOrder={routeOrderThroughVenue}
-          onConsumeNewsTradeIntent={() => setNewsTradeIntent(null)}
-        />
+        <div className="relative min-h-0 flex-1">
+          {activeVenueState.venueType === "cex" ? (
+            <TierGate requires="full">
+              <TradingPanel
+                activeVenueState={activeVenueState}
+                selectedNews={selectedItem}
+                newsTradeIntent={newsTradeIntent}
+                availableTickers={tradableSymbols}
+                quoteAsset={quoteAsset}
+                onQuoteAssetChange={setQuoteAsset}
+                balance={displayBalance}
+                isDemoMode={venueBalance === null}
+                positions={displayPositions}
+                prices={activeVenuePriceMap}
+                marketDataSourceLabel={activeVenueMarketLabel}
+                onActiveSymbolChange={setActiveSymbol}
+                onPlaceOrder={routeOrderThroughVenue}
+                onConsumeNewsTradeIntent={() => setNewsTradeIntent(null)}
+              />
+            </TierGate>
+          ) : (
+            <TradingPanel
+              activeVenueState={activeVenueState}
+              selectedNews={selectedItem}
+              newsTradeIntent={newsTradeIntent}
+              availableTickers={tradableSymbols}
+              quoteAsset={quoteAsset}
+              onQuoteAssetChange={setQuoteAsset}
+              balance={displayBalance}
+              isDemoMode={venueBalance === null}
+              positions={displayPositions}
+              prices={activeVenuePriceMap}
+              marketDataSourceLabel={activeVenueMarketLabel}
+              onActiveSymbolChange={setActiveSymbol}
+              onPlaceOrder={routeOrderThroughVenue}
+              onConsumeNewsTradeIntent={() => setNewsTradeIntent(null)}
+            />
+          )}
+        </div>
       )}
 
       {rightTab === "dex" && (
@@ -1706,41 +1773,35 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
               Hyperliquid
             </button>
             <button
-              onClick={() => setDexSubTab("dydx")}
+              onClick={() => setDexSubTab("aster")}
               className={`flex-1 py-1.5 text-[9px] font-bold uppercase transition-colors ${
-                dexSubTab === "dydx"
+                dexSubTab === "aster"
                   ? "border-b-2 border-amber-300 text-amber-200"
                   : "text-zinc-600 hover:text-zinc-400"
               }`}
             >
-              dYdX v4
-              <span className="ml-1 rounded-full border border-amber-400/20 bg-amber-500/10 px-1 py-0.5 text-[7px] font-bold uppercase tracking-[0.1em] text-amber-400">
-                Soon
-              </span>
+              Aster DEX
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-hidden">
             {dexSubTab === "hl" && (
-              <HyperliquidPanel
-                walletAddress={hlWallet || undefined}
-                onRequestConnect={() => {
-                  setHeaderPlatform("hyperliquid");
-                  setHeaderConnectOpen(true);
-                }}
-              />
+              <div className="relative h-full">
+                <TierGate requires="dex">
+                  <HyperliquidPanel
+                    walletAddress={hlWallet || undefined}
+                    onRequestConnect={() => {
+                      setHeaderPlatform("hyperliquid");
+                      setHeaderConnectOpen(true);
+                    }}
+                  />
+                </TierGate>
+              </div>
             )}
-            {dexSubTab === "dydx" && (
-              <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-400/15 bg-amber-500/8">
-                  <Layers className="h-7 w-7 text-amber-300/50" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-[var(--text-primary)]">dYdX v4</p>
-                  <p className="mt-1 text-xs font-semibold text-amber-300">Coming Soon</p>
-                </div>
-                <p className="max-w-[200px] text-[10px] leading-relaxed text-zinc-500">
-                  Keplr wallet integration with STARK key signing is in development.
-                </p>
+            {dexSubTab === "aster" && (
+              <div className="relative h-full">
+                <TierGate requires="dex">
+                  <AsterPanel />
+                </TierGate>
               </div>
             )}
           </div>
@@ -1860,28 +1921,41 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
               <span className="text-[#f3ead7]">{quoteAsset}</span>
             </button>
             {/* Wallet icon-only on mobile, icon+text on desktop */}
-            <button
-              type="button"
-              onClick={() => setHeaderConnectOpen((open) => !open)}
-              className="brand-chip-active shimmer-on-hover inline-flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] sm:gap-2 sm:px-3 sm:py-2"
+            <TierGate
+              requires="dex"
+              fallback={
+                <Link
+                  href="/pricing"
+                  className="terminal-chip inline-flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-200 sm:gap-2 sm:px-3 sm:py-2"
+                >
+                  <Wallet className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">DEX Plan</span>
+                </Link>
+              }
             >
-              <span
-                className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-                  isActiveHeaderConnection
-                    ? "status-dot-online"
-                    : headerConnection.status === "testing"
-                      ? "status-dot-pending"
-                      : ""
-                }`}
-                style={
-                  !isActiveHeaderConnection && headerConnection.status !== "testing"
-                    ? { background: "#4a3a1a" }
-                    : {}
-                }
-              />
-              <Wallet className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Wallet</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setHeaderConnectOpen((open) => !open)}
+                className="brand-chip-active shimmer-on-hover inline-flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] sm:gap-2 sm:px-3 sm:py-2"
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                    isActiveHeaderConnection
+                      ? "status-dot-online"
+                      : headerConnection.status === "testing"
+                        ? "status-dot-pending"
+                        : ""
+                  }`}
+                  style={
+                    !isActiveHeaderConnection && headerConnection.status !== "testing"
+                      ? { background: "#4a3a1a" }
+                      : {}
+                  }
+                />
+                <Wallet className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Wallet</span>
+              </button>
+            </TierGate>
             {/* Platform label: shorter on mobile */}
             <button
               type="button"
@@ -1892,7 +1966,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
               <span className="hidden sm:inline text-[#f3ead7]">{selectedHeaderPlatform.label}</span>
               <span className="sm:hidden text-[#f3ead7]">
                 {selectedHeaderPlatform.id === "hyperliquid" ? "HL"
-                  : selectedHeaderPlatform.id === "dydx" ? "dYdX"
+                  : selectedHeaderPlatform.id === "aster" ? "ASTER"
                   : selectedHeaderPlatform.label.slice(0, 3).toUpperCase()}
               </span>
             </button>
@@ -2023,13 +2097,13 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
           <span className="text-[#2a2820] hidden sm:inline">·</span>
 
           {/* Venue feeds */}
-          {(["OKX", "Bybit", "HL", "dYdX"] as const).map((v) => {
-            const venueMap: Record<string, string> = { OKX: "okx", Bybit: "bybit", HL: "hyperliquid", dYdX: "dydx" };
+          {(["OKX", "Bybit", "HL", "Aster"] as const).map((v) => {
+            const venueMap: Record<string, string> = { OKX: "okx", Bybit: "bybit", HL: "hyperliquid", Aster: "aster" };
             const tooltipMap: Record<string, string> = {
               OKX: "OKX — CEX data feed",
               Bybit: "Bybit — CEX data feed",
               HL: "Hyperliquid — DEX perp trading",
-              dYdX: "dYdX v4 — coming soon",
+              Aster: "Aster v4 — coming soon",
             };
             const isActive = activeVenueState.venueId === venueMap[v];
             const isConnected = isActive && activeVenueFeedState === "connected";
@@ -2365,6 +2439,23 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                     )}
                   </>
                 ) : (
+                  <TierGate
+                    requires="full"
+                    fallback={
+                      <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-4 text-center">
+                        <div className="text-[12px] font-semibold text-amber-200">Full Plan Required</div>
+                        <p className="mt-1.5 text-[10px] leading-4 text-zinc-400">
+                          CEX API key management is available on the Full tier.
+                        </p>
+                        <Link
+                          href="/pricing"
+                          className="mt-3 inline-flex rounded-lg bg-amber-400 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-black"
+                        >
+                          Get Full Plan — $50/mo
+                        </Link>
+                      </div>
+                    }
+                  >
                   <>
                     <div className="mt-3 space-y-2.5">
                       <label className="block">
@@ -2532,6 +2623,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                       )}
                     </div>
                   </>
+                  </TierGate>
                 )}
               </div>
             </div>
@@ -2541,6 +2633,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     </div>
   );
 }
+
 
 
 

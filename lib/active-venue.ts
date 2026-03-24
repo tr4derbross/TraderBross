@@ -1,4 +1,4 @@
-export type TradingVenueId = "hyperliquid" | "dydx" | "okx" | "bybit" | "binance";
+export type TradingVenueId = "hyperliquid" | "aster" | "okx" | "bybit" | "binance";
 export type TradingVenueType = "wallet" | "cex";
 export type TradingVenueConnectionStatus =
   | "not_configured"

@@ -64,6 +64,9 @@ export default function SignInForm() {
       <p className="mt-1 text-sm text-zinc-400">
         Use email/password or request a magic link.
       </p>
+      <p className="mt-2 text-xs text-zinc-500">
+        Plans: Free (news + paper), DEX ($20/mo), Full ($50/mo) — <a href="/pricing" className="text-amber-300 hover:text-amber-200">see pricing</a>.
+      </p>
 
       <form onSubmit={handlePasswordSignIn} className="mt-5 space-y-3">
         <label className="block space-y-1">

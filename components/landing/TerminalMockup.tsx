@@ -197,7 +197,7 @@ export default function TerminalMockup() {
               { label: "OKX", active: false },
               { label: "Bybit", active: true },
               { label: "HL", active: false },
-              { label: "dYdX", active: false },
+              { label: "Aster", active: false },
             ].map(({ label, active }) => (
               <span key={label} className="flex items-center gap-1 text-[8px] font-mono text-[#6B6B6B]">
                 <span className={`h-1 w-1 rounded-full ${active ? "bg-[#F2B705]" : "bg-[#3A3A3A]"}`} />
