@@ -5,6 +5,8 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 
 export type Tier = "free" | "dex" | "full";
+const TIER_OVERRIDE_STORAGE_KEY = "traderbross.tier-override.v1";
+const UNLOCK_ALL_TIERS = process.env.NEXT_PUBLIC_UNLOCK_ALL_TIERS === "true";
 
 function normalizeTier(value: unknown): Tier {
   if (value === "dex" || value === "full") return value;
@@ -12,6 +14,18 @@ function normalizeTier(value: unknown): Tier {
 }
 
 export function useTier() {
+  if (UNLOCK_ALL_TIERS) {
+    return {
+      tier: "full" as Tier,
+      isFree: false,
+      isDEX: true,
+      isFull: true,
+      canUseDEX: true,
+      canUseCEX: true,
+      loading: false,
+    };
+  }
+
   const supabase = useMemo(
     () => (hasSupabasePublicEnv() ? createSupabaseBrowserClient() : null),
     [],
@@ -23,6 +37,17 @@ export function useTier() {
     let mounted = true;
 
     const resolveTier = async () => {
+      if (typeof window !== "undefined") {
+        const overrideTier = sessionStorage.getItem(TIER_OVERRIDE_STORAGE_KEY);
+        if (overrideTier) {
+          if (mounted) {
+            setTier(normalizeTier(overrideTier));
+            setLoading(false);
+          }
+          return;
+        }
+      }
+
       if (!supabase) {
         if (mounted) {
           setTier("free");
@@ -86,10 +111,19 @@ export function useTier() {
     const authListener = supabase?.auth.onAuthStateChange(() => {
       void resolveTier();
     });
+    const handleTierOverrideChanged = () => {
+      void resolveTier();
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("tier-override-changed", handleTierOverrideChanged);
+    }
 
     return () => {
       mounted = false;
       authListener?.data.subscription.unsubscribe();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("tier-override-changed", handleTierOverrideChanged);
+      }
     };
   }, [supabase]);
 

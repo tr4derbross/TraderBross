@@ -66,6 +66,7 @@ import {
 } from "lucide-react";
 
 const EXECUTION_REQUEST_TIMEOUT_MS = 30_000;
+const ADMIN_TIER_OVERRIDE_STORAGE_KEY = "traderbross.tier-override.v1";
 
 function normalizeVenueTicker(value: string) {
   return String(value || "")
@@ -371,7 +372,7 @@ function ResizeDivider({ onDrag }: { onDrag: (dx: number) => void }) {
 
 export default function TerminalApp({ initialTicker }: { initialTicker?: string } = {}) {
   const initialSymbol = normalizeVenueTicker(initialTicker || "BTC") || "BTC";
-  const { canUseDEX, canUseCEX } = useTier();
+  const { tier, canUseDEX, canUseCEX } = useTier();
   const [secureStorageScope, setSecureStorageScope] = useState<string>("anon");
   const [secureCexStateReady, setSecureCexStateReady] = useState(false);
   const secureCexStorage = useEncryptedLocalStorage<SecureStoredCexState>(`traderbross:cex:${secureStorageScope}`);
@@ -856,6 +857,17 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     const entries = selectedHeaderPlatform.wallets.map((wallet) => [wallet, isWalletInstalled(wallet)] as const);
     return Object.fromEntries(entries) as Record<SupportedWalletLabel, boolean>;
   }, [headerConnectOpen, selectedHeaderPlatform.wallets]);
+  const adminWalletAllowlist = useMemo(
+    () =>
+      String(process.env.NEXT_PUBLIC_ADMIN_WALLETS || "")
+        .split(",")
+        .map((entry) => entry.trim().toLowerCase())
+        .filter(Boolean),
+    [],
+  );
+  const connectedWalletAddress = String(headerConnection.address || "").trim().toLowerCase();
+  const isAdminWalletConnected =
+    Boolean(connectedWalletAddress) && adminWalletAllowlist.includes(connectedWalletAddress);
   const activeVenuePriceMap =
     {
       ...(venueMarketPrices[activeVenueState.venueId] ?? (activeVenueState.venueId === "binance" ? wsPrices : {})),
@@ -1180,6 +1192,20 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     },
     [activeVenueState, canUseCEX, canUseDEX, displayBalance, buildActiveVenueConnection, placeOrder]
   );
+
+  const setAdminTierOverride = useCallback((nextTier: "free" | "dex" | "full") => {
+    if (!isAdminWalletConnected || typeof window === "undefined") return;
+    sessionStorage.setItem(ADMIN_TIER_OVERRIDE_STORAGE_KEY, nextTier);
+    window.dispatchEvent(new Event("tier-override-changed"));
+    setHeaderActionMessage(`Admin tier override active: ${nextTier.toUpperCase()}`);
+  }, [isAdminWalletConnected]);
+
+  const clearAdminTierOverride = useCallback(() => {
+    if (typeof window === "undefined") return;
+    sessionStorage.removeItem(ADMIN_TIER_OVERRIDE_STORAGE_KEY);
+    window.dispatchEvent(new Event("tier-override-changed"));
+    setHeaderActionMessage("Admin tier override cleared.");
+  }, []);
 
   // Close a real venue position (Binance: reduceOnly market order opposite side)
   const handleCloseVenuePosition = useCallback(
@@ -2276,6 +2302,42 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
                 <p className="mt-2 text-[11px] leading-5 text-zinc-400">
                   {selectedHeaderPlatform.description}
                 </p>
+
+                {isAdminWalletConnected && (
+                  <div className="mt-3 rounded-xl border border-indigo-400/20 bg-indigo-500/10 px-3 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-indigo-200">
+                        Admin Tier Switch
+                      </span>
+                      <span className="rounded-full border border-indigo-300/30 bg-indigo-500/10 px-2 py-0.5 text-[9px] text-indigo-100">
+                        Active: {tier.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(["free", "dex", "full"] as const).map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setAdminTierOverride(value)}
+                          className={`rounded-lg px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${
+                            tier === value
+                              ? "bg-indigo-300 text-black"
+                              : "border border-indigo-200/30 text-indigo-100"
+                          }`}
+                        >
+                          {value}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={clearAdminTierOverride}
+                        className="rounded-lg border border-rose-300/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-rose-200"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {selectedHeaderPlatform.comingSoon ? (
                   <div className="mt-3 rounded-xl border border-amber-400/10 bg-amber-500/5 px-4 py-4 text-center">
