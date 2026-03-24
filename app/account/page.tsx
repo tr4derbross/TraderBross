@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import TierPassportCard from "@/components/account/TierPassportCard";
 
 export default async function AccountPage() {
   if (!hasSupabasePublicEnv()) {
@@ -48,8 +47,6 @@ export default async function AccountPage() {
           </div>
         </dl>
       </section>
-
-      <TierPassportCard />
     </main>
   );
 }

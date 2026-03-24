@@ -6,12 +6,6 @@ import { ethers } from "ethers";
 import { encode as msgpackEncode } from "@msgpack/msgpack";
 import { loadConfig } from "./config.mjs";
 import { createLogger } from "./logger.mjs";
-import {
-  isTierPassportConfigured,
-  issueTierPassportToken,
-  validateTierPassportToken,
-  verifyAdminTierPassportCode,
-} from "./services/admin-tier-passport-service.mjs";
 import { getCalendarEvents } from "./services/calendar-service.mjs";
 import { getAsterAccount, getAsterCandles, getAsterMarkets } from "./services/aster-service.mjs";
 import { getHyperliquidAccount, getHyperliquidCandles, getHyperliquidMarket } from "./services/hyperliquid-service.mjs";
@@ -45,7 +39,6 @@ const SENSITIVE_ROUTES = new Set([
   "/api/vault/store",
   "/api/vault/clear",
   "/api/vault/status",
-  "/api/admin/tier-passport",
   "/api/venues/validate",
   "/api/binance",
   "/api/binance/order",
@@ -887,46 +880,6 @@ const server = http.createServer(async (request, reply) => {
     if (request.method === "GET" && url.pathname === "/api/revenue/tier2") {
       json(reply, 200, getTier2RevenuePublicConfig());
       return;
-    }
-
-    if (url.pathname === "/api/admin/tier-passport") {
-      if (!isTierPassportConfigured()) {
-        json(reply, 503, { ok: false, error: "Tier passport is not configured." });
-        return;
-      }
-
-      if (request.method === "POST") {
-        const body = await readJson(request);
-        const code = String(body?.code || "");
-        const tier = String(body?.tier || "free").toLowerCase();
-        if (!verifyAdminTierPassportCode(code)) {
-          json(reply, 401, { ok: false, error: "Invalid passport code." });
-          return;
-        }
-        const issued = issueTierPassportToken(tier);
-        json(reply, 200, {
-          ok: true,
-          tier: issued.tier,
-          token: issued.token,
-          expiresAt: new Date(issued.expiresAt * 1000).toISOString(),
-        });
-        return;
-      }
-
-      if (request.method === "GET") {
-        const token = String(url.searchParams.get("token") || "");
-        const validated = validateTierPassportToken(token);
-        if (!validated) {
-          json(reply, 401, { ok: false, error: "Invalid or expired passport token." });
-          return;
-        }
-        json(reply, 200, {
-          ok: true,
-          tier: validated.tier,
-          expiresAt: new Date(validated.expiresAt * 1000).toISOString(),
-        });
-        return;
-      }
     }
 
     if (request.method === "POST" && url.pathname === "/api/hyperliquid/order") {
