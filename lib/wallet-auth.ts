@@ -12,7 +12,7 @@ function nowSeconds() {
 }
 
 function getSecret() {
-  return String(process.env.WALLET_AUTH_SECRET || process.env.SITE_ACCESS_SECRET || "").trim();
+  return String(process.env.WALLET_AUTH_SECRET || "").trim();
 }
 
 function assertSecret() {

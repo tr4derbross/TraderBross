@@ -4,6 +4,8 @@ import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/supabase/a
 import { getWalletSessionCookieName, verifyWalletSessionToken } from "@/lib/wallet-auth";
 import { type PlanId, hasPaymentVerificationEnv, verifyPlanPayment } from "@/lib/payment-verification";
 import { grantWalletTier } from "@/lib/wallet-subscriptions";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
+import { isRequestSameOrigin } from "@/lib/request-security";
 
 function json(payload: unknown, status = 200) {
   return new NextResponse(JSON.stringify(payload), {
@@ -20,6 +22,21 @@ function planToTier(plan: PlanId) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isRequestSameOrigin(request)) {
+    return json({ ok: false, error: "Origin mismatch." }, 403);
+  }
+
+  const contentLength = Number(request.headers.get("content-length") || "0");
+  if (Number.isFinite(contentLength) && contentLength > 20_000) {
+    return json({ ok: false, error: "Payload too large." }, 413);
+  }
+
+  const ip = getClientIp(request);
+  const requestLimit = rateLimit(`wallet-payment-verify:${ip}`, 15, 60_000);
+  if (!requestLimit.allowed) {
+    return json({ ok: false, error: "Too many payment verification requests. Try again later." }, 429);
+  }
+
   const token = request.cookies.get(getWalletSessionCookieName())?.value || "";
   const session = verifyWalletSessionToken(token);
   if (!session) {
@@ -67,13 +84,6 @@ export async function POST(request: NextRequest) {
     return json({ ok: false, error: message }, 400);
   }
 
-  const tier = planToTier(plan);
-  const entitlement = await grantWalletTier({
-    address: session.address,
-    tier,
-    durationDays: 30,
-  });
-
   const priceUsd = plan === "full" ? Number(process.env.FULL_TIER_PRICE_USD || 50) : Number(process.env.DEX_TIER_PRICE_USD || 20);
   const { error: insertError } = await supabase.from("wallet_payments").insert({
     wallet_address: session.address,
@@ -92,8 +102,26 @@ export async function POST(request: NextRequest) {
   });
 
   if (insertError) {
+    if (String(insertError.message || "").toLowerCase().includes("duplicate key")) {
+      const duplicate = await supabase
+        .from("wallet_payments")
+        .select("wallet_address, plan")
+        .eq("tx_hash", txHash.toLowerCase())
+        .maybeSingle<{ wallet_address: string; plan: PlanId }>();
+      if (duplicate.data?.wallet_address === session.address) {
+        return json({ ok: true, alreadyProcessed: true, plan: duplicate.data.plan });
+      }
+      return json({ ok: false, error: "Transaction already claimed by another wallet." }, 409);
+    }
     return json({ ok: false, error: insertError.message || "Could not record payment." }, 500);
   }
+
+  const tier = planToTier(plan);
+  const entitlement = await grantWalletTier({
+    address: session.address,
+    tier,
+    durationDays: 30,
+  });
 
   return json({
     ok: true,
@@ -104,4 +132,3 @@ export async function POST(request: NextRequest) {
     tierExpiresAt: entitlement.expiresAt,
   });
 }
-

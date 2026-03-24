@@ -7,6 +7,7 @@ import {
   shouldUnlockAllTiersInPrivateMode,
   verifySiteAccessToken,
 } from "@/lib/site-access";
+import { isRequestSameOrigin } from "@/lib/request-security";
 
 const ACCESS_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const ACCESS_MAX_ATTEMPTS = 8;
@@ -55,6 +56,10 @@ function clearAttemptState(ip: string) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isRequestSameOrigin(request)) {
+    return responseJson({ ok: false, error: "Origin mismatch." }, 403);
+  }
+
   if (!isSiteAccessEnabled()) {
     return responseJson({ ok: true, bypass: true });
   }
@@ -109,7 +114,11 @@ export async function GET(request: NextRequest) {
   });
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
+  if (!isRequestSameOrigin(request)) {
+    return responseJson({ ok: false, error: "Origin mismatch." }, 403);
+  }
+
   const response = responseJson({ ok: true });
   response.cookies.set(getSiteAccessCookieName(), "", {
     httpOnly: true,
