@@ -1091,10 +1091,36 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       slPrice?: number
     ) => {
       if (activeVenueState.venueType === "wallet" && !canUseDEX) {
-        return { ok: false, message: "DEX order execution requires the DEX plan." };
+        const accepted = placeOrder(
+          ticker,
+          side,
+          type,
+          marginAmount,
+          leverage,
+          marginMode,
+          limitPrice,
+          tpPrice,
+          slPrice,
+        );
+        return accepted
+          ? { ok: true, message: "Paper trade submitted (DEX plan required for live execution)." }
+          : { ok: false, message: "Paper trade failed. Check margin amount and balance." };
       }
       if (activeVenueState.venueType === "cex" && !canUseCEX) {
-        return { ok: false, message: "CEX order execution requires the Full plan." };
+        const accepted = placeOrder(
+          ticker,
+          side,
+          type,
+          marginAmount,
+          leverage,
+          marginMode,
+          limitPrice,
+          tpPrice,
+          slPrice,
+        );
+        return accepted
+          ? { ok: true, message: "Paper trade submitted (Full plan required for live CEX execution)." }
+          : { ok: false, message: "Paper trade failed. Check margin amount and balance." };
       }
       const adapter = getVenueAdapter(activeVenueState.venueId);
       const validation = validateExecutionRequest(activeVenueState, adapter, {
@@ -1152,7 +1178,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         ? { ok: true, message: `${adapter.id.toUpperCase()} accepted the order request.` }
         : { ok: false, message: result.message };
     },
-    [activeVenueState, canUseCEX, canUseDEX, displayBalance, buildActiveVenueConnection]
+    [activeVenueState, canUseCEX, canUseDEX, displayBalance, buildActiveVenueConnection, placeOrder]
   );
 
   // Close a real venue position (Binance: reduceOnly market order opposite side)
@@ -1611,43 +1637,22 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const renderMobileTradePanel = () => (
     <div className="panel-shell soft-divider flex h-full min-h-0 flex-col overflow-hidden border">
       <div className="relative min-h-0 flex-1">
-        {activeVenueState.venueType === "cex" ? (
-          <TierGate requires="full">
-            <TradingPanel
-              activeVenueState={activeVenueState}
-              selectedNews={selectedItem}
-              newsTradeIntent={newsTradeIntent}
-              availableTickers={tradableSymbols}
-              quoteAsset={quoteAsset}
-              onQuoteAssetChange={setQuoteAsset}
-              balance={displayBalance}
-              isDemoMode={venueBalance === null}
-              positions={displayPositions}
-              prices={activeVenuePriceMap}
-              marketDataSourceLabel={activeVenueMarketLabel}
-              onActiveSymbolChange={setActiveSymbol}
-              onPlaceOrder={routeOrderThroughVenue}
-              onConsumeNewsTradeIntent={() => setNewsTradeIntent(null)}
-            />
-          </TierGate>
-        ) : (
-          <TradingPanel
-            activeVenueState={activeVenueState}
-            selectedNews={selectedItem}
-            newsTradeIntent={newsTradeIntent}
-            availableTickers={tradableSymbols}
-            quoteAsset={quoteAsset}
-            onQuoteAssetChange={setQuoteAsset}
-            balance={displayBalance}
-            isDemoMode={venueBalance === null}
-            positions={displayPositions}
-            prices={activeVenuePriceMap}
-            marketDataSourceLabel={activeVenueMarketLabel}
-            onActiveSymbolChange={setActiveSymbol}
-            onPlaceOrder={routeOrderThroughVenue}
-            onConsumeNewsTradeIntent={() => setNewsTradeIntent(null)}
-          />
-        )}
+        <TradingPanel
+          activeVenueState={activeVenueState}
+          selectedNews={selectedItem}
+          newsTradeIntent={newsTradeIntent}
+          availableTickers={tradableSymbols}
+          quoteAsset={quoteAsset}
+          onQuoteAssetChange={setQuoteAsset}
+          balance={displayBalance}
+          isDemoMode={venueBalance === null}
+          positions={displayPositions}
+          prices={activeVenuePriceMap}
+          marketDataSourceLabel={activeVenueMarketLabel}
+          onActiveSymbolChange={setActiveSymbol}
+          onPlaceOrder={routeOrderThroughVenue}
+          onConsumeNewsTradeIntent={() => setNewsTradeIntent(null)}
+        />
       </div>
     </div>
   );
@@ -1719,43 +1724,22 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
       {rightTab === "trade" && (
         <div className="relative min-h-0 flex-1">
-          {activeVenueState.venueType === "cex" ? (
-            <TierGate requires="full">
-              <TradingPanel
-                activeVenueState={activeVenueState}
-                selectedNews={selectedItem}
-                newsTradeIntent={newsTradeIntent}
-                availableTickers={tradableSymbols}
-                quoteAsset={quoteAsset}
-                onQuoteAssetChange={setQuoteAsset}
-                balance={displayBalance}
-                isDemoMode={venueBalance === null}
-                positions={displayPositions}
-                prices={activeVenuePriceMap}
-                marketDataSourceLabel={activeVenueMarketLabel}
-                onActiveSymbolChange={setActiveSymbol}
-                onPlaceOrder={routeOrderThroughVenue}
-                onConsumeNewsTradeIntent={() => setNewsTradeIntent(null)}
-              />
-            </TierGate>
-          ) : (
-            <TradingPanel
-              activeVenueState={activeVenueState}
-              selectedNews={selectedItem}
-              newsTradeIntent={newsTradeIntent}
-              availableTickers={tradableSymbols}
-              quoteAsset={quoteAsset}
-              onQuoteAssetChange={setQuoteAsset}
-              balance={displayBalance}
-              isDemoMode={venueBalance === null}
-              positions={displayPositions}
-              prices={activeVenuePriceMap}
-              marketDataSourceLabel={activeVenueMarketLabel}
-              onActiveSymbolChange={setActiveSymbol}
-              onPlaceOrder={routeOrderThroughVenue}
-              onConsumeNewsTradeIntent={() => setNewsTradeIntent(null)}
-            />
-          )}
+          <TradingPanel
+            activeVenueState={activeVenueState}
+            selectedNews={selectedItem}
+            newsTradeIntent={newsTradeIntent}
+            availableTickers={tradableSymbols}
+            quoteAsset={quoteAsset}
+            onQuoteAssetChange={setQuoteAsset}
+            balance={displayBalance}
+            isDemoMode={venueBalance === null}
+            positions={displayPositions}
+            prices={activeVenuePriceMap}
+            marketDataSourceLabel={activeVenueMarketLabel}
+            onActiveSymbolChange={setActiveSymbol}
+            onPlaceOrder={routeOrderThroughVenue}
+            onConsumeNewsTradeIntent={() => setNewsTradeIntent(null)}
+          />
         </div>
       )}
 
