@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { apiFetch } from "@/lib/api-client";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 
@@ -45,6 +46,19 @@ export function useTier() {
             setLoading(false);
           }
           return;
+        }
+
+        try {
+          const accessState = await apiFetch<{ unlockAllTiers?: boolean }>("/api/site-access");
+          if (accessState?.unlockAllTiers) {
+            if (mounted) {
+              setTier("full");
+              setLoading(false);
+            }
+            return;
+          }
+        } catch {
+          // ignore and continue to normal tier resolution
         }
       }
 
