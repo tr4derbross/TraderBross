@@ -397,6 +397,7 @@ function buildEmergencyScreenerFromQuotes(quotes: Array<{ symbol: string; price:
     price: q.price,
     change24h: q.changePct,
     volume24h: Math.max(100_000, Math.abs(q.price * 120_000)),
+    trades24h: Math.max(100, Math.round(Math.abs(q.price * 80))),
     marketCap: Math.max(1_000_000, Math.abs(q.price * 1_000_000)),
     high24h: q.price * 1.03,
     low24h: q.price * 0.97,
@@ -407,6 +408,64 @@ function buildEmergencyScreenerFromQuotes(quotes: Array<{ symbol: string; price:
   if (sort === "gainers") return rows.sort((a, b) => b.change24h - a.change24h);
   if (sort === "losers") return rows.sort((a, b) => a.change24h - b.change24h);
   return rows.sort((a, b) => b.volume24h - a.volume24h);
+}
+
+async function fetchEmergencyScreenerRows(sort: string) {
+  try {
+    const res = await fetch("https://fapi.binance.com/fapi/v1/ticker/24hr", {
+      cache: "no-store",
+      signal: AbortSignal.timeout(9000),
+    });
+    if (!res.ok) throw new Error(`Binance ticker failed: ${res.status}`);
+    const payload = await res.json();
+    const rows = (Array.isArray(payload) ? payload : [])
+      .map((row: any) => {
+        const symbolRaw = String(row?.symbol || "").toUpperCase();
+        if (!symbolRaw.endsWith("USDT")) return null;
+        const symbol = symbolRaw.replace(/USDT$/i, "");
+        const price = Number(row?.lastPrice || 0);
+        const change24h = Number(row?.priceChangePercent || 0);
+        const volume24h = Number(row?.quoteVolume || 0);
+        const high24h = Number(row?.highPrice || 0);
+        const low24h = Number(row?.lowPrice || 0);
+        const trades24h = Number(row?.count || 0);
+        if (!symbol || !Number.isFinite(price) || price <= 0) return null;
+        if (!Number.isFinite(volume24h) || volume24h <= 0) return null;
+        return {
+          symbol,
+          price,
+          change24h,
+          volume24h,
+          high24h: Number.isFinite(high24h) && high24h > 0 ? high24h : price * 1.03,
+          low24h: Number.isFinite(low24h) && low24h > 0 ? low24h : price * 0.97,
+          trades24h: Number.isFinite(trades24h) && trades24h > 0 ? Math.round(trades24h) : 0,
+          rsi14: 45 + (change24h % 20),
+          openInterestUsd: Math.max(50_000, Math.abs(price * 300_000)),
+          longShortRatio: 1 + change24h / 100,
+        };
+      })
+      .filter(Boolean) as Array<{
+      symbol: string;
+      price: number;
+      change24h: number;
+      volume24h: number;
+      high24h: number;
+      low24h: number;
+      trades24h: number;
+      rsi14: number;
+      openInterestUsd: number;
+      longShortRatio: number;
+    }>;
+
+    if (sort === "gainers") rows.sort((a, b) => b.change24h - a.change24h);
+    else if (sort === "losers") rows.sort((a, b) => a.change24h - b.change24h);
+    else rows.sort((a, b) => b.volume24h - a.volume24h);
+
+    return rows.slice(0, 120);
+  } catch {
+    const market = await fetchEmergencyQuotes();
+    return buildEmergencyScreenerFromQuotes(market.quotes, sort);
+  }
 }
 
 function normalizeSymbols(input: unknown) {
@@ -705,9 +764,8 @@ async function emergencyResponse(path: string[], request: NextRequest) {
     ]);
   }
   if (key === "screener") {
-    const market = await fetchEmergencyQuotes();
     const sort = request.nextUrl.searchParams.get("sort") || "volume";
-    const payload = buildEmergencyScreenerFromQuotes(market.quotes, sort);
+    const payload = await fetchEmergencyScreenerRows(sort);
     writeEmergencyCache(cacheKey, payload, 20_000);
     return json(payload);
   }
