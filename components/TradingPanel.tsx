@@ -133,6 +133,18 @@ export default function TradingPanel({
     return Array.from(new Set(source.filter((ticker) => !["COIN", "MSTR"].includes(ticker))));
   }, [availableTickers]);
 
+  const resolveSafeTicker = useMemo(
+    () => (requested?: string | null) => {
+      const normalized = String(requested || "").toUpperCase().trim();
+      if (normalized && futuresTickers.includes(normalized)) return normalized;
+      if (futuresTickers.includes(activeVenueState.activeSymbol)) return activeVenueState.activeSymbol;
+      if (futuresTickers.includes("BTC")) return "BTC";
+      if (futuresTickers.includes("ETH")) return "ETH";
+      return futuresTickers[0] || "BTC";
+    },
+    [activeVenueState.activeSymbol, futuresTickers],
+  );
+
   useEffect(() => {
     let active = true;
     const hasLivePrice = Number.isFinite(prices[ticker]) && prices[ticker] > 0;
@@ -183,11 +195,11 @@ export default function TradingPanel({
   useEffect(() => {
     if (futuresTickers.length === 0) return;
     if (!futuresTickers.includes(ticker)) {
-      const next = futuresTickers[0];
+      const next = resolveSafeTicker(ticker);
       setTicker(next);
       onActiveSymbolChange(next);
     }
-  }, [futuresTickers, onActiveSymbolChange, ticker]);
+  }, [futuresTickers, onActiveSymbolChange, resolveSafeTicker, ticker]);
 
   // Fetch leverage brackets once on mount (Binance only)
   useEffect(() => {
@@ -201,8 +213,9 @@ export default function TradingPanel({
   useEffect(() => {
     if (!newsTradeIntent) return;
 
-    setTicker(newsTradeIntent.symbol);
-    onActiveSymbolChange(newsTradeIntent.symbol);
+    const safeTicker = resolveSafeTicker(newsTradeIntent.symbol);
+    setTicker(safeTicker);
+    onActiveSymbolChange(safeTicker);
     setSide(newsTradeIntent.side);
     setTicketType(
       newsTradeIntent.orderType === "limit"
@@ -226,7 +239,7 @@ export default function TradingPanel({
     setSubmitMessage(newsTradeIntent.rationale);
     setSubmitState("idle");
     onConsumeNewsTradeIntent();
-  }, [newsTradeIntent, onActiveSymbolChange, onConsumeNewsTradeIntent]);
+  }, [newsTradeIntent, onActiveSymbolChange, onConsumeNewsTradeIntent, resolveSafeTicker]);
 
   // Dynamic leverage presets based on coin's max leverage from Binance
   const maxLeverage = leverageBrackets[ticker] ?? 100;

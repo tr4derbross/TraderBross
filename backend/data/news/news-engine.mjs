@@ -92,6 +92,13 @@ const SENTIMENT_WORDS = {
   ],
 };
 
+function normalizeSentiment(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "bullish") return "bullish";
+  if (normalized === "bearish") return "bearish";
+  return "neutral";
+}
+
 function toIsoDate(value) {
   const parsed = new Date(value || Date.now());
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
@@ -327,7 +334,7 @@ function normalizeRawNewsItem(raw, watchlistTickers, options = {}) {
   });
   const sentimentMeta = raw.sentiment
     ? {
-        sentiment: raw.sentiment,
+        sentiment: normalizeSentiment(raw.sentiment),
         sentimentScore: Number(raw.sentimentScore || 70),
         sentimentReason: String(raw.sentimentReason || "Provided by source."),
       }

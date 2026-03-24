@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { NewsItem, AVAILABLE_TICKERS } from "@/lib/mock-data";
+import { NewsItem } from "@/lib/mock-data";
 import { useAlerts } from "@/hooks/useAlerts";
 import { useBinanceWs } from "@/hooks/useBinanceWs";
 import { useVenueMarketData } from "@/hooks/useVenueMarketData";
@@ -815,10 +815,25 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
   const handleNewsQuickTrade = (preset: NewsTradePreset, item: NewsItem) => {
     setSelectedItem(item);
-    setActiveSymbol(preset.symbol);
+    const requested = normalizeVenueTicker(preset.symbol);
+    const fallbackFromItem = (item.ticker ?? [])
+      .map((value) => normalizeVenueTicker(value))
+      .find((value) => tradableSet.has(value));
+    const safeSymbol =
+      (requested && tradableSet.has(requested) ? requested : null) ??
+      fallbackFromItem ??
+      (tradableSet.has(activeVenueState.activeSymbol) ? activeVenueState.activeSymbol : null) ??
+      (tradableSet.has(lastValidSymbolRef.current) ? lastValidSymbolRef.current : null) ??
+      (tradableSet.has("BTC") ? "BTC" : null) ??
+      (tradableSet.has("ETH") ? "ETH" : null) ??
+      tradableSymbols[0] ??
+      "BTC";
+
+    setActiveSymbol(safeSymbol);
     setRightTab("trade");
     setNewsTradeIntent({
       ...preset,
+      symbol: safeSymbol,
       sourceItemId: item.id,
     });
 
@@ -883,10 +898,14 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const activeVenueMarketLabel = getVenueAdapter(activeVenueState.venueId).marketDataLabel;
   const fallbackTradableSymbols = useMemo(
     () =>
-      (activeVenueState.venueId === "binance" ? wsQuotes.map((quote) => quote.symbol) : AVAILABLE_TICKERS)
+      (
+        activeVenueState.venueId === "binance"
+          ? wsQuotes.map((quote) => quote.symbol)
+          : [activeVenueState.activeSymbol, lastValidSymbolRef.current, "BTC", "ETH"]
+      )
         .map(normalizeVenueTicker)
         .filter(Boolean),
-    [activeVenueState.venueId, wsQuotes],
+    [activeVenueState.activeSymbol, activeVenueState.venueId, wsQuotes],
   );
   const tradableSymbols = useMemo(
     () =>

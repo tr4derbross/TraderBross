@@ -1,5 +1,12 @@
 import { canonicalSymbol, symbolAliases } from "./symbol-map.mjs";
 
+function normalizeSentiment(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "bullish") return "bullish";
+  if (normalized === "bearish") return "bearish";
+  return "neutral";
+}
+
 function asDate(value) {
   if (!value) return new Date().toISOString();
   const parsed = new Date(value);
@@ -58,7 +65,7 @@ export function normalizeNewsEvent(input) {
     summary: String(input.summary || input.description || ""),
     source: String(input.source || "Unknown"),
     sourceType: input.sourceType || "news",
-    sentiment: input.sentiment || "neutral",
+    sentiment: normalizeSentiment(input.sentiment),
     importance: input.importance || "watch",
     url: String(input.url || "#"),
     tickers: normalizedTickers,
@@ -92,7 +99,7 @@ export function normalizeWhaleEvent(input) {
       : [symbol],
     labels: input.labels || null,
     price: Number.isFinite(price) ? price : 0,
-    sentiment: input.sentiment || "neutral",
+    sentiment: normalizeSentiment(input.sentiment),
     provider: input.provider || "unknown",
     rawText: input.rawText ? String(input.rawText) : "",
   };
@@ -112,17 +119,18 @@ export function toFrontendNewsItem(news) {
     .map((item) => canonicalSymbol(item))
     .filter(Boolean)
     .slice(0, 6);
+  const normalizedSentiment = normalizeSentiment(news.sentiment);
   const fallbackReason =
     news.sentimentReason ||
-    (news.sentiment === "bullish"
+    (normalizedSentiment === "bullish"
       ? "Auto signal favors bullish bias."
-      : news.sentiment === "bearish"
+      : normalizedSentiment === "bearish"
         ? "Auto signal favors bearish bias."
         : "Auto signal is neutral.");
   const sentimentScore =
     Number.isFinite(Number(news.sentimentScore)) && Number(news.sentimentScore) > 0
       ? Math.max(50, Math.min(99, Math.round(Number(news.sentimentScore))))
-      : news.sentiment === "neutral"
+      : normalizedSentiment === "neutral"
         ? 50
         : 62;
 
@@ -136,7 +144,7 @@ export function toFrontendNewsItem(news) {
     timestamp: news.timestamp,
     url: news.url,
     type: news.sourceType,
-    sentiment: news.sentiment,
+    sentiment: normalizedSentiment,
     sentimentScore,
     sentimentReason: fallbackReason,
     importance: news.importance,
@@ -164,9 +172,10 @@ export function toFrontendWhaleItem(event) {
       : event.eventType === "exchange_outflow"
         ? "from exchange"
         : event.eventType.replace(/_/g, " ");
+  const normalizedSentiment = normalizeSentiment(event.sentiment);
   const headline =
     event.eventType === "liquidation"
-      ? `${event.token} ${event.sentiment === "bearish" ? "LONG" : "SHORT"} liquidation ${amountText}`
+      ? `${event.token} ${normalizedSentiment === "bearish" ? "LONG" : "SHORT"} liquidation ${amountText}`
       : `${amountText} ${event.token} ${direction}`;
 
   return {
@@ -179,7 +188,7 @@ export function toFrontendWhaleItem(event) {
     timestamp: event.timestamp,
     url: "#",
     type: "whale",
-    sentiment: event.sentiment,
+    sentiment: normalizedSentiment,
     whaleAmountUsd: event.usdValue,
     whaleToken: event.token,
     whaleFrom: event.fromLabel,
