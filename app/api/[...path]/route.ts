@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getWalletSessionCookieName, type WalletTier, verifyWalletSessionToken } from "@/lib/wallet-auth";
+import { getWalletTier } from "@/lib/wallet-subscriptions";
 
 const DEFAULT_LOCAL_BACKEND = "http://127.0.0.1:4001";
 const DEFAULT_PROD_BACKEND = "https://traderbross-production.up.railway.app";
@@ -8,7 +10,7 @@ const EMERGENCY_CACHE_TTL_MS = 45_000;
 const MUTATION_PROXY_TIMEOUT_MS = 30_000;
 const MAX_MUTATION_PROXY_BODY_BYTES = 1024 * 1024; // 1 MB
 const emergencyCache = new Map<string, { expiresAt: number; value: unknown }>();
-type Tier = "free" | "dex" | "full";
+type Tier = WalletTier;
 const TIER_ORDER: Tier[] = ["free", "dex", "full"];
 const FULL_TIER_PATH_PREFIXES = [
   "/api/vault/status",
@@ -446,7 +448,19 @@ function requiresTierCheck(pathname: string, method: string) {
   return null;
 }
 
-async function resolveRequestTier() {
+async function resolveRequestTier(request: NextRequest) {
+  const walletSessionToken = request.cookies.get(getWalletSessionCookieName())?.value || "";
+  if (walletSessionToken) {
+    const walletSession = verifyWalletSessionToken(walletSessionToken);
+    if (walletSession?.address) {
+      const walletTier = await getWalletTier(walletSession.address);
+      return {
+        authenticated: true,
+        tier: walletTier.tier,
+      };
+    }
+  }
+
   if (!hasSupabasePublicEnv()) {
     return { authenticated: false, tier: "free" as Tier };
   }
@@ -519,7 +533,7 @@ async function enforceApiTier(request: NextRequest, upstreamPath: string, method
   }
   if (!required) return null;
 
-  const current = await resolveRequestTier();
+  const current = await resolveRequestTier(request);
   if (!current.authenticated) {
     return json({ error: "Unauthorized" }, 401);
   }

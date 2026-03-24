@@ -128,7 +128,7 @@ const PRICING_PLANS = [
       "Funding rate tracker",
     ],
     cta: "Start Free — No credit card",
-    ctaHref: "/register",
+    ctaHref: "/sign-in",
   },
   {
     name: "DEX",
@@ -585,3 +585,4 @@ export default function LandingPage() {
     </PageWrapper>
   );
 }
+

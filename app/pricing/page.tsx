@@ -8,7 +8,7 @@ const TIERS = [
     price: 0,
     priceLabel: "Forever Free",
     cta: "Start Free",
-    ctaLink: "/register",
+    ctaLink: "/sign-in",
     highlight: false,
     features: [
       "Real-time news feed (CoinDesk, Cointelegraph, Decrypt)",
@@ -83,11 +83,11 @@ export default function PricingPage() {
                 href={tier.ctaLink}
                 className="mt-4 inline-flex rounded-lg bg-amber-400 px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] text-black"
               >
-                {tier.id === "free" ? "Start Free — No credit card" : tier.cta}
+                {tier.id === "free" ? "Start Free - No credit card" : tier.cta}
               </Link>
               <ul className="mt-4 space-y-2 text-sm text-zinc-300">
                 {tier.features.map((feature) => (
-                  <li key={feature}>• {feature}</li>
+                  <li key={feature}>- {feature}</li>
                 ))}
               </ul>
               {tier.locked.length > 0 ? (

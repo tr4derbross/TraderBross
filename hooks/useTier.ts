@@ -39,6 +39,30 @@ export function useTier() {
 
     const resolveTier = async () => {
       if (typeof window !== "undefined") {
+        try {
+          const walletSession = await apiFetch<{
+            authenticated?: boolean;
+            tier?: Tier;
+            tierExpiresAt?: string | null;
+          }>("/api/auth/wallet/session");
+          if (walletSession?.authenticated) {
+            const expiresAt = walletSession.tierExpiresAt
+              ? new Date(walletSession.tierExpiresAt).getTime()
+              : null;
+            const expired =
+              typeof expiresAt === "number" &&
+              Number.isFinite(expiresAt) &&
+              expiresAt < Date.now();
+            if (mounted) {
+              setTier(expired ? "free" : normalizeTier(walletSession.tier));
+              setLoading(false);
+            }
+            return;
+          }
+        } catch {
+          // ignore wallet session errors and continue
+        }
+
         const overrideTier = sessionStorage.getItem(TIER_OVERRIDE_STORAGE_KEY);
         if (overrideTier) {
           if (mounted) {
