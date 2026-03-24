@@ -1,10 +1,28 @@
 import { NextRequest } from "next/server";
+import { hasSupabasePublicEnv } from "@/lib/supabase/env";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEFAULT_LOCAL_BACKEND = "http://127.0.0.1:4001";
 const DEFAULT_PROD_BACKEND = "https://traderbross-production.up.railway.app";
 const EMERGENCY_CACHE_TTL_MS = 45_000;
 const MUTATION_PROXY_TIMEOUT_MS = 30_000;
+const MAX_MUTATION_PROXY_BODY_BYTES = 1024 * 1024; // 1 MB
 const emergencyCache = new Map<string, { expiresAt: number; value: unknown }>();
+type Tier = "free" | "dex" | "full";
+const TIER_ORDER: Tier[] = ["free", "dex", "full"];
+const FULL_TIER_PATH_PREFIXES = [
+  "/api/vault/status",
+  "/api/venues/validate",
+  "/api/binance",
+  "/api/binance/order",
+  "/api/okx",
+  "/api/okx/order",
+  "/api/bybit",
+  "/api/bybit/order",
+];
+const DEX_TIER_PATH_PREFIXES = [
+  "/api/hyperliquid/order",
+];
 
 function trimSlash(value: string) {
   return value.replace(/\/+$/, "");
@@ -404,6 +422,122 @@ function normalizeSymbols(input: unknown) {
   ).sort((a, b) => a.localeCompare(b));
 }
 
+function normalizeTier(value: unknown): Tier {
+  if (value === "full" || value === "dex") return value;
+  return "free";
+}
+
+function hasRequiredTier(tier: Tier, required: Tier) {
+  return TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf(required);
+}
+
+function requiresTierCheck(pathname: string, method: string) {
+  const upperMethod = String(method || "").toUpperCase();
+  if (!["POST", "DELETE", "PUT", "PATCH", "GET"].includes(upperMethod)) return null;
+  if (FULL_TIER_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+    return "full" as Tier;
+  }
+  if (DEX_TIER_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+    return "dex" as Tier;
+  }
+  if (pathname === "/api/vault/store" || pathname.startsWith("/api/vault/store/")) {
+    return "dex" as Tier;
+  }
+  return null;
+}
+
+async function resolveRequestTier() {
+  if (!hasSupabasePublicEnv()) {
+    return { authenticated: false, tier: "free" as Tier };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { authenticated: false, tier: "free" as Tier };
+  }
+
+  const now = Date.now();
+  try {
+    const profileQuery = await supabase
+      .from("profiles")
+      .select("tier, tier_expires_at")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileQuery.data) {
+      const expiresAt = profileQuery.data.tier_expires_at
+        ? new Date(profileQuery.data.tier_expires_at).getTime()
+        : null;
+      const expired = typeof expiresAt === "number" && Number.isFinite(expiresAt) && expiresAt < now;
+      return {
+        authenticated: true,
+        tier: expired ? ("free" as Tier) : normalizeTier(profileQuery.data.tier),
+      };
+    }
+  } catch {
+    // fall through to subscriptions
+  }
+
+  try {
+    const subsQuery = await supabase
+      .from("subscriptions")
+      .select("tier, expires_at")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const expiresAt = subsQuery.data?.expires_at ? new Date(subsQuery.data.expires_at).getTime() : null;
+    const expired = typeof expiresAt === "number" && Number.isFinite(expiresAt) && expiresAt < now;
+    return {
+      authenticated: true,
+      tier: expired ? ("free" as Tier) : normalizeTier(subsQuery.data?.tier),
+    };
+  } catch {
+    return { authenticated: true, tier: "free" as Tier };
+  }
+}
+
+async function determineVaultStoreRequiredTier(request: NextRequest): Promise<Tier> {
+  try {
+    const body = await request.clone().json().catch(() => ({}));
+    const scopeRaw = String(body?.scope || body?.venueId || body?.payload?.venueId || "").toLowerCase();
+    if (scopeRaw === "binance" || scopeRaw === "okx" || scopeRaw === "bybit") {
+      return "full";
+    }
+  } catch {
+    // ignore parse issues and keep safest default for dex flow
+  }
+  return "dex";
+}
+
+async function enforceApiTier(request: NextRequest, upstreamPath: string, method: string) {
+  let required = requiresTierCheck(upstreamPath, method);
+  if (upstreamPath === "/api/vault/store" && String(method || "").toUpperCase() === "POST") {
+    required = await determineVaultStoreRequiredTier(request);
+  }
+  if (!required) return null;
+
+  const current = await resolveRequestTier();
+  if (!current.authenticated) {
+    return json({ error: "Unauthorized" }, 401);
+  }
+
+  if (!hasRequiredTier(current.tier, required)) {
+    return json(
+      {
+        error: "Upgrade required",
+        requiredTier: required,
+        currentTier: current.tier,
+      },
+      403,
+    );
+  }
+
+  return null;
+}
+
 async function fetchEmergencyVenueSymbols(venueId: string, quoteAsset: string) {
   const venue = String(venueId || "binance").toLowerCase();
   const quote = String(quoteAsset || "USDT").toUpperCase() === "USDC" ? "USDC" : "USDT";
@@ -589,6 +723,8 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
     normalizedPath.length === 1 && normalizedPath[0] === "health"
       ? "/health"
       : `/api/${normalizedPath.join("/")}`;
+  const tierBlock = await enforceApiTier(request, upstreamPath, method);
+  if (tierBlock) return tierBlock;
   const backendCandidates = resolveBackendCandidates();
 
   const init: RequestInit = {
@@ -605,7 +741,15 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
   }
 
   if (method !== "GET" && method !== "HEAD") {
-    init.body = await request.arrayBuffer();
+    const contentLength = Number(request.headers.get("content-length") || "0");
+    if (Number.isFinite(contentLength) && contentLength > MAX_MUTATION_PROXY_BODY_BYTES) {
+      return json({ error: "Payload too large" }, 413);
+    }
+    const bodyBytes = await request.arrayBuffer();
+    if (bodyBytes.byteLength > MAX_MUTATION_PROXY_BODY_BYTES) {
+      return json({ error: "Payload too large" }, 413);
+    }
+    init.body = bodyBytes;
   }
 
   let upstream: Response | null = null;

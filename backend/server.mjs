@@ -31,6 +31,7 @@ const terminalData = createTerminalDataService({ config, logger });
 const endpointCache = new MemoryCache();
 const upstashCache = createUpstashCache(config, logger);
 const clients = new Set();
+const MAX_JSON_BODY_BYTES = 1024 * 1024; // 1 MB
 let bootstrapRefreshInFlight = false;
 let calendarEvents = [];
 let calendarRefreshTimer = null;
@@ -551,10 +552,25 @@ function withCors(request, reply) {
   reply.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
 }
 
-async function readJson(request) {
+async function readJson(request, maxBytes = MAX_JSON_BODY_BYTES) {
+  const declaredLength = Number(request.headers["content-length"] || "0");
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    const error = new Error("Payload too large");
+    error.statusCode = 413;
+    throw error;
+  }
+
   const chunks = [];
+  let totalBytes = 0;
   for await (const chunk of request) {
-    chunks.push(Buffer.from(chunk));
+    const part = Buffer.from(chunk);
+    totalBytes += part.length;
+    if (totalBytes > maxBytes) {
+      const error = new Error("Payload too large");
+      error.statusCode = 413;
+      throw error;
+    }
+    chunks.push(part);
   }
   if (chunks.length === 0) {
     return {};
@@ -2860,6 +2876,10 @@ const server = http.createServer(async (request, reply) => {
     json(reply, 404, { error: "Not found" });
   } catch (error) {
     upstreamStatus = "error";
+    if (Number(error?.statusCode) === 413) {
+      json(reply, 413, { error: "Payload too large" });
+      return;
+    }
     logger.error("backend.request.failed", { path: url.pathname, error: String(error) });
     json(reply, 500, { error: "Internal server error" });
   }
