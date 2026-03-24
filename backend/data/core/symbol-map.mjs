@@ -146,6 +146,17 @@ export function canonicalSymbol(value) {
   return LOOKUP.get(normalized) || normalized || null;
 }
 
+export function isKnownSymbol(value) {
+  const canonical = canonicalSymbol(value);
+  return Boolean(canonical && CORE_SYMBOLS.includes(canonical));
+}
+
+export function canonicalKnownSymbol(value) {
+  const canonical = canonicalSymbol(value);
+  if (!canonical) return null;
+  return CORE_SYMBOLS.includes(canonical) ? canonical : null;
+}
+
 export function symbolAliases(value) {
   const canonical = canonicalSymbol(value);
   if (!canonical) return [];

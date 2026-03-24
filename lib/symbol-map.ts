@@ -51,9 +51,19 @@ export function canonicalSymbol(input: string) {
   return lookup.get(normalized) || normalized;
 }
 
+export function isKnownSymbol(input: string) {
+  const canonical = canonicalSymbol(input);
+  return Boolean(canonical && canonical in SYMBOL_ALIASES);
+}
+
+export function canonicalKnownSymbol(input: string) {
+  const canonical = canonicalSymbol(input);
+  if (!canonical) return "";
+  return canonical in SYMBOL_ALIASES ? canonical : "";
+}
+
 export function symbolAliases(input: string) {
   const canonical = canonicalSymbol(input);
   if (!canonical) return [];
   return SYMBOL_ALIASES[canonical] ? [...SYMBOL_ALIASES[canonical]] : [canonical];
 }
-

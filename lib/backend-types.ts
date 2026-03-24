@@ -132,6 +132,8 @@ export type BackendSnapshot = {
         };
       };
       sentiment: "bullish" | "bearish" | "neutral";
+      sentimentScore?: number;
+      sentimentReason?: string;
       watchlistRelevance?: number;
       relevanceLabels?: string[];
       priorityLabel?: string;
@@ -239,6 +241,8 @@ export type RealtimeEnvelope =
         label: "low" | "medium" | "high";
       };
       sentiment: "bullish" | "bearish" | "neutral";
+      sentimentScore?: number;
+      sentimentReason?: string;
       eventType: string;
     }; timestamp: string }
   | { type: "social"; payload: NewsItem[]; timestamp: string }

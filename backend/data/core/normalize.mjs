@@ -1,4 +1,4 @@
-import { canonicalSymbol, symbolAliases } from "./symbol-map.mjs";
+import { canonicalKnownSymbol, canonicalSymbol, symbolAliases } from "./symbol-map.mjs";
 
 function asDate(value) {
   if (!value) return new Date().toISOString();
@@ -47,7 +47,7 @@ export function normalizeTokenPair(input) {
 export function normalizeNewsEvent(input) {
   const tickers = Array.isArray(input.tickers) ? input.tickers : [];
   const normalizedTickers = tickers
-    .map((item) => canonicalSymbol(item))
+    .map((item) => canonicalKnownSymbol(item))
     .filter(Boolean)
     .slice(0, 6);
 
@@ -108,21 +108,43 @@ export function toFrontendQuote(tick) {
 }
 
 export function toFrontendNewsItem(news) {
+  const tickers = (Array.isArray(news.tickers) ? news.tickers : [])
+    .map((item) => canonicalKnownSymbol(item))
+    .filter(Boolean)
+    .slice(0, 6);
+  const fallbackReason =
+    news.sentimentReason ||
+    (news.sentiment === "bullish"
+      ? "Auto signal favors bullish bias."
+      : news.sentiment === "bearish"
+        ? "Auto signal favors bearish bias."
+        : "Auto signal is neutral.");
+  const sentimentScore =
+    Number.isFinite(Number(news.sentimentScore)) && Number(news.sentimentScore) > 0
+      ? Math.max(50, Math.min(99, Math.round(Number(news.sentimentScore))))
+      : news.sentiment === "neutral"
+        ? 50
+        : 62;
+
   return {
     id: news.id,
     headline: news.title,
     summary: news.summary,
     source: news.source,
-    ticker: news.tickers,
-    sector: news.tickers[0] || "Crypto",
+    ticker: tickers,
+    sector: tickers[0] || "Crypto",
     timestamp: news.timestamp,
     url: news.url,
     type: news.sourceType,
     sentiment: news.sentiment,
+    sentimentScore,
+    sentimentReason: fallbackReason,
     importance: news.importance,
     author: news.author,
     authorHandle: news.authorHandle,
-    relatedAssets: Array.isArray(news.relatedAssets) ? news.relatedAssets : news.tickers,
+    relatedAssets: Array.isArray(news.relatedAssets)
+      ? news.relatedAssets.map((item) => canonicalKnownSymbol(item)).filter(Boolean).slice(0, 6)
+      : tickers,
     watchlistRelevance: Number(news.watchlistRelevance || 0),
     relevanceLabels: Array.isArray(news.relevanceLabels) ? news.relevanceLabels : [],
     priorityLabel: news.priorityLabel || undefined,

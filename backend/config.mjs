@@ -149,6 +149,7 @@ export function loadConfig() {
       enableCoincap: toBoolean(process.env.FEATURE_COINCAP, true),
       enableCoinpaprika: toBoolean(process.env.FEATURE_COINPAPRIKA, true),
       enableCoinlore: toBoolean(process.env.FEATURE_COINLORE, true),
+      allowUnknownNewsTickers: toBoolean(process.env.FEATURE_ALLOW_UNKNOWN_NEWS_TICKERS, false),
     },
     dataTtl: {
       marketSnapshotMs: toNumber(process.env.TTL_MARKET_SNAPSHOT_MS, 60_000),

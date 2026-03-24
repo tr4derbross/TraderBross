@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { canonicalSymbol, CORE_SYMBOLS } from "../core/symbol-map.mjs";
+import { canonicalKnownSymbol, canonicalSymbol, CORE_SYMBOLS } from "../core/symbol-map.mjs";
 import { createWatchlistRelevance } from "../core/watchlist-relevance.mjs";
 
 const WATCHLIST_DEFAULT = ["BTC", "ETH", "SOL", "BNB", "XRP"];
@@ -58,8 +58,38 @@ const TICKER_ALIAS = {
 };
 
 const SENTIMENT_WORDS = {
-  bullish: ["rally", "surge", "gain", "approval", "partnership", "inflow", "launch", "buy", "breakout"],
-  bearish: ["dump", "drop", "fall", "hack", "exploit", "lawsuit", "outflow", "liquidation", "depeg"],
+  bullish: [
+    ["rally", 2],
+    ["surge", 2],
+    ["gain", 1],
+    ["approval", 2],
+    ["partnership", 2],
+    ["inflow", 2],
+    ["launch", 1],
+    ["buy", 1],
+    ["breakout", 2],
+    ["record high", 2],
+    ["accumulation", 2],
+    ["etf inflow", 3],
+    ["upgrade", 1],
+    ["integration", 1],
+  ],
+  bearish: [
+    ["dump", 2],
+    ["drop", 2],
+    ["fall", 1],
+    ["hack", 3],
+    ["exploit", 3],
+    ["lawsuit", 2],
+    ["outflow", 2],
+    ["liquidation", 2],
+    ["depeg", 3],
+    ["breach", 3],
+    ["drain", 3],
+    ["unlock", 2],
+    ["sell-off", 2],
+    ["rejection", 1],
+  ],
 };
 
 function toIsoDate(value) {
@@ -113,13 +143,14 @@ function jaccardSimilarity(a, b) {
   return union > 0 ? overlap / union : 0;
 }
 
-function extractTickers(text, existing = []) {
-  const found = new Set((Array.isArray(existing) ? existing : []).map((value) => canonicalSymbol(value)).filter(Boolean));
+function extractTickers(text, existing = [], { allowUnknownTickers = false } = {}) {
+  const mapSymbol = allowUnknownTickers ? canonicalSymbol : canonicalKnownSymbol;
+  const found = new Set((Array.isArray(existing) ? existing : []).map((value) => mapSymbol(value)).filter(Boolean));
   const upper = ` ${String(text || "").toUpperCase()} `;
 
   const symbolTokens = upper.match(/\$[A-Z0-9]{2,10}\b/g) || [];
   symbolTokens.forEach((token) => {
-    const parsed = canonicalSymbol(token.slice(1));
+    const parsed = mapSymbol(token.slice(1));
     if (parsed) found.add(parsed);
   });
 
@@ -132,20 +163,60 @@ function extractTickers(text, existing = []) {
   const normalized = upper.replace(/[^A-Z0-9 ]/g, " ");
   Object.entries(TICKER_ALIAS).forEach(([name, symbol]) => {
     if (normalized.includes(` ${name} `)) {
-      found.add(symbol);
+      const parsed = mapSymbol(symbol);
+      if (parsed) found.add(parsed);
     }
   });
 
   return Array.from(found).slice(0, 8);
 }
 
-function inferSentiment(text) {
+function scorePhraseHits(text, pairs) {
   const normalized = String(text || "").toLowerCase();
-  const bullish = SENTIMENT_WORDS.bullish.filter((word) => normalized.includes(word)).length;
-  const bearish = SENTIMENT_WORDS.bearish.filter((word) => normalized.includes(word)).length;
-  if (bullish > bearish) return "bullish";
-  if (bearish > bullish) return "bearish";
-  return "neutral";
+  return pairs.reduce((acc, [phrase, weight]) => {
+    if (normalized.includes(phrase)) {
+      acc.score += weight;
+      acc.hits.push(phrase);
+    }
+    return acc;
+  }, { score: 0, hits: [] });
+}
+
+function inferSentimentMeta(text, matchedKeywords = []) {
+  const normalized = String(text || "").toLowerCase();
+  const bull = scorePhraseHits(normalized, SENTIMENT_WORDS.bullish);
+  const bear = scorePhraseHits(normalized, SENTIMENT_WORDS.bearish);
+  let score = bull.score - bear.score;
+  if (matchedKeywords.some((item) => item.eventType === "listing")) score += 1;
+  if (matchedKeywords.some((item) => item.eventType === "exploit" || item.eventType === "regulation")) score -= 1;
+  const magnitude = Math.abs(score);
+  const confidence = score === 0 ? 50 : Math.min(96, 58 + magnitude * 8);
+
+  if (score > 0) {
+    return {
+      sentiment: "bullish",
+      sentimentScore: confidence,
+      sentimentReason: bull.hits.length > 0
+        ? `Bullish trigger words: ${bull.hits.slice(0, 3).join(", ")}.`
+        : "Positive event weighting favors bullish bias.",
+    };
+  }
+
+  if (score < 0) {
+    return {
+      sentiment: "bearish",
+      sentimentScore: confidence,
+      sentimentReason: bear.hits.length > 0
+        ? `Bearish trigger words: ${bear.hits.slice(0, 3).join(", ")}.`
+        : "Negative event weighting favors bearish bias.",
+    };
+  }
+
+  return {
+    sentiment: "neutral",
+    sentimentScore: 50,
+    sentimentReason: "No dominant bullish/bearish signal in the text.",
+  };
 }
 
 function inferEventType(text, tickers, matchedKeywords) {
@@ -207,7 +278,8 @@ function buildId(seed) {
   return crypto.createHash("sha1").update(seed).digest("hex").slice(0, 20);
 }
 
-function normalizeRawNewsItem(raw, watchlistTickers) {
+function normalizeRawNewsItem(raw, watchlistTickers, options = {}) {
+  const { allowUnknownTickers = false } = options;
   const title = normalizeWhitespace(raw.title || raw.headline || "");
   if (!title) return null;
   const summary = stripHtml(raw.summary || raw.description || "");
@@ -215,8 +287,7 @@ function normalizeRawNewsItem(raw, watchlistTickers) {
   const url = canonicalUrl(raw.url || "#");
   const publishedAt = toIsoDate(raw.timestamp || raw.publishedAt || Date.now());
   const text = `${title} ${summary}`.trim();
-  const tickers = extractTickers(text, raw.tickers);
-  const sentiment = raw.sentiment || inferSentiment(text);
+  const tickers = extractTickers(text, raw.tickers, { allowUnknownTickers });
   const priorityMeta = computePriority({
     source,
     publishedAt,
@@ -224,6 +295,13 @@ function normalizeRawNewsItem(raw, watchlistTickers) {
     tickers,
     watchlistTickers,
   });
+  const sentimentMeta = raw.sentiment
+    ? {
+        sentiment: raw.sentiment,
+        sentimentScore: Number(raw.sentimentScore || 70),
+        sentimentReason: String(raw.sentimentReason || "Provided by source."),
+      }
+    : inferSentimentMeta(text, priorityMeta.matchedKeywords);
   const keywordTags = priorityMeta.matchedKeywords.map((item) => item.tag);
   const tags = Array.from(
     new Set([
@@ -256,7 +334,9 @@ function normalizeRawNewsItem(raw, watchlistTickers) {
         watchlist: priorityMeta.watchlistHit ? 14 : 0,
       },
     },
-    sentiment,
+    sentiment: sentimentMeta.sentiment,
+    sentimentScore: sentimentMeta.sentimentScore,
+    sentimentReason: sentimentMeta.sentimentReason,
     eventType,
     clusterId: null,
     sourceType: raw.sourceType || "news",
@@ -324,7 +404,11 @@ function clusterNearDuplicates(items) {
   return { items: clustered, clusters: clusterSummary };
 }
 
-export function createNewsIngestionEngine({ watchlistTickers = WATCHLIST_DEFAULT, logger } = {}) {
+export function createNewsIngestionEngine({
+  watchlistTickers = WATCHLIST_DEFAULT,
+  allowUnknownTickers = false,
+  logger,
+} = {}) {
   const watchlist = new Set(
     (Array.isArray(watchlistTickers) ? watchlistTickers : WATCHLIST_DEFAULT)
       .map((item) => canonicalSymbol(item))
@@ -335,7 +419,7 @@ export function createNewsIngestionEngine({ watchlistTickers = WATCHLIST_DEFAULT
   function ingest(rawItems, options = {}) {
     const nowIso = toIsoDate(options.now || Date.now());
     const normalized = (Array.isArray(rawItems) ? rawItems : [])
-      .map((item) => normalizeRawNewsItem(item, watchlist))
+      .map((item) => normalizeRawNewsItem(item, watchlist, { allowUnknownTickers }))
       .filter(Boolean);
 
     const deduped = removeObviousDuplicates(normalized);
@@ -370,6 +454,8 @@ export function createNewsIngestionEngine({ watchlistTickers = WATCHLIST_DEFAULT
           priority: item.priority,
           priorityLabel: relevanceMeta.priorityLabel,
           sentiment: item.sentiment,
+          sentimentScore: item.sentimentScore,
+          sentimentReason: item.sentimentReason,
           eventType: item.eventType,
           watchlistRelevance: relevanceMeta.score,
           relevanceLabels: relevanceMeta.labels,

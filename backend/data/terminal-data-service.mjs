@@ -78,6 +78,7 @@ export function createTerminalDataService({ config, logger }) {
   const coreSymbols = CORE_SYMBOLS.slice(0, 12);
   const newsEngine = createNewsIngestionEngine({
     watchlistTickers: config.watchlistTickers,
+    allowUnknownTickers: config.featureFlags?.allowUnknownNewsTickers === true,
     logger,
   });
   const whaleEngine = createWhaleEventEngine({
@@ -574,6 +575,8 @@ export function createTerminalDataService({ config, logger }) {
               source: item.source,
               sourceType: "social",
               sentiment: item.sentiment || "neutral",
+              sentimentScore: item.sentimentScore,
+              sentimentReason: item.sentimentReason,
               importance: item.importance || "watch",
               tickers: item.tickers || [],
               relatedAssets: item.tickers || [],
@@ -621,6 +624,8 @@ export function createTerminalDataService({ config, logger }) {
         source: item.source,
         sourceType: item.sourceType || "news",
         sentiment: item.sentiment,
+        sentimentScore: item.sentimentScore,
+        sentimentReason: item.sentimentReason,
         importance:
           item.priority?.score >= 70
             ? "breaking"
@@ -898,6 +903,8 @@ export function createTerminalDataService({ config, logger }) {
             source: newsEvent.source,
             sourceType: newsEvent.sourceType || "news",
             sentiment: newsEvent.sentiment || "neutral",
+            sentimentScore: newsEvent.sentimentScore,
+            sentimentReason: newsEvent.sentimentReason,
             importance: newsEvent.importance || "watch",
             tickers: newsEvent.tickers || [],
             relatedAssets: newsEvent.tickers || [],
