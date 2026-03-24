@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Layers, RefreshCw, TrendingDown, TrendingUp } from "lucide-react";
+import { ExternalLink, Layers, RefreshCw, TrendingDown, TrendingUp } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
+import { useTier2Revenue } from "@/hooks/useTier2Revenue";
 
 type AsterAsset = {
   name: string;
@@ -25,6 +26,7 @@ function fmt(n: number, decimals = 2) {
 }
 
 export default function AsterPanel() {
+  const revenue = useTier2Revenue();
   const [assets, setAssets] = useState<AsterAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState("BTC");
@@ -57,6 +59,17 @@ export default function AsterPanel() {
           <Layers className="h-3.5 w-3.5 text-amber-200" />
           <span className="brand-section-title text-xs">Aster DEX</span>
           <span className="brand-badge rounded-full px-1.5 py-0.5 text-[9px]">Perp Futures</span>
+          {revenue.aster.referralEnabled && (
+            <a
+              href={revenue.aster.referralUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-emerald-300"
+            >
+              Referral Active
+              <ExternalLink className="h-2.5 w-2.5" />
+            </a>
+          )}
         </div>
         <button onClick={fetchMarkets} className="text-zinc-600 transition-colors hover:text-amber-100">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />

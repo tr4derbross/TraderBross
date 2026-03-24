@@ -2,6 +2,7 @@
 
 import { Wallet, Zap, TrendingUp, TrendingDown, Loader2, AlertTriangle, RefreshCw, BarChart2 } from "lucide-react";
 import { useHyperliquid } from "@/hooks/useHyperliquid";
+import { useTier2Revenue } from "@/hooks/useTier2Revenue";
 import { signHLAction, buildMarketOrder, buildLimitOrder } from "@/lib/hyperliquid-sign";
 import { apiFetch } from "@/lib/api-client";
 import { reconnectRealtime } from "@/lib/realtime-client";
@@ -15,6 +16,7 @@ type Props = {
 type Tab = "markets" | "positions" | "trade";
 
 export default function HyperliquidPanel({ walletAddress, onRequestConnect }: Props) {
+  const revenue = useTier2Revenue();
   const [tab, setTab] = useState<Tab>("markets");
   const [orderSide, setOrderSide] = useState<"buy" | "sell">("buy");
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
@@ -93,6 +95,11 @@ export default function HyperliquidPanel({ walletAddress, onRequestConnect }: Pr
             <span className={`h-1 w-1 rounded-full ${wsConnected ? "bg-emerald-400" : "bg-zinc-600"}`} />
             {wsConnected ? "Live" : "Offline"}
           </span>
+          {revenue.hyperliquid.builderEnabled && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-emerald-300">
+              Builder Revenue
+            </span>
+          )}
           {!wsConnected && (
             <button
               onClick={reconnectRealtime}

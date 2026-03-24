@@ -34,6 +34,7 @@ This proxy forwards requests to backend, applies emergency fallback behavior for
 - `GET /api/social`
 - `GET /api/prices`
 - `GET /api/market`
+- `GET /api/revenue/tier2`
 - `GET /api/mempool`
 - `GET /api/feargreed`
 - `GET /api/hyperliquid`

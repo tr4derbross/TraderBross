@@ -17,6 +17,7 @@ import {
 import { getScreenerData } from "./services/screener-service.mjs";
 import { getMarketStats, getMempoolStats, getFearGreed, getEthGas, getDefiLlamaTvl, getForexRates } from "./services/stats-service.mjs";
 import { getTrendingData } from "./services/trending-service.mjs";
+import { attachHyperliquidBuilderCode, getTier2RevenuePublicConfig } from "./services/tier2-revenue-service.mjs";
 import { clearSecret, getSecret, storeSecret } from "./services/vault-service.mjs";
 import { createTerminalDataService } from "./data/terminal-data-service.mjs";
 import { CORE_SYMBOLS, canonicalSymbol, symbolAliases } from "./data/core/symbol-map.mjs";
@@ -876,6 +877,11 @@ const server = http.createServer(async (request, reply) => {
       }
     }
 
+    if (request.method === "GET" && url.pathname === "/api/revenue/tier2") {
+      json(reply, 200, getTier2RevenuePublicConfig());
+      return;
+    }
+
     if (request.method === "POST" && url.pathname === "/api/hyperliquid/order") {
       const body = await readJson(request);
       const entry = getSecret(String(body.sessionToken || ""));
@@ -997,7 +1003,9 @@ const server = http.createServer(async (request, reply) => {
               ],
               grouping: "na",
             };
-            const result = await postExchange(action);
+            const result = await postExchange(
+              await attachHyperliquidBuilderCode(action, { userAddress: accountAddress }),
+            );
             json(reply, 200, { ok: true, data: result });
             return;
           }
@@ -1036,7 +1044,12 @@ const server = http.createServer(async (request, reply) => {
               t: { trigger: { isMarket: true, triggerPx: toWireDecimal(sl), tpsl: "sl" } },
             });
           }
-          const result = await postExchange({ type: "order", orders, grouping: "positionTpsl" });
+          const result = await postExchange(
+            await attachHyperliquidBuilderCode(
+              { type: "order", orders, grouping: "positionTpsl" },
+              { userAddress: accountAddress },
+            ),
+          );
           json(reply, 200, { ok: true, data: result });
           return;
         }
@@ -1108,11 +1121,16 @@ const server = http.createServer(async (request, reply) => {
               });
             }
           }
-          const result = await postExchange({
-            type: "order",
-            orders,
-            grouping: tp || sl ? "normalTpsl" : "na",
-          });
+          const result = await postExchange(
+            await attachHyperliquidBuilderCode(
+              {
+                type: "order",
+                orders,
+                grouping: tp || sl ? "normalTpsl" : "na",
+              },
+              { userAddress: vaultAddress },
+            ),
+          );
           json(reply, 200, { ok: true, data: result });
           return;
         }
