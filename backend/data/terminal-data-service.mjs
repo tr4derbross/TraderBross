@@ -39,6 +39,7 @@ import { createWhaleEventEngine } from "./onchain/whale-engine.mjs";
 import { createWatchlistRelevance } from "./core/watchlist-relevance.mjs";
 import { createRuleAnalysisEngine } from "./analysis/rule-analysis.mjs";
 import { getVenueQuotes } from "../services/venue-service.mjs";
+import { fetchJson } from "../services/http.mjs";
 import {
   createBinanceQuoteStream,
   createBybitQuoteStream,
@@ -66,6 +67,10 @@ function maxTimestamp(values = []) {
     const ts = toMs(value);
     return ts > max ? ts : max;
   }, 0);
+}
+
+function uniqueSortedSymbols(values = []) {
+  return Array.from(new Set((Array.isArray(values) ? values : []).filter(Boolean))).sort((a, b) => a.localeCompare(b));
 }
 
 export function createTerminalDataService({ config, logger }) {
@@ -174,6 +179,7 @@ export function createTerminalDataService({ config, logger }) {
   const whaleEventThrottle = new Map();
   const whaleMinIntervalMs = Math.max(500, Number(config.whaleFallback?.minIntervalMs || 8000));
   const whaleMinUsd = Math.max(10_000_000, Number(config.whaleFallback?.minUsd || 10_000_000));
+  let knownNewsTickers = new Set(CORE_SYMBOLS);
 
   function publish(type, payload) {
     events.publish("stream", {
@@ -189,6 +195,40 @@ export function createTerminalDataService({ config, logger }) {
       bySymbol.set(tick.symbol, toFrontendQuote(tick));
     });
     state.quotes = Array.from(bySymbol.values()).sort((a, b) => a.symbol.localeCompare(b.symbol));
+  }
+
+  async function fetchKnownBinanceTickers() {
+    const result = await cache.remember(
+      "core:binance-known-tickers",
+      { ttlMs: 10 * 60_000, staleMs: 60 * 60_000 },
+      async () => {
+        const payload = await fetchJson("https://fapi.binance.com/fapi/v1/exchangeInfo", { timeoutMs: 7000 });
+        const symbols = (Array.isArray(payload?.symbols) ? payload.symbols : [])
+          .filter(
+            (row) =>
+              row?.status === "TRADING" &&
+              row?.contractType === "PERPETUAL" &&
+              String(row?.quoteAsset || "").toUpperCase() === "USDT",
+          )
+          .map((row) => canonicalSymbol(row?.baseAsset || ""))
+          .filter(Boolean);
+        return uniqueSortedSymbols(symbols);
+      },
+    );
+    return Array.isArray(result?.value) ? result.value : [];
+  }
+
+  function sanitizeNewsTickers(input, options = {}) {
+    const allowUnknown = options.allowUnknown === true;
+    const source = Array.isArray(input) ? input : [];
+    const list = source
+      .map((value) => canonicalSymbol(value))
+      .filter((symbol) => {
+        if (!symbol) return false;
+        if (allowUnknown) return true;
+        return knownNewsTickers.has(symbol);
+      });
+    return uniqueSortedSymbols(list).slice(0, 6);
   }
 
   function canPublishWhaleEvent(event) {
@@ -498,6 +538,15 @@ export function createTerminalDataService({ config, logger }) {
       limiterKey: "news_aggregate",
       providerName: "news",
       primary: async () => {
+        try {
+          const binanceSymbols = await fetchKnownBinanceTickers();
+          if (binanceSymbols.length > 0) {
+            knownNewsTickers = new Set(binanceSymbols);
+          }
+        } catch (error) {
+          logger?.warn?.("data.news.known_tickers_fetch_failed", { error: String(error) });
+        }
+
         const defaultSocialFeeds = config.enableDefaultSocialFeeds !== false
           ? getDefaultSocialRssFeeds(config.socialRedditSubreddits)
           : [];
@@ -559,7 +608,9 @@ export function createTerminalDataService({ config, logger }) {
           ...ninjaNewsRows,
           ...socialRows,
           ...ninjaSocialRows,
-        ]);
+        ], {
+          knownTickers: knownNewsTickers,
+        });
         const socialFeedRows = dedupeBy(
           [...treeSocialRows, ...ninjaSocialRows, ...socialRows]
             .sort((a, b) => toMs(b.timestamp) - toMs(a.timestamp))
@@ -578,8 +629,12 @@ export function createTerminalDataService({ config, logger }) {
               sentimentScore: item.sentimentScore,
               sentimentReason: item.sentimentReason,
               importance: item.importance || "watch",
-              tickers: item.tickers || [],
-              relatedAssets: item.tickers || [],
+              tickers: sanitizeNewsTickers(item.tickers || [], {
+                allowUnknown: config.featureFlags?.allowUnknownNewsTickers === true,
+              }),
+              relatedAssets: sanitizeNewsTickers(item.tickers || [], {
+                allowUnknown: config.featureFlags?.allowUnknownNewsTickers === true,
+              }),
               watchlistRelevance: 0,
               relevanceLabels: [],
               priorityLabel: "watchlist hit",
@@ -906,8 +961,12 @@ export function createTerminalDataService({ config, logger }) {
             sentimentScore: newsEvent.sentimentScore,
             sentimentReason: newsEvent.sentimentReason,
             importance: newsEvent.importance || "watch",
-            tickers: newsEvent.tickers || [],
-            relatedAssets: newsEvent.tickers || [],
+            tickers: sanitizeNewsTickers(newsEvent.tickers || [], {
+              allowUnknown: config.featureFlags?.allowUnknownNewsTickers === true,
+            }),
+            relatedAssets: sanitizeNewsTickers(newsEvent.tickers || [], {
+              allowUnknown: config.featureFlags?.allowUnknownNewsTickers === true,
+            }),
             watchlistRelevance: 0,
             relevanceLabels: [],
             priorityLabel: "watchlist hit",

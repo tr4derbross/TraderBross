@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { canonicalKnownSymbol, canonicalSymbol, CORE_SYMBOLS } from "../core/symbol-map.mjs";
+import { canonicalSymbol, CORE_SYMBOLS } from "../core/symbol-map.mjs";
 import { createWatchlistRelevance } from "../core/watchlist-relevance.mjs";
 
 const WATCHLIST_DEFAULT = ["BTC", "ETH", "SOL", "BNB", "XRP"];
@@ -143,28 +143,46 @@ function jaccardSimilarity(a, b) {
   return union > 0 ? overlap / union : 0;
 }
 
-function extractTickers(text, existing = [], { allowUnknownTickers = false } = {}) {
-  const mapSymbol = allowUnknownTickers ? canonicalSymbol : canonicalKnownSymbol;
-  const found = new Set((Array.isArray(existing) ? existing : []).map((value) => mapSymbol(value)).filter(Boolean));
+function canUseTicker(symbol, { allowUnknownTickers = false, knownTickerSet = null } = {}) {
+  if (!symbol) return false;
+  if (allowUnknownTickers) return true;
+  if (knownTickerSet && knownTickerSet.size > 0) return knownTickerSet.has(symbol);
+  return CORE_SYMBOLS.includes(symbol);
+}
+
+function extractTickers(text, existing = [], { allowUnknownTickers = false, knownTickerSet = null } = {}) {
+  const found = new Set();
+  (Array.isArray(existing) ? existing : []).forEach((value) => {
+    const parsed = canonicalSymbol(value);
+    if (canUseTicker(parsed, { allowUnknownTickers, knownTickerSet })) {
+      found.add(parsed);
+    }
+  });
   const upper = ` ${String(text || "").toUpperCase()} `;
 
   const symbolTokens = upper.match(/\$[A-Z0-9]{2,10}\b/g) || [];
   symbolTokens.forEach((token) => {
-    const parsed = mapSymbol(token.slice(1));
-    if (parsed) found.add(parsed);
+    const parsed = canonicalSymbol(token.slice(1));
+    if (canUseTicker(parsed, { allowUnknownTickers, knownTickerSet })) {
+      found.add(parsed);
+    }
   });
 
   const wordTokens = upper.match(/\b[A-Z]{2,6}\b/g) || [];
   wordTokens.forEach((word) => {
     const parsed = canonicalSymbol(word);
-    if (parsed && CORE_SYMBOLS.includes(parsed)) found.add(parsed);
+    if (canUseTicker(parsed, { allowUnknownTickers, knownTickerSet })) {
+      found.add(parsed);
+    }
   });
 
   const normalized = upper.replace(/[^A-Z0-9 ]/g, " ");
   Object.entries(TICKER_ALIAS).forEach(([name, symbol]) => {
     if (normalized.includes(` ${name} `)) {
-      const parsed = mapSymbol(symbol);
-      if (parsed) found.add(parsed);
+      const parsed = canonicalSymbol(symbol);
+      if (canUseTicker(parsed, { allowUnknownTickers, knownTickerSet })) {
+        found.add(parsed);
+      }
     }
   });
 
@@ -173,13 +191,23 @@ function extractTickers(text, existing = [], { allowUnknownTickers = false } = {
 
 function scorePhraseHits(text, pairs) {
   const normalized = String(text || "").toLowerCase();
+  const isNegated = (phrase) => {
+    const escaped = phrase
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\s+/g, "\\s+");
+    const negationPattern = new RegExp(`\\b(?:not|no|hardly|rarely|without)\\b[^.!?]{0,24}\\b${escaped}\\b`, "i");
+    return negationPattern.test(normalized);
+  };
+
   return pairs.reduce((acc, [phrase, weight]) => {
-    if (normalized.includes(phrase)) {
+    if (normalized.includes(phrase) && !isNegated(phrase)) {
       acc.score += weight;
       acc.hits.push(phrase);
+    } else if (normalized.includes(phrase)) {
+      acc.negated += 1;
     }
     return acc;
-  }, { score: 0, hits: [] });
+  }, { score: 0, hits: [], negated: 0 });
 }
 
 function inferSentimentMeta(text, matchedKeywords = []) {
@@ -187,6 +215,8 @@ function inferSentimentMeta(text, matchedKeywords = []) {
   const bull = scorePhraseHits(normalized, SENTIMENT_WORDS.bullish);
   const bear = scorePhraseHits(normalized, SENTIMENT_WORDS.bearish);
   let score = bull.score - bear.score;
+  if (bull.negated > 0) score -= 1;
+  if (bear.negated > 0) score += 1;
   if (matchedKeywords.some((item) => item.eventType === "listing")) score += 1;
   if (matchedKeywords.some((item) => item.eventType === "exploit" || item.eventType === "regulation")) score -= 1;
   const magnitude = Math.abs(score);
@@ -279,7 +309,7 @@ function buildId(seed) {
 }
 
 function normalizeRawNewsItem(raw, watchlistTickers, options = {}) {
-  const { allowUnknownTickers = false } = options;
+  const { allowUnknownTickers = false, knownTickerSet = null } = options;
   const title = normalizeWhitespace(raw.title || raw.headline || "");
   if (!title) return null;
   const summary = stripHtml(raw.summary || raw.description || "");
@@ -287,7 +317,7 @@ function normalizeRawNewsItem(raw, watchlistTickers, options = {}) {
   const url = canonicalUrl(raw.url || "#");
   const publishedAt = toIsoDate(raw.timestamp || raw.publishedAt || Date.now());
   const text = `${title} ${summary}`.trim();
-  const tickers = extractTickers(text, raw.tickers, { allowUnknownTickers });
+  const tickers = extractTickers(text, raw.tickers, { allowUnknownTickers, knownTickerSet });
   const priorityMeta = computePriority({
     source,
     publishedAt,
@@ -418,8 +448,15 @@ export function createNewsIngestionEngine({
 
   function ingest(rawItems, options = {}) {
     const nowIso = toIsoDate(options.now || Date.now());
+    const knownTickerSet = options.knownTickers instanceof Set
+      ? options.knownTickers
+      : new Set(
+          (Array.isArray(options.knownTickers) ? options.knownTickers : CORE_SYMBOLS)
+            .map((item) => canonicalSymbol(item))
+            .filter(Boolean),
+        );
     const normalized = (Array.isArray(rawItems) ? rawItems : [])
-      .map((item) => normalizeRawNewsItem(item, watchlist, { allowUnknownTickers }))
+      .map((item) => normalizeRawNewsItem(item, watchlist, { allowUnknownTickers, knownTickerSet }))
       .filter(Boolean);
 
     const deduped = removeObviousDuplicates(normalized);

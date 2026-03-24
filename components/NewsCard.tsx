@@ -334,7 +334,7 @@ function SocialCard({ item, isNew, onSelect, onTickerSelect, onQuickTrade, selec
         ))}
         <div className="ml-auto flex items-center">
           {item.sentiment && item.sentiment !== "neutral" && (
-            <SentimentBadge score={item.sentiment} confidence={65} />
+            <SentimentBadge score={item.sentiment} confidence={item.sentimentScore ?? 65} />
           )}
         </div>
       </div>

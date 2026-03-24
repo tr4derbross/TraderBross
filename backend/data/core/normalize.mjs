@@ -1,4 +1,4 @@
-import { canonicalKnownSymbol, canonicalSymbol, symbolAliases } from "./symbol-map.mjs";
+import { canonicalSymbol, symbolAliases } from "./symbol-map.mjs";
 
 function asDate(value) {
   if (!value) return new Date().toISOString();
@@ -47,7 +47,7 @@ export function normalizeTokenPair(input) {
 export function normalizeNewsEvent(input) {
   const tickers = Array.isArray(input.tickers) ? input.tickers : [];
   const normalizedTickers = tickers
-    .map((item) => canonicalKnownSymbol(item))
+    .map((item) => canonicalSymbol(item))
     .filter(Boolean)
     .slice(0, 6);
 
@@ -109,7 +109,7 @@ export function toFrontendQuote(tick) {
 
 export function toFrontendNewsItem(news) {
   const tickers = (Array.isArray(news.tickers) ? news.tickers : [])
-    .map((item) => canonicalKnownSymbol(item))
+    .map((item) => canonicalSymbol(item))
     .filter(Boolean)
     .slice(0, 6);
   const fallbackReason =
@@ -143,7 +143,7 @@ export function toFrontendNewsItem(news) {
     author: news.author,
     authorHandle: news.authorHandle,
     relatedAssets: Array.isArray(news.relatedAssets)
-      ? news.relatedAssets.map((item) => canonicalKnownSymbol(item)).filter(Boolean).slice(0, 6)
+      ? news.relatedAssets.map((item) => canonicalSymbol(item)).filter(Boolean).slice(0, 6)
       : tickers,
     watchlistRelevance: Number(news.watchlistRelevance || 0),
     relevanceLabels: Array.isArray(news.relevanceLabels) ? news.relevanceLabels : [],
