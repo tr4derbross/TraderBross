@@ -1295,10 +1295,9 @@ export default function PriceChart({
                   <div
                     className="pointer-events-none absolute left-0 right-14 z-[4] flex items-center justify-end pr-3"
                     style={{
-                      top: Math.min(entryY, tpY),
-                      height: Math.max(Math.abs(entryY - tpY), 2),
-                      background: "rgba(14,203,129,0.08)",
-                      borderBottom: "1px solid rgba(14,203,129,0.35)",
+                      top: Math.max(tpY - 1, 0),
+                      height: 0,
+                      borderTop: "1px dashed rgba(14,203,129,0.75)",
                     }}
                   >
                     <span className="rounded-full bg-[#07140f]/90 px-2 py-1 text-[10px] text-emerald-300">
@@ -1310,10 +1309,9 @@ export default function PriceChart({
                   <div
                     className="pointer-events-none absolute left-0 right-14 z-[4] flex items-center justify-end pr-3"
                     style={{
-                      top: Math.min(entryY, slY),
-                      height: Math.max(Math.abs(entryY - slY), 2),
-                      background: "rgba(246,70,93,0.08)",
-                      borderTop: "1px solid rgba(246,70,93,0.35)",
+                      top: Math.max(slY - 1, 0),
+                      height: 0,
+                      borderTop: "1px dashed rgba(246,70,93,0.75)",
                     }}
                   >
                     <span className="rounded-full bg-[#160a0d]/90 px-2 py-1 text-[10px] text-red-300">

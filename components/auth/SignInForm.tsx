@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ethers } from "ethers";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { apiFetch } from "@/lib/api-client";
 import { connectWalletByLabel, type SupportedWalletLabel } from "@/lib/wallet-connect";
+import Link from "next/link";
+import { X } from "lucide-react";
 
 function toHexUtf8(value: string) {
   const encoded = new TextEncoder().encode(value);
@@ -46,65 +47,12 @@ async function signWalletMessage(
 }
 
 export default function SignInForm() {
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [walletLoading, setWalletLoading] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [walletLabel, setWalletLabel] = useState<SupportedWalletLabel>("MetaMask");
 
-  async function handlePasswordSignIn(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setLoading(true);
-    setMessage("");
-    setError("");
-
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    setLoading(false);
-
-    if (signInError) {
-      setError(signInError.message);
-      return;
-    }
-
-    window.location.href = "/terminal";
-  }
-
-  async function handleMagicLink() {
-    if (!email.trim()) {
-      setError("Please enter your email first.");
-      return;
-    }
-
-    setLoading(true);
-    setMessage("");
-    setError("");
-
-    const redirectTo = `${window.location.origin}/auth/callback?next=/terminal`;
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: redirectTo },
-    });
-
-    setLoading(false);
-
-    if (otpError) {
-      setError(otpError.message);
-      return;
-    }
-
-    setMessage("Magic link sent. Check your inbox.");
-  }
-
   async function handleWalletSignIn() {
     setWalletLoading(true);
-    setMessage("");
     setError("");
 
     try {
@@ -150,16 +98,43 @@ export default function SignInForm() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md rounded-xl border border-white/10 bg-zinc-950/80 p-6">
-      <h1 className="text-xl font-semibold text-white">Sign in</h1>
-      <p className="mt-1 text-sm text-zinc-400">
-        Connect wallet to use TraderBross. Team can still use email login.
-      </p>
-      <p className="mt-2 text-xs text-zinc-500">
-        Plans: Free (news + paper), DEX ($20/mo), Full ($50/mo) - <a href="/pricing" className="text-amber-300 hover:text-amber-200">see pricing</a>.
-      </p>
+    <div className="mx-auto w-full max-w-xl rounded-2xl border border-white/10 bg-zinc-950/90 p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-white">Sign in with wallet</h1>
+          <p className="mt-1 text-sm text-zinc-400">
+            Free users can test with live prices + paper trading. DEX and Full unlock live execution.
+          </p>
+        </div>
+        <Link
+          href="/terminal"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 text-zinc-300 transition hover:bg-white/5"
+          title="Close"
+          aria-label="Close"
+        >
+          <X className="h-4 w-4" />
+        </Link>
+      </div>
 
-      <div className="mt-5 space-y-3 rounded-lg border border-amber-400/20 bg-black/40 p-3">
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <div className="rounded-lg border border-white/10 bg-black/40 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-300">Free</p>
+          <p className="mt-1 text-[11px] text-zinc-500">$0 / forever</p>
+          <p className="mt-2 text-xs text-zinc-400">Live prices, news, paper trading.</p>
+        </div>
+        <div className="rounded-lg border border-amber-400/35 bg-amber-500/10 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-200">DEX</p>
+          <p className="mt-1 text-[11px] text-amber-300">$20 / month</p>
+          <p className="mt-2 text-xs text-amber-100/90">Hyperliquid + Aster live execution.</p>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-black/40 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-300">Full</p>
+          <p className="mt-1 text-[11px] text-zinc-500">$50 / month</p>
+          <p className="mt-2 text-xs text-zinc-400">CEX API integrations + advanced tools.</p>
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-3 rounded-lg border border-amber-400/25 bg-black/45 p-3">
         <label className="block space-y-1">
           <span className="text-xs text-zinc-400">Wallet</span>
           <select
@@ -180,53 +155,11 @@ export default function SignInForm() {
         >
           {walletLoading ? "Connecting..." : "Sign in with wallet"}
         </button>
+        <p className="text-[11px] text-zinc-500">
+          Team access is wallet-based only. <Link href="/pricing" className="text-amber-300 hover:text-amber-200">View plans</Link>.
+        </p>
       </div>
 
-      <form onSubmit={handlePasswordSignIn} className="mt-4 space-y-3 border-t border-white/10 pt-4">
-        <p className="text-xs uppercase tracking-[0.08em] text-zinc-500">Team login</p>
-        <label className="block space-y-1">
-          <span className="text-xs text-zinc-400">Email</span>
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="w-full rounded-md border border-white/15 bg-black/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60"
-            placeholder="you@example.com"
-            required
-          />
-        </label>
-
-        <label className="block space-y-1">
-          <span className="text-xs text-zinc-400">Password</span>
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="w-full rounded-md border border-white/15 bg-black/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60"
-            placeholder="Your password"
-            required
-          />
-        </label>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-md bg-amber-400 px-3 py-2 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {loading ? "Signing in..." : "Sign in with password"}
-        </button>
-      </form>
-
-      <button
-        type="button"
-        onClick={handleMagicLink}
-        disabled={loading}
-        className="mt-3 w-full rounded-md border border-white/20 px-3 py-2 text-sm text-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {loading ? "Please wait..." : "Send magic link"}
-      </button>
-
-      {message ? <p className="mt-3 text-sm text-emerald-400">{message}</p> : null}
       {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
     </div>
   );

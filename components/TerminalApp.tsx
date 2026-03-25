@@ -2057,7 +2057,7 @@ const runHeaderCexAction = useCallback(async () => {
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-[10px] text-zinc-300 sm:text-[11px]">
-              Demo mode aktif: canlı fiyatlar ve paper trading açık. Canlı işlem için giriş yap.
+              Demo mode active: live prices and paper trading are available. Sign in to enable live execution.
             </div>
             <div className="flex items-center gap-1.5">
               <Link
@@ -2276,32 +2276,6 @@ const runHeaderCexAction = useCallback(async () => {
       </div>}
 
       {/* â”€â”€ Mobile Status Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      {!isAuthenticated && (
-        <div
-          className="shrink-0 border-b px-2 py-2 sm:px-4"
-          style={{ borderColor: "rgba(212,161,31,0.12)", background: "rgba(11,12,14,0.96)" }}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-[10px] text-zinc-300 sm:text-[11px]">
-              Demo mode aktif: canlı fiyatlar ve paper trading açık. Canlı işlem için giriş yap.
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Link
-                href="/terminal"
-                className="terminal-chip rounded-lg px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-200"
-              >
-                Continue Demo
-              </Link>
-              <Link
-                href="/sign-in"
-                className="brand-chip-active rounded-lg px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.12em]"
-              >
-                Sign In Live
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
       {isMobile && (
         <div className="shrink-0 flex items-center justify-between px-4 py-1.5 border-t" style={{ borderColor: "rgba(42,42,42,0.9)", background: "rgba(9,9,10,0.99)", paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}>
           <div className="flex items-center gap-1.5">
@@ -2796,6 +2770,7 @@ const runHeaderCexAction = useCallback(async () => {
     </div>
   );
 }
+
 
 
 
