@@ -1394,6 +1394,18 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     }
   }, [headerConnection.platform]);
 
+  const handleTerminalLogout = useCallback(async () => {
+    try {
+      await disconnectHeaderWallet();
+      await apiFetch("/api/auth/wallet/logout", { method: "POST" });
+    } catch (error) {
+      const message = error instanceof Error && error.message ? error.message : "Logout failed";
+      window.alert(message);
+      return;
+    }
+    window.location.href = "/sign-in";
+  }, [disconnectHeaderWallet]);
+
   const connectHeaderWallet = useCallback(
     async (walletLabel: SupportedWalletLabel) => {
       if (!isAuthenticated) {
@@ -2050,32 +2062,42 @@ const runHeaderCexAction = useCallback(async () => {
       </div>
 
       {/* â”€â”€ Market Info Bar (desktop only) â”€â”€ */}
-      {!isAuthenticated && (
-        <div
-          className="shrink-0 border-b px-2 py-2 sm:px-4"
-          style={{ borderColor: "rgba(212,161,31,0.12)", background: "rgba(11,12,14,0.96)" }}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-[10px] text-zinc-300 sm:text-[11px]">
-              Demo mode active: live prices and paper trading are available. Sign in to enable live execution.
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Link
-                href="/terminal"
-                className="terminal-chip rounded-lg px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-200"
+      <div
+        className="shrink-0 border-b px-2 py-2 sm:px-4"
+        style={{ borderColor: "rgba(212,161,31,0.12)", background: "rgba(11,12,14,0.96)" }}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-[10px] text-zinc-300 sm:text-[11px]">
+            {isAuthenticated
+              ? `Live session active (${tier.toUpperCase()}): you can manage wallet and execution access from here.`
+              : "Demo mode active: live prices and paper trading are available. Sign in to enable live execution."}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Link
+              href="/terminal"
+              className="terminal-chip rounded-lg px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-200"
+            >
+              Continue Demo
+            </Link>
+            {isAuthenticated ? (
+              <button
+                type="button"
+                onClick={handleTerminalLogout}
+                className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-rose-200 hover:bg-rose-500/15"
               >
-                Continue Demo
-              </Link>
+                Logout
+              </button>
+            ) : (
               <Link
                 href="/sign-in"
                 className="brand-chip-active rounded-lg px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.12em]"
               >
                 Sign In Live
               </Link>
-            </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
       {isMobile && (
         <div
           className="shrink-0 border-b px-1.5 py-1"
