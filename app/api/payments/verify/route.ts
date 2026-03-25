@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/supabase/admin";
 import { getWalletSessionCookieName, verifyWalletSessionToken } from "@/lib/wallet-auth";
+import { isWalletSessionRevoked } from "@/lib/wallet-session-revocation";
 import { type PlanId, getPaymentNetwork, hasAnyPaymentVerificationEnv, hasPaymentVerificationEnv, verifyPlanPayment } from "@/lib/payment-verification";
 import { grantWalletTier } from "@/lib/wallet-subscriptions";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
-import { isRequestSameOrigin } from "@/lib/request-security";
+import { hasValidCsrfToken, isRequestSameOrigin } from "@/lib/request-security";
 
 function json(payload: unknown, status = 200) {
   return new NextResponse(JSON.stringify(payload), {
@@ -32,6 +33,9 @@ export async function POST(request: NextRequest) {
   if (!isRequestSameOrigin(request)) {
     return json({ ok: false, error: "Origin mismatch." }, 403);
   }
+  if (!hasValidCsrfToken(request)) {
+    return json({ ok: false, error: "Missing or invalid CSRF token." }, 403);
+  }
 
   const contentLength = Number(request.headers.get("content-length") || "0");
   if (Number.isFinite(contentLength) && contentLength > 20_000) {
@@ -49,6 +53,9 @@ export async function POST(request: NextRequest) {
   if (!session) {
     return json({ ok: false, error: "Unauthorized wallet session." }, 401);
   }
+  if (await isWalletSessionRevoked(token)) {
+    return json({ ok: false, error: "Wallet session is revoked." }, 401);
+  }
   if (!hasSupabaseAdminEnv()) {
     return json({ ok: false, error: "Supabase admin is not configured." }, 503);
   }
@@ -60,6 +67,9 @@ export async function POST(request: NextRequest) {
   const txHash = String(body?.txHash || "").trim();
   const plan = String(body?.plan || "").trim().toLowerCase() as PlanId;
   const requestedNetworkId = normalizeNetworkId(String(body?.networkId || ""));
+  if (!requestedNetworkId) {
+    return json({ ok: false, error: "networkId is required." }, 400);
+  }
   const network = getPaymentNetwork(requestedNetworkId || undefined);
   if (requestedNetworkId && network.id !== requestedNetworkId) {
     return json({ ok: false, error: "Invalid payment network selection." }, 400);
@@ -76,17 +86,6 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createSupabaseAdminClient();
-  const existingPayment = await supabase
-    .from("wallet_payments")
-    .select("id, wallet_address, plan")
-    .eq("tx_hash", paymentRef)
-    .maybeSingle<{ id: string; wallet_address: string; plan: PlanId }>();
-  if (existingPayment.data) {
-    if (existingPayment.data.wallet_address !== session.address) {
-      return json({ ok: false, error: "Transaction already claimed by another wallet." }, 409);
-    }
-    return json({ ok: true, alreadyProcessed: true, plan: existingPayment.data.plan });
-  }
 
   let payment;
   try {
@@ -102,7 +101,7 @@ export async function POST(request: NextRequest) {
   }
 
   const priceUsd = plan === "full" ? Number(process.env.FULL_TIER_PRICE_USD || 50) : Number(process.env.DEX_TIER_PRICE_USD || 20);
-  const { error: insertError } = await supabase.from("wallet_payments").insert({
+  const insertPayload = {
     wallet_address: session.address,
     tx_hash: paymentRef,
     chain_id: payment.chainId,
@@ -120,21 +119,26 @@ export async function POST(request: NextRequest) {
       tokenSymbol: payment.tokenSymbol,
       txHash,
     },
-  });
+  };
+  const { data: inserted, error: insertError } = await supabase
+    .from("wallet_payments")
+    .upsert(insertPayload, { onConflict: "tx_hash", ignoreDuplicates: true })
+    .select("wallet_address,plan")
+    .maybeSingle<{ wallet_address: string; plan: PlanId }>();
 
   if (insertError) {
-    if (String(insertError.message || "").toLowerCase().includes("duplicate key")) {
-      const duplicate = await supabase
-        .from("wallet_payments")
-        .select("wallet_address, plan")
-        .eq("tx_hash", paymentRef)
-        .maybeSingle<{ wallet_address: string; plan: PlanId }>();
-      if (duplicate.data?.wallet_address === session.address) {
-        return json({ ok: true, alreadyProcessed: true, plan: duplicate.data.plan });
-      }
-      return json({ ok: false, error: "Transaction already claimed by another wallet." }, 409);
-    }
     return json({ ok: false, error: insertError.message || "Could not record payment." }, 500);
+  }
+  if (!inserted) {
+    const duplicate = await supabase
+      .from("wallet_payments")
+      .select("wallet_address, plan")
+      .eq("tx_hash", paymentRef)
+      .maybeSingle<{ wallet_address: string; plan: PlanId }>();
+    if (duplicate.data?.wallet_address === session.address) {
+      return json({ ok: true, alreadyProcessed: true, plan: duplicate.data.plan });
+    }
+    return json({ ok: false, error: "Transaction already claimed by another wallet." }, 409);
   }
 
   const tier = planToTier(plan);

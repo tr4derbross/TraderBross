@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { hasValidCsrfToken, isRequestSameOrigin } from "@/lib/request-security";
 
 type WatchlistSymbol = {
   symbol: string;
@@ -56,7 +57,14 @@ export async function GET() {
   return NextResponse.json({ items: data ?? [] });
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
+  if (!isRequestSameOrigin(request)) {
+    return NextResponse.json({ error: "Origin mismatch." }, { status: 403 });
+  }
+  if (!hasValidCsrfToken(request)) {
+    return NextResponse.json({ error: "Missing or invalid CSRF token." }, { status: 403 });
+  }
+
   if (!hasSupabasePublicEnv()) {
     return NextResponse.json({ error: "Supabase not configured" }, { status: 503 });
   }

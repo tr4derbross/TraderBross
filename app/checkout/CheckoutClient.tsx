@@ -35,6 +35,7 @@ type PaymentConfigPayload = {
     tokenDecimals?: number;
     tokenSymbol?: string | null;
     txExplorerBaseUrl?: string | null;
+    tokenAllowed?: boolean;
   }>;
   receiver?: string | null;
   chainId?: number | null;
@@ -85,6 +86,8 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
   const [selectedNetworkId, setSelectedNetworkId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmChecked, setConfirmChecked] = useState(false);
 
   const planMeta = PLANS[plan];
 
@@ -134,6 +137,7 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
     tokenDecimals: config?.tokenDecimals || 6,
     tokenSymbol: config?.tokenSymbol || null,
     txExplorerBaseUrl: config?.txExplorerBaseUrl || null,
+    tokenAllowed: false,
   };
   const activeNetwork =
     configuredNetworks.find((network) => network.id === selectedNetworkId) ||
@@ -144,12 +148,14 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
   const tokenDecimals = Math.max(0, Number(activeNetwork?.tokenDecimals || 6) || 6);
   const tokenSymbol = String(activeNetwork?.tokenSymbol || "").trim().toUpperCase();
   const stableSymbol = tokenSymbol === "USDC" || tokenSymbol === "USDT" ? tokenSymbol : "";
+  const tokenAllowed = Boolean(activeNetwork?.tokenAllowed);
   const expectedAmountUnits = parseSafeUnits(priceUsd, tokenDecimals);
   const displayAmount = ethers.formatUnits(expectedAmountUnits, tokenDecimals);
   const paymentReady = Boolean(
-    activeNetwork?.enabled &&
+      activeNetwork?.enabled &&
       activeNetwork?.receiver &&
       activeNetwork?.tokenAddress &&
+      tokenAllowed &&
       stableSymbol &&
       activeNetwork?.chainId,
   );
@@ -193,7 +199,7 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
     }
   }
 
-  async function handlePayWithWallet() {
+  async function executeWalletPayment() {
     if (!session?.walletAddress) {
       setError("Wallet session is missing. Sign in again.");
       return;
@@ -204,6 +210,10 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
     }
     if (!activeNetwork?.tokenAddress || !stableSymbol) {
       setError("Payment token is not configured as USDC/USDT.");
+      return;
+    }
+    if (!tokenAllowed) {
+      setError("Payment token contract is not in the allowlist.");
       return;
     }
     if (!activeNetwork?.chainId) {
@@ -259,6 +269,15 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
     } finally {
       setPaying(false);
     }
+  }
+
+  async function handlePayWithWallet() {
+    if (!canUseWalletPay) {
+      setError("Payment requirements are not satisfied.");
+      return;
+    }
+    setConfirmChecked(false);
+    setConfirmOpen(true);
   }
 
   return (
@@ -346,6 +365,9 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
                         <p className="mt-1 font-mono text-[11px] text-zinc-500">
                           {network.receiver || "Receiver not configured"}
                         </p>
+                        {!network.tokenAllowed ? (
+                          <p className="mt-1 text-xs text-rose-300">Token contract not in allowlist</p>
+                        ) : null}
                       </button>
                     );
                   })}
@@ -396,6 +418,55 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
           {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
         </section>
       </main>
+      {confirmOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-lg rounded-xl border border-white/15 bg-[#121722] p-5">
+            <h2 className="text-lg font-semibold text-white">Confirm payment details</h2>
+            <p className="mt-2 text-sm text-zinc-300">
+              Review receiver, chain, and token contract before approving transfer in your wallet.
+            </p>
+            <div className="mt-4 space-y-2 text-sm text-zinc-200">
+              <p>Plan: <span className="font-semibold text-white">{planMeta.label}</span></p>
+              <p>Amount: <span className="font-semibold text-white">{displayAmount} {stableSymbol || "USDC/USDT"}</span></p>
+              <p>Chain ID: <span className="font-semibold text-white">{activeNetwork?.chainId || "N/A"}</span></p>
+              <p>Receiver: <span className="font-mono text-xs text-white">{activeNetwork?.receiver || "N/A"}</span></p>
+              <p>Token: <span className="font-mono text-xs text-white">{activeNetwork?.tokenAddress || "N/A"}</span></p>
+              <p className="text-amber-300">
+                If your wallet is on a different chain, it will ask for an explicit chain switch confirmation.
+              </p>
+            </div>
+            <label className="mt-4 flex items-start gap-2 text-sm text-zinc-300">
+              <input
+                type="checkbox"
+                checked={confirmChecked}
+                onChange={(event) => setConfirmChecked(event.target.checked)}
+                className="mt-0.5"
+              />
+              <span>I verified all payment details above.</span>
+            </label>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(false)}
+                className="flex-1 rounded-md border border-white/20 px-3 py-2 text-sm text-zinc-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!confirmChecked || paying}
+                onClick={async () => {
+                  setConfirmOpen(false);
+                  await executeWalletPayment();
+                }}
+                className="flex-1 rounded-md bg-amber-400 px-3 py-2 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {paying ? "Processing..." : "Confirm and Pay"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </PageWrapper>
   );
 }

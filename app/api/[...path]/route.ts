@@ -2,7 +2,10 @@ import { NextRequest } from "next/server";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getWalletSessionCookieName, type WalletTier, verifyWalletSessionToken } from "@/lib/wallet-auth";
+import { isWalletSessionRevoked } from "@/lib/wallet-session-revocation";
 import { getWalletTier } from "@/lib/wallet-subscriptions";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
+import { hasValidCsrfToken } from "@/lib/request-security";
 
 const DEFAULT_LOCAL_BACKEND = "http://127.0.0.1:4001";
 const DEFAULT_PROD_BACKEND = "https://traderbross-production.up.railway.app";
@@ -25,6 +28,21 @@ const FULL_TIER_PATH_PREFIXES = [
 const DEX_TIER_PATH_PREFIXES = [
   "/api/hyperliquid/order",
 ];
+const SENSITIVE_PROXY_PATH_PREFIXES = [
+  "/api/vault/store",
+  "/api/vault/clear",
+  "/api/vault/status",
+  "/api/venues/validate",
+  "/api/binance",
+  "/api/binance/order",
+  "/api/okx",
+  "/api/okx/order",
+  "/api/bybit",
+  "/api/bybit/order",
+  "/api/hyperliquid/order",
+];
+const ALLOWED_PROXY_METHODS = new Set(["GET", "POST", "DELETE", "PUT", "PATCH", "OPTIONS"]);
+const SAFE_PATH_SEGMENT_REGEX = /^[a-zA-Z0-9._-]+$/;
 
 function trimSlash(value: string) {
   return value.replace(/\/+$/, "");
@@ -494,7 +512,7 @@ function hasRequiredTier(tier: Tier, required: Tier) {
 
 function requiresTierCheck(pathname: string, method: string) {
   const upperMethod = String(method || "").toUpperCase();
-  if (!["POST", "DELETE", "PUT", "PATCH", "GET"].includes(upperMethod)) return null;
+  if (!["POST", "DELETE", "PUT", "PATCH", "OPTIONS", "GET"].includes(upperMethod)) return null;
   if (FULL_TIER_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
     return "full" as Tier;
   }
@@ -507,11 +525,47 @@ function requiresTierCheck(pathname: string, method: string) {
   return null;
 }
 
+function hasUnsafePathSegments(path: string[]) {
+  return path.some((segment) => {
+    const value = String(segment || "");
+    if (!value || value === "." || value === "..") return true;
+    if (value.includes("/") || value.includes("\\")) return true;
+    return !SAFE_PATH_SEGMENT_REGEX.test(value);
+  });
+}
+
+function isSensitiveProxyPath(pathname: string) {
+  return SENSITIVE_PROXY_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+function enforceProxyRateLimit(request: NextRequest, method: string, upstreamPath: string) {
+  const ip = getClientIp(request);
+  const isMutation = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
+  const isSensitive = isSensitiveProxyPath(upstreamPath);
+  const ipLimit = isMutation ? (isSensitive ? 30 : 60) : 180;
+  const ipWindowMs = 60_000;
+  const ipResult = rateLimit(`proxy:${method}:ip:${ip}`, ipLimit, ipWindowMs);
+  if (!ipResult.allowed) {
+    return json({ error: "Too many requests. Please try again shortly." }, 429);
+  }
+
+  const walletSessionToken = request.cookies.get(getWalletSessionCookieName())?.value || "";
+  const walletSession = verifyWalletSessionToken(walletSessionToken);
+  if (walletSession?.address) {
+    const userLimit = isMutation ? (isSensitive ? 50 : 80) : 240;
+    const userResult = rateLimit(`proxy:${method}:wallet:${walletSession.address}`, userLimit, ipWindowMs);
+    if (!userResult.allowed) {
+      return json({ error: "Too many requests. Please try again shortly." }, 429);
+    }
+  }
+  return null;
+}
+
 async function resolveRequestTier(request: NextRequest) {
   const walletSessionToken = request.cookies.get(getWalletSessionCookieName())?.value || "";
   if (walletSessionToken) {
     const walletSession = verifyWalletSessionToken(walletSessionToken);
-    if (walletSession?.address) {
+    if (walletSession?.address && !(await isWalletSessionRevoked(walletSessionToken))) {
       const walletTier = await getWalletTier(walletSession.address);
       return {
         authenticated: true,
@@ -790,21 +844,38 @@ async function emergencyResponse(path: string[], request: NextRequest) {
 }
 
 async function proxy(request: NextRequest, method: string, path: string[]) {
+  const normalizedMethod = String(method || "").toUpperCase();
+  if (!ALLOWED_PROXY_METHODS.has(normalizedMethod)) {
+    return json({ error: "Method not allowed." }, 405);
+  }
   const normalizedPath = Array.isArray(path) ? path.filter(Boolean) : [];
+  if (hasUnsafePathSegments(normalizedPath)) {
+    return json({ error: "Invalid API path." }, 400);
+  }
   const upstreamPath =
     normalizedPath.length === 1 && normalizedPath[0] === "health"
       ? "/health"
       : `/api/${normalizedPath.join("/")}`;
-  const tierBlock = await enforceApiTier(request, upstreamPath, method);
+  if (normalizedMethod !== "GET" && normalizedMethod !== "HEAD" && normalizedMethod !== "OPTIONS") {
+    if (!hasValidCsrfToken(request)) {
+      return json({ error: "Missing or invalid CSRF token." }, 403);
+    }
+  }
+  if (isSensitiveProxyPath(upstreamPath) && !String(process.env.PROXY_SHARED_SECRET || "").trim()) {
+    return json({ error: "Proxy is not securely configured." }, 503);
+  }
+  const rateLimitBlock = enforceProxyRateLimit(request, normalizedMethod, upstreamPath);
+  if (rateLimitBlock) return rateLimitBlock;
+  const tierBlock = await enforceApiTier(request, upstreamPath, normalizedMethod);
   if (tierBlock) return tierBlock;
   const backendCandidates = resolveBackendCandidates();
 
   const init: RequestInit = {
-    method,
+    method: normalizedMethod,
     headers: cloneHeaders(request),
     redirect: "manual",
     cache: "no-store",
-    signal: AbortSignal.timeout(method === "GET" || method === "HEAD" ? 6000 : MUTATION_PROXY_TIMEOUT_MS),
+    signal: AbortSignal.timeout(normalizedMethod === "GET" || normalizedMethod === "HEAD" ? 6000 : MUTATION_PROXY_TIMEOUT_MS),
   };
   const headers = init.headers as Headers;
   headers.set("x-traderbross-proxy", "1");
@@ -812,7 +883,7 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
     headers.set("x-traderbross-proxy-secret", process.env.PROXY_SHARED_SECRET);
   }
 
-  if (method !== "GET" && method !== "HEAD") {
+  if (normalizedMethod !== "GET" && normalizedMethod !== "HEAD") {
     const contentLength = Number(request.headers.get("content-length") || "0");
     if (Number.isFinite(contentLength) && contentLength > MAX_MUTATION_PROXY_BODY_BYTES) {
       return json({ error: "Payload too large" }, 413);
@@ -835,7 +906,7 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
 
     try {
       upstream = await fetch(upstreamUrl.toString(), init);
-      if (upstream.ok || method === "GET" || method === "HEAD") {
+      if (upstream.ok || normalizedMethod === "GET" || normalizedMethod === "HEAD") {
         break;
       }
       // For POST/DELETE, retry another backend candidate if we hit 5xx.
@@ -849,16 +920,16 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
   }
 
   if (!upstream) {
-    if (method === "GET") return emergencyResponse(normalizedPath, request);
+    if (normalizedMethod === "GET") return emergencyResponse(normalizedPath, request);
     const fallbackMessage = normalizedPath[0] === "okx" || normalizedPath[0] === "bybit"
       ? "Trade backend temporarily unavailable. Please retry in a few seconds."
       : "upstream_unavailable";
     return json({ error: fallbackMessage }, 503);
   }
-  if (method === "GET" && upstream.status >= 500) {
+  if (normalizedMethod === "GET" && upstream.status >= 500) {
     return emergencyResponse(normalizedPath, request);
   }
-  if (method === "GET" && upstream.ok) {
+  if (normalizedMethod === "GET" && upstream.ok) {
     const primary = (normalizedPath?.[0] || "").toLowerCase();
     if (["bootstrap", "news", "market", "screener", "prices", "okx", "bybit", "hyperliquid", "aster", "symbols", "venues"].includes(primary)) {
       try {
@@ -931,4 +1002,14 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 export async function OPTIONS(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
   return proxy(request, "OPTIONS", path || []);
+}
+
+export async function PUT(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const { path } = await context.params;
+  return proxy(request, "PUT", path || []);
+}
+
+export async function PATCH(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const { path } = await context.params;
+  return proxy(request, "PATCH", path || []);
 }

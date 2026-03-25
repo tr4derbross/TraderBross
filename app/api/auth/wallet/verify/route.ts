@@ -8,9 +8,10 @@ import {
   issueWalletSessionToken,
   verifyWalletNonceToken,
 } from "@/lib/wallet-auth";
+import { consumeWalletNonceOnce } from "@/lib/wallet-nonce-store";
 import { getWalletTier } from "@/lib/wallet-subscriptions";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
-import { isRequestSameOrigin } from "@/lib/request-security";
+import { hasValidCsrfToken, isRequestSameOrigin } from "@/lib/request-security";
 
 function json(payload: unknown, status = 200) {
   return new NextResponse(JSON.stringify(payload), {
@@ -25,6 +26,9 @@ function json(payload: unknown, status = 200) {
 export async function POST(request: NextRequest) {
   if (!isRequestSameOrigin(request)) {
     return json({ ok: false, error: "Origin mismatch." }, 403);
+  }
+  if (!hasValidCsrfToken(request)) {
+    return json({ ok: false, error: "Missing or invalid CSRF token." }, 403);
   }
 
   const ip = getClientIp(request);
@@ -54,7 +58,6 @@ export async function POST(request: NextRequest) {
   if (noncePayload.address !== normalizedAddress) {
     return json({ ok: false, error: "Nonce address mismatch." }, 401);
   }
-
   const origin = request.headers.get("origin") || request.nextUrl.origin;
   const expectedMessage = buildWalletSignMessage(address, noncePayload.nonce, origin, noncePayload.issuedAt);
   if (message.trim() !== expectedMessage.trim()) {
@@ -69,6 +72,14 @@ export async function POST(request: NextRequest) {
   }
   if (recovered !== normalizedAddress) {
     return json({ ok: false, error: "Signer address mismatch." }, 401);
+  }
+  const nonceAccepted = await consumeWalletNonceOnce({
+    address: normalizedAddress,
+    nonce: noncePayload.nonce,
+    issuedAt: noncePayload.issuedAt,
+  });
+  if (!nonceAccepted) {
+    return json({ ok: false, error: "Nonce already used. Request a new nonce." }, 401);
   }
 
   const sessionToken = issueWalletSessionToken(address);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWalletSessionCookieName, verifyWalletSessionToken } from "@/lib/wallet-auth";
+import { isWalletSessionRevoked } from "@/lib/wallet-session-revocation";
 import { getWalletTier } from "@/lib/wallet-subscriptions";
 
 function json(payload: unknown, status = 200) {
@@ -15,7 +16,7 @@ function json(payload: unknown, status = 200) {
 export async function GET(request: NextRequest) {
   const token = request.cookies.get(getWalletSessionCookieName())?.value || "";
   const session = verifyWalletSessionToken(token);
-  if (!session) {
+  if (!session || (token && await isWalletSessionRevoked(token))) {
     return json({ ok: true, authenticated: false, tier: "free" });
   }
 
@@ -28,4 +29,3 @@ export async function GET(request: NextRequest) {
     tierExpiresAt: tier.expiresAt,
   });
 }
-

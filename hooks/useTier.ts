@@ -6,9 +6,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 
 export type Tier = "free" | "dex" | "full";
-const TIER_OVERRIDE_STORAGE_KEY = "traderbross.tier-override.v1";
 const UNLOCK_ALL_TIERS = process.env.NEXT_PUBLIC_UNLOCK_ALL_TIERS === "true";
-const ALLOW_ADMIN_TIER_OVERRIDE = process.env.NEXT_PUBLIC_ENABLE_ADMIN_TIER_OVERRIDE === "true";
 
 function normalizeTier(value: unknown): Tier {
   if (value === "dex" || value === "full") return value;
@@ -65,18 +63,6 @@ export function useTier() {
           }
         } catch {
           // ignore wallet session errors and continue
-        }
-
-        const overrideTier = ALLOW_ADMIN_TIER_OVERRIDE
-          ? sessionStorage.getItem(TIER_OVERRIDE_STORAGE_KEY)
-          : null;
-        if (overrideTier && ALLOW_ADMIN_TIER_OVERRIDE) {
-          if (mounted) {
-            setIsAuthenticated(true);
-            setTier(normalizeTier(overrideTier));
-            setLoading(false);
-          }
-          return;
         }
 
         try {
@@ -160,19 +146,9 @@ export function useTier() {
     const authListener = supabase?.auth.onAuthStateChange(() => {
       void resolveTier();
     });
-    const handleTierOverrideChanged = () => {
-      void resolveTier();
-    };
-    if (typeof window !== "undefined") {
-      window.addEventListener("tier-override-changed", handleTierOverrideChanged);
-    }
-
     return () => {
       mounted = false;
       authListener?.data.subscription.unsubscribe();
-      if (typeof window !== "undefined") {
-        window.removeEventListener("tier-override-changed", handleTierOverrideChanged);
-      }
     };
   }, [supabase]);
 

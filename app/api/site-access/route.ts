@@ -7,7 +7,8 @@ import {
   shouldUnlockAllTiersInPrivateMode,
   verifySiteAccessToken,
 } from "@/lib/site-access";
-import { isRequestSameOrigin } from "@/lib/request-security";
+import { getClientIp } from "@/lib/rate-limit";
+import { hasValidCsrfToken, isRequestSameOrigin } from "@/lib/request-security";
 
 const ACCESS_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const ACCESS_MAX_ATTEMPTS = 8;
@@ -22,13 +23,6 @@ function responseJson(payload: unknown, status = 200) {
       "cache-control": "no-store",
     },
   });
-}
-
-function getClientIp(request: NextRequest) {
-  const forwarded = request.headers.get("x-forwarded-for") || "";
-  const realIp = request.headers.get("x-real-ip") || "";
-  const fallback = "unknown";
-  return (forwarded.split(",")[0] || realIp || fallback).trim();
 }
 
 function getAttemptState(ip: string, now: number) {
@@ -58,6 +52,9 @@ function clearAttemptState(ip: string) {
 export async function POST(request: NextRequest) {
   if (!isRequestSameOrigin(request)) {
     return responseJson({ ok: false, error: "Origin mismatch." }, 403);
+  }
+  if (!hasValidCsrfToken(request)) {
+    return responseJson({ ok: false, error: "Missing or invalid CSRF token." }, 403);
   }
 
   if (!isSiteAccessEnabled()) {
@@ -117,6 +114,9 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   if (!isRequestSameOrigin(request)) {
     return responseJson({ ok: false, error: "Origin mismatch." }, 403);
+  }
+  if (!hasValidCsrfToken(request)) {
+    return responseJson({ ok: false, error: "Missing or invalid CSRF token." }, 403);
   }
 
   const response = responseJson({ ok: true });

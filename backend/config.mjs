@@ -23,6 +23,15 @@ function parseOrigins(value) {
     .map(trimSlash);
 }
 
+function isSecureProductionOrigin(origin) {
+  const value = String(origin || "").trim().toLowerCase();
+  if (!value) return false;
+  if (!value.startsWith("https://")) return false;
+  if (value.includes("*")) return false;
+  if (value.includes("localhost") || value.includes("127.0.0.1")) return false;
+  return true;
+}
+
 function toBoolean(value, fallback = true) {
   if (value === undefined || value === null || value === "") return fallback;
   const normalized = String(value).trim().toLowerCase();
@@ -190,12 +199,23 @@ export function loadConfig() {
       },
     },
     security: {
-      proxyAuthEnabled: toBoolean(process.env.REQUIRE_PROXY_AUTH, isProductionNodeEnv()),
+      proxyAuthEnabled: toBoolean(process.env.REQUIRE_PROXY_AUTH, true),
       proxyAuthHeader: process.env.PROXY_AUTH_HEADER || "x-traderbross-proxy-secret",
       proxyAuthSecret: process.env.PROXY_SHARED_SECRET || "",
       requireProxyMarker: toBoolean(process.env.REQUIRE_PROXY_MARKER, true),
       allowSensitiveOriginBypass: toBoolean(process.env.ALLOW_SENSITIVE_ORIGIN_BYPASS, false),
     },
   };
-  return applyFreeTierOverrides(baseConfig, process.env);
+  const config = applyFreeTierOverrides(baseConfig, process.env);
+  if (isProductionNodeEnv()) {
+    const allOriginsSecure = Array.isArray(config.frontendOrigins) && config.frontendOrigins.length > 0
+      && config.frontendOrigins.every(isSecureProductionOrigin);
+    if (!allOriginsSecure) {
+      throw new Error("CORS_ORIGINS must contain only explicit https production domains in production.");
+    }
+    if (!String(config.rateLimit?.redisUrl || "").trim()) {
+      throw new Error("RATE_LIMIT_REDIS_URL (or REDIS_URL) is required in production.");
+    }
+  }
+  return config;
 }

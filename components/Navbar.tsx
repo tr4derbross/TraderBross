@@ -1,15 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Send, Twitter } from "lucide-react";
 import { useI18n } from "@/components/i18n/LanguageProvider";
 import LanguageSwitcher from "@/components/i18n/LanguageSwitcher";
+import { apiFetch } from "@/lib/api-client";
+
+type WalletSessionPayload = {
+  authenticated?: boolean;
+  walletAddress?: string;
+};
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
+  const [walletAuthenticated, setWalletAuthenticated] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const pathname = usePathname();
   const { dict } = useI18n();
   const NAV_LINKS = [
@@ -19,6 +27,38 @@ export default function Navbar() {
     { href: "/screener", label: dict.nav.screener },
     { href: "/calendar", label: dict.nav.calendar },
   ];
+
+  useEffect(() => {
+    let active = true;
+    const loadSession = async () => {
+      try {
+        const session = await apiFetch<WalletSessionPayload>("/api/auth/wallet/session");
+        if (!active) return;
+        setWalletAuthenticated(Boolean(session?.authenticated));
+      } catch {
+        if (!active) return;
+        setWalletAuthenticated(false);
+      }
+    };
+    void loadSession();
+    return () => {
+      active = false;
+    };
+  }, [pathname]);
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await apiFetch("/api/auth/wallet/logout", { method: "POST" });
+    } catch {
+      // Continue to sign-in even if logout endpoint fails.
+    } finally {
+      setWalletAuthenticated(false);
+      setOpen(false);
+      setLoggingOut(false);
+      window.location.href = "/sign-in";
+    }
+  };
 
   return (
     <>
@@ -74,6 +114,16 @@ export default function Navbar() {
             >
               <Twitter size={16} />
             </a>
+            {walletAuthenticated ? (
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="hidden rounded-md border border-[#3A3A3A] px-2 py-1 text-[11px] text-[#D8D8D8] transition-colors hover:border-[#F2B705] hover:text-[#F2B705] disabled:cursor-not-allowed disabled:opacity-60 md:inline-flex"
+              >
+                {loggingOut ? "Logging out..." : "Logout"}
+              </button>
+            ) : null}
             <button
               onClick={() => setOpen(!open)}
               className="flex h-8 w-8 items-center justify-center text-[#A0A0A0] md:hidden"
@@ -144,6 +194,16 @@ export default function Navbar() {
                   <LanguageSwitcher />
                 </div>
               </div>
+              {walletAuthenticated ? (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  disabled={loggingOut}
+                  className="mt-3 w-full rounded-md border border-[#3A3A3A] px-3 py-2 text-[12px] text-[#D8D8D8] transition-colors hover:border-[#F2B705] hover:text-[#F2B705] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loggingOut ? "Logging out..." : "Logout"}
+                </button>
+              ) : null}
             </motion.div>
           </>
         )}

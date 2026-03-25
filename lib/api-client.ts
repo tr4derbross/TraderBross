@@ -13,9 +13,19 @@ function getRequestKey(path: string, init?: RequestInit) {
   return `${method}:${path}`;
 }
 
+function readCookie(name: string) {
+  if (typeof document === "undefined") return "";
+  const token = document.cookie
+    .split(";")
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith(`${name}=`));
+  return token ? decodeURIComponent(token.slice(name.length + 1)) : "";
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const method = normalizeMethod(init);
   const isGet = method === "GET";
+  const isMutation = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
   const key = getRequestKey(path, init);
 
   if (isGet) {
@@ -31,12 +41,14 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const MUTATION_TIMEOUT_MS = 25_000;
   const requestPromise = (async () => {
     const signal = isGet ? init?.signal : (init?.signal ?? AbortSignal.timeout(MUTATION_TIMEOUT_MS));
+    const csrfToken = isMutation ? readCookie("tb_csrf_token") : "";
     const response = await fetch(buildApiUrl(path), {
       ...init,
       signal,
       cache: init?.cache ?? "no-store",
       headers: {
         "content-type": "application/json",
+        ...(isMutation && csrfToken ? { "x-csrf-token": csrfToken } : {}),
         ...(init?.headers || {}),
       },
     });

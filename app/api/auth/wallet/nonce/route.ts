@@ -8,7 +8,7 @@ import {
   issueWalletNonceToken,
 } from "@/lib/wallet-auth";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
-import { isRequestSameOrigin } from "@/lib/request-security";
+import { hasValidCsrfToken, isRequestSameOrigin } from "@/lib/request-security";
 
 function json(payload: unknown, status = 200) {
   return new NextResponse(JSON.stringify(payload), {
@@ -23,6 +23,9 @@ function json(payload: unknown, status = 200) {
 export async function POST(request: NextRequest) {
   if (!isRequestSameOrigin(request)) {
     return json({ ok: false, error: "Origin mismatch." }, 403);
+  }
+  if (!hasValidCsrfToken(request)) {
+    return json({ ok: false, error: "Missing or invalid CSRF token." }, 403);
   }
 
   const ip = getClientIp(request);

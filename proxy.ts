@@ -1,6 +1,7 @@
 import { type NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { updateSupabaseSession } from "@/lib/supabase/middleware";
+import { ensureCsrfCookie } from "@/lib/request-security";
 import {
   getSiteAccessCookieName,
   isSiteAccessEnabled,
@@ -30,7 +31,9 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  return updateSupabaseSession(request);
+  const response = updateSupabaseSession(request);
+  ensureCsrfCookie(request, response);
+  return response;
 }
 
 export const config = {

@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 
 const TTL_MS = Number(process.env.VAULT_SESSION_TTL_MS || 6 * 60 * 60 * 1000);
 const revokedTokens = new Map();
+const isProduction = String(process.env.NODE_ENV || "").toLowerCase() === "production";
 
 function parseKey(raw) {
   const value = String(raw || "").trim();
@@ -26,7 +27,11 @@ function parseKey(raw) {
   return null;
 }
 
-const encryptionKey = parseKey(process.env.VAULT_ENCRYPTION_KEY) || crypto.randomBytes(32);
+const parsedEncryptionKey = parseKey(process.env.VAULT_ENCRYPTION_KEY);
+if (isProduction && !parsedEncryptionKey) {
+  throw new Error("Missing or invalid VAULT_ENCRYPTION_KEY in production.");
+}
+const encryptionKey = parsedEncryptionKey || crypto.randomBytes(32);
 
 function b64urlEncode(value) {
   return Buffer.from(value).toString("base64url");

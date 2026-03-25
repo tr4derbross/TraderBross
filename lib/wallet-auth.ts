@@ -5,7 +5,7 @@ export type WalletTier = "free" | "dex" | "full";
 const NONCE_COOKIE = "tb_wallet_nonce";
 const SESSION_COOKIE = "tb_wallet_session";
 const NONCE_TTL_SECONDS = 60 * 10; // 10 min
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
+const SESSION_TTL_SECONDS = Number(process.env.WALLET_SESSION_TTL_SECONDS || 60 * 60 * 24 * 7); // 7 days default
 
 function nowSeconds() {
   return Math.floor(Date.now() / 1000);
@@ -114,22 +114,24 @@ export function verifyWalletNonceToken(token: string) {
 }
 
 export function issueWalletSessionToken(address: string) {
+  const iat = nowSeconds();
   return createToken({
     typ: "wallet_session",
     adr: normalizeAddress(address),
-    exp: nowSeconds() + SESSION_TTL_SECONDS,
-    iat: nowSeconds(),
+    exp: iat + SESSION_TTL_SECONDS,
+    iat,
+    jti: crypto.randomBytes(12).toString("hex"),
   });
 }
 
 export function verifyWalletSessionToken(token: string) {
-  const payload = verifyToken<{ typ?: string; adr?: string; exp?: number }>(token);
+  const payload = verifyToken<{ typ?: string; adr?: string; exp?: number; jti?: string }>(token);
   if (!payload || payload.typ !== "wallet_session") return null;
   const exp = Number(payload.exp || 0);
   if (!Number.isFinite(exp) || exp <= nowSeconds()) return null;
   const address = normalizeAddress(String(payload.adr || ""));
   if (!address) return null;
-  return { address };
+  return { address, exp, jti: String(payload.jti || "") };
 }
 
 export function getWalletSessionMaxAgeSeconds() {

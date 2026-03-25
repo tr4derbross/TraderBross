@@ -58,16 +58,18 @@ if (upstashCache.enabled) {
 }
 
 if (config.security.proxyAuthEnabled && !String(config.security.proxyAuthSecret || "").trim()) {
-  logger.warn("backend.security.proxy_secret_missing", {
+  logger.error("backend.security.proxy_secret_missing", {
     message:
-      "REQUIRE_PROXY_AUTH is enabled but PROXY_SHARED_SECRET is missing. Sensitive routes will be denied until configured.",
+      "REQUIRE_PROXY_AUTH is enabled but PROXY_SHARED_SECRET is missing. Refusing to start in fail-closed mode.",
   });
+  throw new Error("Missing PROXY_SHARED_SECRET while REQUIRE_PROXY_AUTH is enabled.");
 }
 
 if (String(process.env.NODE_ENV || "").toLowerCase() === "production" && !String(process.env.VAULT_ENCRYPTION_KEY || "").trim()) {
-  logger.warn("backend.security.vault_key_missing", {
+  logger.error("backend.security.vault_key_missing", {
     message: "VAULT_ENCRYPTION_KEY is not set. Vault key will rotate on restart and invalidate sessions.",
   });
+  throw new Error("Missing VAULT_ENCRYPTION_KEY in production.");
 }
 
 process.on("unhandledRejection", (reason) => {
@@ -545,11 +547,15 @@ function json(reply, statusCode, payload) {
 }
 
 function withCors(request, reply) {
-  const origin = request.headers.origin;
-  const allowedOrigin = origin && config.frontendOrigins.includes(origin.replace(/\/+$/, "")) ? origin : config.frontendOrigins[0];
-  reply.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  const origin = String(request.headers.origin || "").trim();
+  const normalized = origin.replace(/\/+$/, "");
+  const allowedOrigin = origin && config.frontendOrigins.includes(normalized) ? origin : "";
+  if (allowedOrigin) {
+    reply.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  }
+  reply.setHeader("Vary", "Origin");
   reply.setHeader("Access-Control-Allow-Headers", "content-type");
-  reply.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
+  reply.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,PUT,PATCH,OPTIONS");
 }
 
 async function readJson(request, maxBytes = MAX_JSON_BODY_BYTES) {
@@ -1153,9 +1159,8 @@ const server = http.createServer(async (request, reply) => {
 
         json(reply, 400, { ok: false, error: "Unknown action type" });
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Hyperliquid order request failed.";
         logger.warn("hyperliquid.order.failed", { type: body.type, error: String(err) });
-        json(reply, 500, { ok: false, error: message || "Hyperliquid order request failed." });
+        json(reply, 500, { ok: false, error: "Hyperliquid order request failed." });
       }
       return;
     }
@@ -1492,7 +1497,7 @@ const server = http.createServer(async (request, reply) => {
           const res = await fetch(`${base}/fapi/v2/balance?${qs}`, { headers: { "X-MBX-APIKEY": apiKey }, signal: AbortSignal.timeout(8000) });
           const data = await res.json();
           if (!res.ok) {
-            json(reply, 200, { ok: false, message: data.msg || `Binance error ${res.status}` });
+            json(reply, 200, { ok: false, message: "Could not validate Binance credentials." });
             return;
           }
           const usdt = Array.isArray(data) ? data.find((b) => b.asset === "USDT") : null;
@@ -1521,7 +1526,7 @@ const server = http.createServer(async (request, reply) => {
           const res = await fetch(`https://www.okx.com${path}`, { headers, signal: AbortSignal.timeout(8000) });
           const data = await res.json();
           if (!res.ok || data?.code !== "0") {
-            json(reply, 200, { ok: false, message: data?.msg || `OKX error ${res.status}` });
+            json(reply, 200, { ok: false, message: "Could not validate OKX credentials." });
             return;
           }
           const details = Array.isArray(data?.data?.[0]?.details) ? data.data[0].details : [];
@@ -1555,7 +1560,7 @@ const server = http.createServer(async (request, reply) => {
           });
           const data = await res.json();
           if (!res.ok || Number(data?.retCode) !== 0) {
-            json(reply, 200, { ok: false, message: data?.retMsg || `Bybit error ${res.status}` });
+            json(reply, 200, { ok: false, message: "Could not validate Bybit credentials." });
             return;
           }
           const coins = Array.isArray(data?.result?.list?.[0]?.coin) ? data.result.list[0].coin : [];
@@ -2104,9 +2109,9 @@ const server = http.createServer(async (request, reply) => {
           }
           const tpslSettled = tpslTasks.length > 0 ? await Promise.all(tpslTasks) : [];
           const tpslResults = tpslSettled.filter((row) => row.ok).map((row) => ({ [row.tag]: row.data }));
-          const tpslErrors = tpslSettled.filter((row) => !row.ok).map((row) => `${String(row.tag).toUpperCase()} failed: ${row.error}`);
+          const tpslErrors = tpslSettled.filter((row) => !row.ok).map((row) => String(row.tag).toUpperCase());
           if (tpslErrors.length > 0) {
-            json(reply, 400, { ok: false, error: tpslErrors.join(" | "), data: result, tpsl: tpslResults });
+            json(reply, 400, { ok: false, error: `Failed to place ${tpslErrors.join("/")} protective orders.`, data: result, tpsl: tpslResults });
             return;
           }
           json(reply, 200, { ok: true, data: result, tpsl: tpslResults });
@@ -2117,7 +2122,7 @@ const server = http.createServer(async (request, reply) => {
         const message = err instanceof Error ? err.message : "Binance order request failed.";
         logger.warn("binance.order.failed", { type: body.type, symbol, error: String(err) });
         const isClientIssue = /(insufficient|invalid|minimum|size|margin|leverage|position|instrument|parameter|order)/i.test(message);
-        json(reply, isClientIssue ? 400 : 500, { ok: false, error: message || "Order request failed." });
+        json(reply, isClientIssue ? 400 : 500, { ok: false, error: isClientIssue ? "Invalid order request." : "Order request failed." });
       }
       return;
     }
@@ -2515,6 +2520,10 @@ const server = http.createServer(async (request, reply) => {
         return;
       }
       const symbol = normalizeTradeSymbol(body.symbol, body.quoteAsset || "USDT");
+      if (!/^[A-Z0-9]{4,20}$/.test(symbol)) {
+        json(reply, 400, { ok: false, error: "Invalid symbol." });
+        return;
+      }
       const requestBybit = async (method, path, query = "", payload = null) => {
         const bodyStr = payload ? JSON.stringify(payload) : "";
         const headers = bybitSign({
@@ -2672,7 +2681,7 @@ const server = http.createServer(async (request, reply) => {
         const message = err instanceof Error ? err.message : "Bybit order request failed.";
         logger.warn("bybit.order.failed", { type: body.type, symbol, error: String(err) });
         const isClientIssue = /(insufficient|invalid|minimum|size|margin|leverage|position|instrument|parameter|order)/i.test(message);
-        json(reply, isClientIssue ? 400 : 500, { ok: false, error: message || "Bybit order request failed." });
+        json(reply, isClientIssue ? 400 : 500, { ok: false, error: isClientIssue ? "Invalid order request." : "Bybit order request failed." });
       }
       return;
     }
@@ -2868,7 +2877,7 @@ const server = http.createServer(async (request, reply) => {
         const message = err instanceof Error ? err.message : "OKX order request failed.";
         logger.warn("okx.order.failed", { type: body.type, instId, error: String(err) });
         const isClientIssue = /(insufficient|invalid|minimum|size|margin|leverage|position|instrument|parameter|order)/i.test(message);
-        json(reply, isClientIssue ? 400 : 500, { ok: false, error: message || "OKX order request failed." });
+        json(reply, isClientIssue ? 400 : 500, { ok: false, error: isClientIssue ? "Invalid order request." : "OKX order request failed." });
       }
       return;
     }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPaymentNetwork, getPaymentNetworks, type PlanId, hasPaymentVerificationEnv } from "@/lib/payment-verification";
+import { getPaymentNetwork, getPaymentNetworks, type PlanId, hasPaymentVerificationEnv, isAllowedStableTokenContract } from "@/lib/payment-verification";
 
 function normalizeAddress(value: string) {
   return String(value || "").trim().toLowerCase();
@@ -19,6 +19,7 @@ export async function GET() {
     tokenDecimals: network.tokenDecimals,
     tokenSymbol: network.tokenSymbol || null,
     txExplorerBaseUrl: network.txExplorerBaseUrl || null,
+    tokenAllowed: isAllowedStableTokenContract(network),
     enabled: hasPaymentVerificationEnv(network.id),
   }));
   const active = getPaymentNetwork();

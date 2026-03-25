@@ -4,12 +4,13 @@ import SignInForm from "@/components/auth/SignInForm";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getWalletSessionCookieName, verifyWalletSessionToken } from "@/lib/wallet-auth";
+import { isWalletSessionRevoked } from "@/lib/wallet-session-revocation";
 
 export default async function SignInPage() {
   const cookieStore = await cookies();
   const walletToken = cookieStore.get(getWalletSessionCookieName())?.value || "";
   const walletSession = verifyWalletSessionToken(walletToken);
-  if (walletSession) {
+  if (walletSession && !(await isWalletSessionRevoked(walletToken))) {
     redirect("/terminal");
   }
 
