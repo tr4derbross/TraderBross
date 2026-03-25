@@ -8,6 +8,7 @@ import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 export type Tier = "free" | "dex" | "full";
 const TIER_OVERRIDE_STORAGE_KEY = "traderbross.tier-override.v1";
 const UNLOCK_ALL_TIERS = process.env.NEXT_PUBLIC_UNLOCK_ALL_TIERS === "true";
+const ALLOW_ADMIN_TIER_OVERRIDE = process.env.NEXT_PUBLIC_ENABLE_ADMIN_TIER_OVERRIDE === "true";
 
 function normalizeTier(value: unknown): Tier {
   if (value === "dex" || value === "full") return value;
@@ -18,6 +19,7 @@ export function useTier() {
   if (UNLOCK_ALL_TIERS) {
     return {
       tier: "full" as Tier,
+      isAuthenticated: false,
       isFree: false,
       isDEX: true,
       isFull: true,
@@ -32,6 +34,7 @@ export function useTier() {
     [],
   );
   const [tier, setTier] = useState<Tier>("free");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,11 +52,12 @@ export function useTier() {
             const expiresAt = walletSession.tierExpiresAt
               ? new Date(walletSession.tierExpiresAt).getTime()
               : null;
-            const expired =
+          const expired =
               typeof expiresAt === "number" &&
               Number.isFinite(expiresAt) &&
               expiresAt < Date.now();
             if (mounted) {
+              setIsAuthenticated(true);
               setTier(expired ? "free" : normalizeTier(walletSession.tier));
               setLoading(false);
             }
@@ -63,9 +67,12 @@ export function useTier() {
           // ignore wallet session errors and continue
         }
 
-        const overrideTier = sessionStorage.getItem(TIER_OVERRIDE_STORAGE_KEY);
-        if (overrideTier) {
+        const overrideTier = ALLOW_ADMIN_TIER_OVERRIDE
+          ? sessionStorage.getItem(TIER_OVERRIDE_STORAGE_KEY)
+          : null;
+        if (overrideTier && ALLOW_ADMIN_TIER_OVERRIDE) {
           if (mounted) {
+            setIsAuthenticated(true);
             setTier(normalizeTier(overrideTier));
             setLoading(false);
           }
@@ -75,10 +82,11 @@ export function useTier() {
         try {
           const accessState = await apiFetch<{ unlockAllTiers?: boolean }>("/api/site-access");
           if (accessState?.unlockAllTiers) {
-            if (mounted) {
-              setTier("full");
-              setLoading(false);
-            }
+          if (mounted) {
+            setIsAuthenticated(false);
+            setTier("full");
+            setLoading(false);
+          }
             return;
           }
         } catch {
@@ -88,6 +96,7 @@ export function useTier() {
 
       if (!supabase) {
         if (mounted) {
+          setIsAuthenticated(false);
           setTier("free");
           setLoading(false);
         }
@@ -101,10 +110,12 @@ export function useTier() {
 
       if (!mounted) return;
       if (!user) {
+        setIsAuthenticated(false);
         setTier("free");
         setLoading(false);
         return;
       }
+      setIsAuthenticated(true);
 
       const now = Date.now();
 
@@ -166,7 +177,8 @@ export function useTier() {
   }, [supabase]);
 
   return {
-    tier,
+      tier,
+    isAuthenticated,
     isFree: tier === "free",
     isDEX: tier === "dex" || tier === "full",
     isFull: tier === "full",

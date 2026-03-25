@@ -372,7 +372,7 @@ function ResizeDivider({ onDrag }: { onDrag: (dx: number) => void }) {
 
 export default function TerminalApp({ initialTicker }: { initialTicker?: string } = {}) {
   const initialSymbol = normalizeVenueTicker(initialTicker || "BTC") || "BTC";
-  const { tier, canUseDEX, canUseCEX } = useTier();
+  const { tier, isAuthenticated, canUseDEX, canUseCEX } = useTier();
   const [secureStorageScope, setSecureStorageScope] = useState<string>("anon");
   const [secureCexStateReady, setSecureCexStateReady] = useState(false);
   const secureCexStorage = useEncryptedLocalStorage<SecureStoredCexState>(`traderbross:cex:${secureStorageScope}`);
@@ -1121,6 +1121,22 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       tpPrice?: number,
       slPrice?: number
     ) => {
+      if ((activeVenueState.venueType === "wallet" || activeVenueState.venueType === "cex") && !isAuthenticated) {
+        const accepted = placeOrder(
+          ticker,
+          side,
+          type,
+          marginAmount,
+          leverage,
+          marginMode,
+          limitPrice,
+          tpPrice,
+          slPrice,
+        );
+        return accepted
+          ? { ok: true, message: "Paper trade submitted. Sign in to enable live execution." }
+          : { ok: false, message: "Paper trade failed. Check margin amount and balance." };
+      }
       if (activeVenueState.venueType === "wallet" && !canUseDEX) {
         const accepted = placeOrder(
           ticker,
@@ -1209,7 +1225,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         ? { ok: true, message: `${adapter.id.toUpperCase()} accepted the order request.` }
         : { ok: false, message: result.message };
     },
-    [activeVenueState, canUseCEX, canUseDEX, displayBalance, buildActiveVenueConnection, placeOrder]
+    [activeVenueState, canUseCEX, canUseDEX, isAuthenticated, displayBalance, buildActiveVenueConnection, placeOrder]
   );
 
   const setAdminTierOverride = useCallback((nextTier: "free" | "dex" | "full") => {
@@ -1380,6 +1396,10 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
 
   const connectHeaderWallet = useCallback(
     async (walletLabel: SupportedWalletLabel) => {
+      if (!isAuthenticated) {
+        setHeaderActionMessage("Sign in to connect a DEX wallet for live trading.");
+        return;
+      }
       if (!canUseDEX) {
         setHeaderActionMessage("DEX wallet connection requires the DEX plan.");
         return;
@@ -1454,10 +1474,14 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         });
       }
     },
-    [canUseDEX, headerPlatform]
+    [canUseDEX, headerPlatform, isAuthenticated]
   );
 
   const saveHlPrivateKey = async () => {
+    if (!isAuthenticated) {
+      setHeaderActionMessage("Sign in to enable Hyperliquid live execution.");
+      return;
+    }
     if (!hlPrivateKeyInput.trim()) return;
     setHlKeyStatus("saving");
     try {
@@ -1513,6 +1537,10 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     [cexTestnetMode]
   );
 const runHeaderCexAction = useCallback(async () => {
+    if (!isAuthenticated) {
+      setHeaderActionMessage("Sign in to connect CEX API keys.");
+      return;
+    }
     if (!canUseCEX) {
       setHeaderActionMessage("CEX API keys require the Full plan.");
       return;
@@ -1570,7 +1598,7 @@ const runHeaderCexAction = useCallback(async () => {
       );
       setHeaderConnection({ status: "failed", platform: headerPlatform, error: message });
     }
-  }, [canUseCEX, headerCexCredentials, headerPlatform, selectedHeaderPlatform, storeHeaderCexCredentials]);
+  }, [canUseCEX, headerCexCredentials, headerPlatform, isAuthenticated, selectedHeaderPlatform, storeHeaderCexCredentials]);
 
   const removeHeaderCexCredentials = useCallback(() => {
     if (selectedHeaderPlatform.type !== "cex") return;
@@ -1598,6 +1626,10 @@ const runHeaderCexAction = useCallback(async () => {
   }, [headerPlatform, selectedHeaderPlatform, vaultTokens]);
 
   const testHeaderCexConnection = useCallback(async () => {
+    if (!isAuthenticated) {
+      setHeaderActionMessage("Sign in to test CEX API connections.");
+      return;
+    }
     if (!canUseCEX) {
       setHeaderActionMessage("CEX API testing requires the Full plan.");
       return;
@@ -1673,6 +1705,7 @@ const runHeaderCexAction = useCallback(async () => {
     selectedHeaderCexPlatform,
     selectedHeaderPlatform.label,
     canUseCEX,
+    isAuthenticated,
     storeHeaderCexCredentials,
     vaultTokens,
   ]);
