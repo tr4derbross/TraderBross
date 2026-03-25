@@ -847,7 +847,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const isMobile = viewportWidth < 768;
   const isTablet = viewportWidth >= 768 && viewportWidth < 1280;
   const showDesktopLayout = viewportWidth >= 1280;
-  const showBottomPanel = !isMobile;
+  const showBottomPanel = true;
   const mobileChartHeight = viewportWidth < 390 ? 186 : viewportWidth < 430 ? 206 : 224;
   const mobileNewsPaneFlex = viewportWidth < 390 ? "0 0 56%" : "0 0 53%";
   const mobileTradePaneFlex = viewportWidth < 390 ? "0 0 44%" : "0 0 47%";
