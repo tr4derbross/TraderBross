@@ -61,6 +61,9 @@ export async function POST(request: NextRequest) {
   const plan = String(body?.plan || "").trim().toLowerCase() as PlanId;
   const requestedNetworkId = normalizeNetworkId(String(body?.networkId || ""));
   const network = getPaymentNetwork(requestedNetworkId || undefined);
+  if (requestedNetworkId && network.id !== requestedNetworkId) {
+    return json({ ok: false, error: "Invalid payment network selection." }, 400);
+  }
   if (!hasPaymentVerificationEnv(network.id)) {
     return json({ ok: false, error: "Selected payment network is not configured." }, 400);
   }

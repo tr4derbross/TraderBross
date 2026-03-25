@@ -29,6 +29,21 @@ function fromBase64Url(value: string) {
   return Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
 }
 
+function constantTimeEqual(a: string, b: string) {
+  const left = String(a || "");
+  const right = String(b || "");
+  const leftBytes = new TextEncoder().encode(left);
+  const rightBytes = new TextEncoder().encode(right);
+  const maxLength = Math.max(leftBytes.length, rightBytes.length);
+  let diff = leftBytes.length ^ rightBytes.length;
+  for (let i = 0; i < maxLength; i += 1) {
+    const l = i < leftBytes.length ? leftBytes[i] : 0;
+    const r = i < rightBytes.length ? rightBytes[i] : 0;
+    diff |= l ^ r;
+  }
+  return diff === 0;
+}
+
 async function signPayload(payload: string) {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -58,6 +73,10 @@ export function getSiteAccessPassword() {
   return getAccessPassword();
 }
 
+export function isSiteAccessPasswordMatch(candidate: string) {
+  return constantTimeEqual(String(candidate || ""), getAccessPassword());
+}
+
 export async function issueSiteAccessToken(ttlSeconds = DEFAULT_TTL_SECONDS) {
   const exp = Math.floor(Date.now() / 1000) + Math.max(60, ttlSeconds);
   const payload = `tb_access:${exp}`;
@@ -75,7 +94,7 @@ export async function verifySiteAccessToken(token: string) {
     // Normalize base64url input shape before compare.
     const normalizedSig = toBase64Url(fromBase64Url(String(signatureRaw || "")));
     const expectedSig = await signPayload(`tb_access:${exp}`);
-    return normalizedSig === expectedSig;
+    return constantTimeEqual(normalizedSig, expectedSig);
   } catch {
     return false;
   }

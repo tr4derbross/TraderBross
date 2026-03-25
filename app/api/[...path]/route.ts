@@ -853,7 +853,7 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
     const fallbackMessage = normalizedPath[0] === "okx" || normalizedPath[0] === "bybit"
       ? "Trade backend temporarily unavailable. Please retry in a few seconds."
       : "upstream_unavailable";
-    return json({ error: fallbackMessage, detail: String(lastError || "") }, 503);
+    return json({ error: fallbackMessage }, 503);
   }
   if (method === "GET" && upstream.status >= 500) {
     return emergencyResponse(normalizedPath, request);

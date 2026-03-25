@@ -314,21 +314,43 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
           ) : null}
 
           <div className="mt-6 space-y-3">
-            {configuredNetworks.length > 1 ? (
-              <label className="block">
-                <span className="text-xs uppercase tracking-[0.08em] text-zinc-500">Payment network</span>
-                <select
-                  value={activeNetwork.id}
-                  onChange={(event) => setSelectedNetworkId(event.target.value)}
-                  className="mt-2 w-full rounded-md border border-white/15 bg-black/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60"
-                >
-                  {configuredNetworks.map((network) => (
-                    <option key={network.id} value={network.id}>
-                      {network.label || network.id}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            {configuredNetworks.length > 0 ? (
+              <div className="rounded-lg border border-white/10 p-3">
+                <p className="text-xs uppercase tracking-[0.08em] text-zinc-500">Select network and token</p>
+                <div className="mt-2 grid gap-2">
+                  {configuredNetworks.map((network) => {
+                    const isSelected = network.id === activeNetwork.id;
+                    const networkSymbol = String(network.tokenSymbol || "").toUpperCase();
+                    return (
+                      <button
+                        key={network.id}
+                        type="button"
+                        onClick={() => setSelectedNetworkId(network.id)}
+                        className={`rounded-md border px-3 py-2 text-left transition ${
+                          isSelected
+                            ? "border-amber-400/70 bg-amber-400/10"
+                            : "border-white/10 bg-black/40 hover:border-white/25"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-white">
+                            {network.label || network.id}
+                          </span>
+                          <span className={`text-[11px] ${isSelected ? "text-amber-300" : "text-zinc-400"}`}>
+                            {isSelected ? "Selected" : "Select"}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-zinc-400">
+                          {networkSymbol || "USDC/USDT"} • Chain {network.chainId || "?"}
+                        </p>
+                        <p className="mt-1 font-mono text-[11px] text-zinc-500">
+                          {network.receiver || "Receiver not configured"}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             ) : null}
 
             <button

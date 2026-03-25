@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getSiteAccessCookieName,
-  getSiteAccessPassword,
+  isSiteAccessPasswordMatch,
   isSiteAccessEnabled,
   issueSiteAccessToken,
   shouldUnlockAllTiersInPrivateMode,
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const password = String(body?.password || "");
 
-  if (password !== getSiteAccessPassword()) {
+  if (!isSiteAccessPasswordMatch(password)) {
     const attempt = registerFailedAttempt(ip, now);
     const retryAfterSec =
       attempt.lockedUntil > now ? Math.max(1, Math.ceil((attempt.lockedUntil - now) / 1000)) : 0;
