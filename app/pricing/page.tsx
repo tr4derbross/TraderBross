@@ -8,7 +8,7 @@ const TIERS = [
     price: 0,
     priceLabel: "Forever Free",
     cta: "Start Free",
-    ctaLink: "/sign-in",
+    ctaLink: "/terminal",
     highlight: false,
     features: [
       "Real-time news feed (CoinDesk, Cointelegraph, Decrypt)",
