@@ -24,6 +24,18 @@ type WalletSessionPayload = {
 type PaymentConfigPayload = {
   ok?: boolean;
   enabled?: boolean;
+  defaultNetworkId?: string | null;
+  networks?: Array<{
+    id: string;
+    label?: string | null;
+    enabled?: boolean;
+    receiver?: string | null;
+    chainId?: number | null;
+    tokenAddress?: string | null;
+    tokenDecimals?: number;
+    tokenSymbol?: string | null;
+    txExplorerBaseUrl?: string | null;
+  }>;
   receiver?: string | null;
   chainId?: number | null;
   tokenAddress?: string | null;
@@ -70,6 +82,7 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
   const [paying, setPaying] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [txHash, setTxHash] = useState("");
+  const [selectedNetworkId, setSelectedNetworkId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -90,6 +103,7 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
         if (!active) return;
         setSession(walletSession);
         setConfig(paymentConfig);
+        setSelectedNetworkId(String(paymentConfig.defaultNetworkId || ""));
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : "Could not load checkout state.");
@@ -109,12 +123,38 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
     return plan === "full" ? Number(config.fullPriceUsd || 50) : Number(config.dexPriceUsd || 20);
   }, [config, plan, planMeta.fallbackPrice]);
 
-  const tokenDecimals = Math.max(0, Number(config?.tokenDecimals || 6) || 6);
-  const tokenSymbol = String(config?.tokenSymbol || (config?.tokenAddress ? "USDC" : "ETH"));
+  const configuredNetworks = (config?.networks || []).filter((network) => network?.id);
+  const fallbackNetwork = {
+    id: String(config?.defaultNetworkId || "default"),
+    label: "Default",
+    enabled: config?.enabled,
+    receiver: config?.receiver || null,
+    chainId: config?.chainId || null,
+    tokenAddress: config?.tokenAddress || null,
+    tokenDecimals: config?.tokenDecimals || 6,
+    tokenSymbol: config?.tokenSymbol || null,
+    txExplorerBaseUrl: config?.txExplorerBaseUrl || null,
+  };
+  const activeNetwork =
+    configuredNetworks.find((network) => network.id === selectedNetworkId) ||
+    configuredNetworks.find((network) => network.id === config?.defaultNetworkId) ||
+    configuredNetworks[0] ||
+    fallbackNetwork;
+
+  const tokenDecimals = Math.max(0, Number(activeNetwork?.tokenDecimals || 6) || 6);
+  const tokenSymbol = String(activeNetwork?.tokenSymbol || "").trim().toUpperCase();
+  const stableSymbol = tokenSymbol === "USDC" || tokenSymbol === "USDT" ? tokenSymbol : "";
   const expectedAmountUnits = parseSafeUnits(priceUsd, tokenDecimals);
   const displayAmount = ethers.formatUnits(expectedAmountUnits, tokenDecimals);
+  const paymentReady = Boolean(
+    activeNetwork?.enabled &&
+      activeNetwork?.receiver &&
+      activeNetwork?.tokenAddress &&
+      stableSymbol &&
+      activeNetwork?.chainId,
+  );
 
-  const canUseWalletPay = Boolean(config?.enabled && config?.receiver && session?.authenticated);
+  const canUseWalletPay = Boolean(paymentReady && session?.authenticated);
 
   async function handleVerify() {
     if (!txHash.trim()) {
@@ -134,6 +174,7 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
         body: JSON.stringify({
           txHash: txHash.trim(),
           plan,
+          networkId: activeNetwork.id,
         }),
       });
 
@@ -157,8 +198,16 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
       setError("Wallet session is missing. Sign in again.");
       return;
     }
-    if (!config?.receiver) {
+    if (!activeNetwork?.receiver) {
       setError("Payment receiver is not configured.");
+      return;
+    }
+    if (!activeNetwork?.tokenAddress || !stableSymbol) {
+      setError("Payment token is not configured as USDC/USDT.");
+      return;
+    }
+    if (!activeNetwork?.chainId) {
+      setError("Payment chain is not configured.");
       return;
     }
 
@@ -178,27 +227,19 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
         throw new Error("Active wallet must match signed-in wallet.");
       }
 
-      if (config.chainId) {
-        await switchWalletChain(config.chainId);
+      if (activeNetwork.chainId) {
+        await switchWalletChain(activeNetwork.chainId);
       }
 
       const browserProvider = new ethers.BrowserProvider(ethereum as ethers.Eip1193Provider);
       const signer = await browserProvider.getSigner();
 
-      let txResponse: ethers.TransactionResponse;
-      if (config.tokenAddress) {
-        const contract = new ethers.Contract(
-          config.tokenAddress,
-          ["function transfer(address to, uint256 value) returns (bool)"],
-          signer,
-        );
-        txResponse = await contract.transfer(config.receiver, expectedAmountUnits);
-      } else {
-        txResponse = await signer.sendTransaction({
-          to: config.receiver,
-          value: expectedAmountUnits,
-        });
-      }
+      const contract = new ethers.Contract(
+        activeNetwork.tokenAddress,
+        ["function transfer(address to, uint256 value) returns (bool)"],
+        signer,
+      );
+      const txResponse: ethers.TransactionResponse = await contract.transfer(activeNetwork.receiver, expectedAmountUnits);
 
       setTxHash(txResponse.hash);
       setMessage("Transaction submitted. Waiting for chain confirmation...");
@@ -206,7 +247,7 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
       await txResponse.wait(1);
       await apiFetch<{ ok: boolean }>("/api/payments/verify", {
         method: "POST",
-        body: JSON.stringify({ txHash: txResponse.hash, plan }),
+        body: JSON.stringify({ txHash: txResponse.hash, plan, networkId: activeNetwork.id }),
       });
 
       setMessage(`Payment confirmed and ${planMeta.label} tier activated.`);
@@ -227,7 +268,7 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
           <p className="text-[11px] uppercase tracking-[0.18em] text-amber-300/70">Checkout</p>
           <h1 className="mt-2 text-2xl font-bold text-white">{planMeta.label} Plan</h1>
           <p className="mt-2 text-sm text-zinc-400">
-            One-time wallet payment extends your plan for 30 days.
+            One-time {stableSymbol || "USDC/USDT"} wallet payment extends your plan for 30 days.
           </p>
 
           {loading ? <p className="mt-4 text-sm text-zinc-400">Loading checkout...</p> : null}
@@ -244,13 +285,19 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
                 Price: <span className="font-semibold text-white">${priceUsd}</span>
               </p>
               <p>
-                Pay amount: <span className="font-semibold text-white">{displayAmount} {tokenSymbol}</span>
+                Pay amount: <span className="font-semibold text-white">{displayAmount} {stableSymbol || "USDC/USDT"}</span>
               </p>
               <p>
-                Receiver: <span className="font-mono text-xs text-zinc-200">{config?.receiver || "Not configured"}</span>
+                Network: <span className="text-zinc-200">{activeNetwork?.label || "Not configured"}</span>
               </p>
               <p>
-                Chain: <span className="text-zinc-200">{config?.chainId || "Any"}</span>
+                Receiver: <span className="font-mono text-xs text-zinc-200">{activeNetwork?.receiver || "Not configured"}</span>
+              </p>
+              <p>
+                Chain: <span className="text-zinc-200">{activeNetwork?.chainId || "Not configured"}</span>
+              </p>
+              <p>
+                Token contract: <span className="font-mono text-xs text-zinc-200">{activeNetwork?.tokenAddress || "Not configured"}</span>
               </p>
               {session?.walletAddress ? (
                 <p>
@@ -260,14 +307,37 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
             </div>
           ) : null}
 
+          {!loading && !paymentReady ? (
+            <div className="mt-5 rounded-lg border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+              Payment is temporarily unavailable. Admin must configure receiver, chain ID, token contract, and token symbol (USDC/USDT).
+            </div>
+          ) : null}
+
           <div className="mt-6 space-y-3">
+            {configuredNetworks.length > 1 ? (
+              <label className="block">
+                <span className="text-xs uppercase tracking-[0.08em] text-zinc-500">Payment network</span>
+                <select
+                  value={activeNetwork.id}
+                  onChange={(event) => setSelectedNetworkId(event.target.value)}
+                  className="mt-2 w-full rounded-md border border-white/15 bg-black/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60"
+                >
+                  {configuredNetworks.map((network) => (
+                    <option key={network.id} value={network.id}>
+                      {network.label || network.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
             <button
               type="button"
               disabled={!canUseWalletPay || paying}
               onClick={handlePayWithWallet}
               className="w-full rounded-md bg-amber-400 px-3 py-2 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {paying ? "Processing payment..." : `Pay with wallet (${tokenSymbol})`}
+              {paying ? "Processing payment..." : `Pay with wallet (${stableSymbol || "USDC/USDT"})`}
             </button>
 
             <div className="rounded-lg border border-white/10 p-3">
@@ -289,9 +359,9 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
             </div>
           </div>
 
-          {config?.txExplorerBaseUrl && txHash ? (
+          {activeNetwork?.txExplorerBaseUrl && txHash ? (
             <a
-              href={`${config.txExplorerBaseUrl.replace(/\/+$/, "")}/${txHash}`}
+              href={`${activeNetwork.txExplorerBaseUrl.replace(/\/+$/, "")}/${txHash}`}
               target="_blank"
               rel="noreferrer"
               className="mt-4 inline-block text-xs text-amber-300 hover:text-amber-200"

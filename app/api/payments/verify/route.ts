@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/supabase/admin";
 import { getWalletSessionCookieName, verifyWalletSessionToken } from "@/lib/wallet-auth";
-import { type PlanId, hasPaymentVerificationEnv, verifyPlanPayment } from "@/lib/payment-verification";
+import { type PlanId, getPaymentNetwork, hasAnyPaymentVerificationEnv, hasPaymentVerificationEnv, verifyPlanPayment } from "@/lib/payment-verification";
 import { grantWalletTier } from "@/lib/wallet-subscriptions";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { isRequestSameOrigin } from "@/lib/request-security";
@@ -19,6 +19,13 @@ function json(payload: unknown, status = 200) {
 
 function planToTier(plan: PlanId) {
   return plan === "full" ? "full" : "dex";
+}
+
+function normalizeNetworkId(value: string) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "");
 }
 
 export async function POST(request: NextRequest) {
@@ -45,13 +52,19 @@ export async function POST(request: NextRequest) {
   if (!hasSupabaseAdminEnv()) {
     return json({ ok: false, error: "Supabase admin is not configured." }, 503);
   }
-  if (!hasPaymentVerificationEnv()) {
+  if (!hasAnyPaymentVerificationEnv()) {
     return json({ ok: false, error: "Payment verification env is missing." }, 503);
   }
 
   const body = await request.json().catch(() => ({}));
   const txHash = String(body?.txHash || "").trim();
   const plan = String(body?.plan || "").trim().toLowerCase() as PlanId;
+  const requestedNetworkId = normalizeNetworkId(String(body?.networkId || ""));
+  const network = getPaymentNetwork(requestedNetworkId || undefined);
+  if (!hasPaymentVerificationEnv(network.id)) {
+    return json({ ok: false, error: "Selected payment network is not configured." }, 400);
+  }
+  const paymentRef = `${network.id}:${txHash.toLowerCase()}`;
   if (!txHash || !ethers.isHexString(txHash, 32)) {
     return json({ ok: false, error: "Invalid tx hash." }, 400);
   }
@@ -63,7 +76,7 @@ export async function POST(request: NextRequest) {
   const existingPayment = await supabase
     .from("wallet_payments")
     .select("id, wallet_address, plan")
-    .eq("tx_hash", txHash.toLowerCase())
+    .eq("tx_hash", paymentRef)
     .maybeSingle<{ id: string; wallet_address: string; plan: PlanId }>();
   if (existingPayment.data) {
     if (existingPayment.data.wallet_address !== session.address) {
@@ -78,6 +91,7 @@ export async function POST(request: NextRequest) {
       txHash,
       payer: session.address,
       plan,
+      networkId: network.id,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Payment verification failed.";
@@ -87,7 +101,7 @@ export async function POST(request: NextRequest) {
   const priceUsd = plan === "full" ? Number(process.env.FULL_TIER_PRICE_USD || 50) : Number(process.env.DEX_TIER_PRICE_USD || 20);
   const { error: insertError } = await supabase.from("wallet_payments").insert({
     wallet_address: session.address,
-    tx_hash: txHash.toLowerCase(),
+    tx_hash: paymentRef,
     chain_id: payment.chainId,
     token_address: payment.tokenAddress,
     paid_amount_units: payment.paidAmountUnits,
@@ -98,6 +112,10 @@ export async function POST(request: NextRequest) {
     metadata: {
       receiver: payment.receiver,
       blockNumber: payment.blockNumber,
+      networkId: payment.networkId,
+      networkLabel: payment.networkLabel,
+      tokenSymbol: payment.tokenSymbol,
+      txHash,
     },
   });
 
@@ -106,7 +124,7 @@ export async function POST(request: NextRequest) {
       const duplicate = await supabase
         .from("wallet_payments")
         .select("wallet_address, plan")
-        .eq("tx_hash", txHash.toLowerCase())
+        .eq("tx_hash", paymentRef)
         .maybeSingle<{ wallet_address: string; plan: PlanId }>();
       if (duplicate.data?.wallet_address === session.address) {
         return json({ ok: true, alreadyProcessed: true, plan: duplicate.data.plan });
