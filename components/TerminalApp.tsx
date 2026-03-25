@@ -229,20 +229,20 @@ const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
     label: "Hyperliquid",
     type: "wallet",
     eyebrow: "DEX · Live",
-    description: "Step 1: Connect your main wallet (MetaMask, Rabby…) to view read-only balance and positions. Step 2: Enter your Hyperliquid API wallet private key below to enable in-terminal order placement.",
+    description: "Step 1: Connect a Hyperliquid-supported EVM wallet (MetaMask, Rabby, Coinbase Wallet) for account sync. Step 2: Enter your Hyperliquid API wallet private key for in-terminal execution.",
     primaryAction: "Connect Wallet",
     secondaryAction: "Wallet Menu",
-    wallets: ["MetaMask", "Rabby", "Coinbase Wallet", "Phantom", "Solflare"],
+    wallets: ["MetaMask", "Rabby", "Coinbase Wallet"],
   },
   {
     id: "aster",
     label: "Aster",
     type: "wallet",
     eyebrow: "DEX · Live",
-    description: "Aster DEX perpetuals with wallet-based trading access in the terminal flow.",
+    description: "Aster DEX perpetuals with Aster-supported EVM wallet flow in the terminal.",
     primaryAction: "Connect Wallet",
     secondaryAction: "Wallet Menu",
-    wallets: ["MetaMask", "Rabby", "Coinbase Wallet", "Phantom", "Solflare"],
+    wallets: ["MetaMask", "Rabby"],
   },
   {
     id: "okx",
@@ -1479,7 +1479,40 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     }
   };
 
-  const runHeaderCexAction = useCallback(async () => {
+    const storeHeaderCexCredentials = useCallback(
+    async (cexPlatform: HeaderCexPlatform, creds: HeaderCexCredentials) => {
+      const data = await apiFetch<{ ok: boolean; sessionToken?: string; message?: string }>("/api/vault/store", {
+        method: "POST",
+        body: JSON.stringify({
+          venueId: cexPlatform,
+          apiKey: creds.apiKey.trim(),
+          apiSecret: creds.apiSecret.trim(),
+          passphrase: creds.passphrase.trim() || undefined,
+          testnet: cexTestnetMode[cexPlatform] || undefined,
+        }),
+      });
+
+      if (!data.ok || !data.sessionToken) {
+        return { ok: false as const, message: data.message ?? "Failed to store credentials." };
+      }
+
+      try {
+        sessionStorage.setItem(`traderbross.vault-token.${cexPlatform}.v1`, data.sessionToken);
+      } catch {
+        // ignore sessionStorage errors
+      }
+
+      setVaultTokens((prev) => ({ ...prev, [cexPlatform]: data.sessionToken! }));
+      setHeaderCexCredentials((prev) => ({
+        ...prev,
+        [cexPlatform]: { apiKey: "", apiSecret: "", passphrase: "" },
+      }));
+
+      return { ok: true as const, sessionToken: data.sessionToken };
+    },
+    [cexTestnetMode]
+  );
+const runHeaderCexAction = useCallback(async () => {
     if (!canUseCEX) {
       setHeaderActionMessage("CEX API keys require the Full plan.");
       return;
@@ -1500,38 +1533,33 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       return;
     }
 
-    // Store credentials in server-side vault — browser will only keep the session token
     setHeaderActionMessage("Securing credentials…");
+    setHeaderConnection({ status: "testing", platform: headerPlatform });
+
     try {
-      const data = await apiFetch<{ ok: boolean; sessionToken?: string; message?: string }>("/api/vault/store", {
-        method: "POST",
-        body: JSON.stringify({
-          venueId: cexPlatform,
-          apiKey: creds.apiKey.trim(),
-          apiSecret: creds.apiSecret.trim(),
-          passphrase: creds.passphrase.trim() || undefined,
-          testnet: cexTestnetMode[cexPlatform] || undefined,
-        }),
-      });
-
-      if (data.ok && data.sessionToken) {
-        // Persist token in sessionStorage (safe — just a UUID, not the key itself)
-        try {
-          sessionStorage.setItem(`traderbross.vault-token.${cexPlatform}.v1`, data.sessionToken);
-        } catch { /* ignore */ }
-
-        setVaultTokens((prev) => ({ ...prev, [cexPlatform]: data.sessionToken }));
-        // Clear raw credentials from React state — they're secured server-side now
-        setHeaderCexCredentials((prev) => ({
-          ...prev,
-          [cexPlatform]: { apiKey: "", apiSecret: "", passphrase: "" },
-        }));
-        setHeaderConnection({ status: "saved_locally", platform: headerPlatform });
-        setHeaderActionMessage(`${selectedHeaderPlatform.label} credentials secured in server vault.`);
-      } else {
-        setHeaderActionMessage(data.message ?? "Failed to store credentials.");
-        setHeaderConnection({ status: "failed", platform: headerPlatform, error: data.message });
+      const store = await storeHeaderCexCredentials(cexPlatform, creds);
+      if (!store.ok || !store.sessionToken) {
+        const reason = store.message ?? "Failed to store credentials.";
+        setHeaderActionMessage(reason);
+        setHeaderConnection({ status: "failed", platform: headerPlatform, error: reason });
+        return;
       }
+
+      setHeaderActionMessage("Testing API connection…");
+      const result = await getVenueAdapter(cexPlatform).testConnection({ sessionToken: store.sessionToken });
+
+      if (result.ok) {
+        setHeaderConnection({ status: "connected", platform: headerPlatform });
+        setHeaderActionMessage(result.detail || result.message || `${selectedHeaderPlatform.label} connected.`);
+        return;
+      }
+
+      setHeaderConnection({
+        status: "failed",
+        platform: headerPlatform,
+        error: result.message || "Credential validation failed.",
+      });
+      setHeaderActionMessage(result.message || "Credential validation failed.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Vault unreachable.";
       const isProxy403 = message.includes("403");
@@ -1542,7 +1570,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       );
       setHeaderConnection({ status: "failed", platform: headerPlatform, error: message });
     }
-  }, [canUseCEX, cexTestnetMode, headerCexCredentials, headerPlatform, selectedHeaderPlatform]);
+  }, [canUseCEX, headerCexCredentials, headerPlatform, selectedHeaderPlatform, storeHeaderCexCredentials]);
 
   const removeHeaderCexCredentials = useCallback(() => {
     if (selectedHeaderPlatform.type !== "cex") return;
@@ -1594,32 +1622,17 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     setHeaderConnection({ status: "testing", platform: headerPlatform });
 
     try {
-      // If no vault token yet, auto-save to vault first so test goes through server-side signing
       let effectiveToken = token;
       if (!effectiveToken && hasRawCreds) {
         setHeaderActionMessage("Securing credentials…");
         const creds = headerCexCredentials[selectedHeaderCexPlatform];
-        const storeData = await apiFetch<{ ok: boolean; sessionToken?: string; message?: string }>("/api/vault/store", {
-          method: "POST",
-          body: JSON.stringify({
-            venueId: selectedHeaderCexPlatform,
-            apiKey: creds.apiKey.trim(),
-            apiSecret: creds.apiSecret.trim(),
-            passphrase: creds.passphrase.trim() || undefined,
-            testnet: cexTestnetMode[selectedHeaderCexPlatform] || undefined,
-          }),
-        });
-        if (storeData.ok && storeData.sessionToken) {
-          effectiveToken = storeData.sessionToken;
-          try { sessionStorage.setItem(`traderbross.vault-token.${selectedHeaderCexPlatform}.v1`, effectiveToken); } catch { /* ignore */ }
-          setVaultTokens((prev) => ({ ...prev, [selectedHeaderCexPlatform]: effectiveToken! }));
-          setHeaderCexCredentials((prev) => ({
-            ...prev,
-            [selectedHeaderCexPlatform]: { apiKey: "", apiSecret: "", passphrase: "" },
-          }));
+        const store = await storeHeaderCexCredentials(selectedHeaderCexPlatform, creds);
+        if (store.ok && store.sessionToken) {
+          effectiveToken = store.sessionToken;
         } else {
-          setHeaderActionMessage(storeData.message ?? "Failed to secure credentials.");
-          setHeaderConnection({ status: "failed", platform: headerPlatform, error: storeData.message });
+          const reason = store.message ?? "Failed to store credentials.";
+          setHeaderActionMessage(reason);
+          setHeaderConnection({ status: "failed", platform: headerPlatform, error: reason });
           return;
         }
       }
@@ -1660,7 +1673,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     selectedHeaderCexPlatform,
     selectedHeaderPlatform.label,
     canUseCEX,
-    cexTestnetMode,
+    storeHeaderCexCredentials,
     vaultTokens,
   ]);
 
@@ -2698,7 +2711,4 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     </div>
   );
 }
-
-
-
 

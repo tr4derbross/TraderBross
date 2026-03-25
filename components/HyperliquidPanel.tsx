@@ -3,6 +3,7 @@
 import { Wallet, Zap, TrendingUp, TrendingDown, Loader2, AlertTriangle, RefreshCw, BarChart2 } from "lucide-react";
 import { useHyperliquid } from "@/hooks/useHyperliquid";
 import { useTier2Revenue } from "@/hooks/useTier2Revenue";
+import { useTier } from "@/hooks/useTier";
 import { signHLAction, buildMarketOrder, buildLimitOrder } from "@/lib/hyperliquid-sign";
 import { apiFetch } from "@/lib/api-client";
 import { reconnectRealtime } from "@/lib/realtime-client";
@@ -17,6 +18,7 @@ type Tab = "markets" | "positions" | "trade";
 
 export default function HyperliquidPanel({ walletAddress, onRequestConnect }: Props) {
   const revenue = useTier2Revenue();
+  const { tier } = useTier();
   const [tab, setTab] = useState<Tab>("markets");
   const [orderSide, setOrderSide] = useState<"buy" | "sell">("buy");
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
@@ -53,7 +55,12 @@ export default function HyperliquidPanel({ walletAddress, onRequestConnect }: Pr
       const signature = await signHLAction(action, nonce);
       const data = await apiFetch<{ status?: string; ok?: boolean; response?: string; error?: string }>("/api/hyperliquid/order", {
         method: "POST",
-        body: JSON.stringify({ action, nonce, signature }),
+        body: JSON.stringify({
+          action,
+          nonce,
+          signature,
+          revenueMode: tier === "full" ? "none" : "tier2",
+        }),
       });
       if (data.status === "ok" || data.ok) {
         setOrderMsg({ type: "ok", text: "Order submitted successfully" });

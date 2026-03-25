@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { useTier } from "@/hooks/useTier";
 
 type Tier2RevenueConfig = {
   hyperliquid: {
@@ -34,6 +35,7 @@ const EMPTY_CONFIG: Tier2RevenueConfig = {
 };
 
 export function useTier2Revenue() {
+  const { tier } = useTier();
   const [config, setConfig] = useState<Tier2RevenueConfig>(EMPTY_CONFIG);
 
   useEffect(() => {
@@ -56,6 +58,10 @@ export function useTier2Revenue() {
       disposed = true;
     };
   }, []);
+
+  if (tier === "full") {
+    return EMPTY_CONFIG;
+  }
 
   return config;
 }
