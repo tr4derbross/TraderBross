@@ -2,6 +2,68 @@ import type { NextConfig } from "next";
 
 const isProduction = process.env.NODE_ENV === "production";
 const scriptSrc = isProduction ? "'self' 'unsafe-inline'" : "'self' 'unsafe-inline' 'unsafe-eval'";
+const isHostedProduction =
+  isProduction &&
+  (
+    String(process.env.VERCEL || "") === "1" ||
+    String(process.env.RAILWAY_ENVIRONMENT || "").toLowerCase() === "production" ||
+    String(process.env.RAILWAY_ENVIRONMENT_NAME || "").toLowerCase() === "production"
+  );
+const DEFAULT_DEV_CONNECT_SRC = [
+  "'self'",
+  "http://localhost:*",
+  "ws://localhost:*",
+  "http://127.0.0.1:*",
+  "ws://127.0.0.1:*",
+];
+
+function toOrigin(value: string) {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return "";
+  }
+}
+
+function parseCspConnectSrc() {
+  const explicit = String(process.env.CSP_CONNECT_SRC || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (explicit.length > 0) return explicit;
+
+  const out = new Set<string>(isProduction ? ["'self'"] : DEFAULT_DEV_CONNECT_SRC);
+  const supabaseOrigin = toOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL || "");
+  if (supabaseOrigin) {
+    out.add(supabaseOrigin);
+    if (supabaseOrigin.startsWith("https://")) {
+      out.add(supabaseOrigin.replace(/^https:\/\//, "wss://"));
+    }
+  }
+  const apiOrigin = toOrigin(process.env.NEXT_PUBLIC_API_BASE_URL || "");
+  if (apiOrigin) out.add(apiOrigin);
+  return Array.from(out);
+}
+
+function validateProductionConnectSrc(entries: string[]) {
+  if (!isHostedProduction) return;
+  if (!Array.isArray(entries) || entries.length === 0) {
+    throw new Error("CSP connect-src must not be empty in production.");
+  }
+  for (const entry of entries) {
+    const value = String(entry || "").trim().toLowerCase();
+    if (!value) throw new Error("CSP connect-src contains an empty value in production.");
+    if (value === "https:" || value === "wss:" || value === "*") {
+      throw new Error("CSP connect-src cannot use wildcard schemes in production.");
+    }
+    if (value.includes("localhost") || value.includes("127.0.0.1")) {
+      throw new Error("CSP connect-src cannot include localhost in production.");
+    }
+  }
+}
+
+const connectSrc = parseCspConnectSrc();
+validateProductionConnectSrc(connectSrc);
 
 const securityHeaders = [
   { key: "X-Frame-Options",                    value: "DENY" },
@@ -21,7 +83,7 @@ const securityHeaders = [
       "font-src 'self'",
       "frame-ancestors 'none'",
       "frame-src https://www.tradingview.com https://s.tradingview.com",
-      "connect-src 'self' https: wss:",
+      `connect-src ${connectSrc.join(" ")}`,
     ].join("; "),
   },
 ];
