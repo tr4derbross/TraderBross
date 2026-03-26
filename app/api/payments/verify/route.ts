@@ -29,6 +29,22 @@ function normalizeNetworkId(value: string) {
     .replace(/[^a-z0-9_-]/g, "");
 }
 
+function sanitizePaymentVerifyError(error: unknown) {
+  const raw = error instanceof Error ? error.message : "Payment verification failed.";
+  const value = String(raw || "").trim();
+  if (!value) return "Payment verification failed.";
+  const lower = value.toLowerCase();
+  if (
+    lower.includes("<!doctype html") ||
+    lower.includes("<html") ||
+    lower.includes("cloudflare") ||
+    lower.includes("server response 403")
+  ) {
+    return "Payment RPC is temporarily unavailable. Please try again in a moment.";
+  }
+  return value.length > 220 ? `${value.slice(0, 220)}...` : value;
+}
+
 export async function POST(request: NextRequest) {
   if (!isRequestSameOrigin(request)) {
     return json({ ok: false, error: "Origin mismatch." }, 403);
@@ -96,7 +112,7 @@ export async function POST(request: NextRequest) {
       networkId: network.id,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Payment verification failed.";
+    const message = sanitizePaymentVerifyError(error);
     return json({ ok: false, error: message }, 400);
   }
 

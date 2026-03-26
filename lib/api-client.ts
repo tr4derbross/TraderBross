@@ -22,6 +22,21 @@ function readCookie(name: string) {
   return token ? decodeURIComponent(token.slice(name.length + 1)) : "";
 }
 
+function sanitizeHttpErrorDetail(detail: string) {
+  const value = String(detail || "").trim();
+  if (!value) return "";
+  const lower = value.toLowerCase();
+  if (
+    lower.includes("<!doctype html") ||
+    lower.includes("<html") ||
+    lower.includes("cloudflare") ||
+    lower.includes("challenge")
+  ) {
+    return "Upstream service rejected the request.";
+  }
+  return value.length > 220 ? `${value.slice(0, 220)}...` : value;
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const method = normalizeMethod(init);
   const isGet = method === "GET";
@@ -66,7 +81,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       } catch {
         detail = "";
       }
-      throw new Error(detail ? `Request failed: ${response.status} (${detail})` : `Request failed: ${response.status}`);
+      const safeDetail = sanitizeHttpErrorDetail(detail);
+      throw new Error(safeDetail ? `Request failed: ${response.status} (${safeDetail})` : `Request failed: ${response.status}`);
     }
 
     const payload = (await response.json()) as T;
