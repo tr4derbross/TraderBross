@@ -1123,32 +1123,48 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
   });
 }
 
+async function safeProxy(request: NextRequest, method: string, path: string[]) {
+  try {
+    return await proxy(request, method, path);
+  } catch {
+    const normalizedMethod = String(method || "").toUpperCase();
+    const normalizedPath = Array.isArray(path) ? path.filter(Boolean) : [];
+    if (normalizedMethod === "GET") {
+      return emergencyResponseSafe(normalizedPath, request);
+    }
+    const fallbackMessage = normalizedPath[0] === "okx" || normalizedPath[0] === "bybit"
+      ? "Trade backend temporarily unavailable. Please retry in a few seconds."
+      : "upstream_unavailable";
+    return json({ error: fallbackMessage }, 503);
+  }
+}
+
 export async function GET(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
-  return proxy(request, "GET", path || []);
+  return safeProxy(request, "GET", path || []);
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
-  return proxy(request, "POST", path || []);
+  return safeProxy(request, "POST", path || []);
 }
 
 export async function DELETE(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
-  return proxy(request, "DELETE", path || []);
+  return safeProxy(request, "DELETE", path || []);
 }
 
 export async function OPTIONS(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
-  return proxy(request, "OPTIONS", path || []);
+  return safeProxy(request, "OPTIONS", path || []);
 }
 
 export async function PUT(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
-  return proxy(request, "PUT", path || []);
+  return safeProxy(request, "PUT", path || []);
 }
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
-  return proxy(request, "PATCH", path || []);
+  return safeProxy(request, "PATCH", path || []);
 }
