@@ -42,6 +42,63 @@ export function rateLimit(
   return { allowed: entry.count <= limit, remaining };
 }
 
+function parseUpstashConfig() {
+  const rawRateLimitUrl = String(process.env.RATE_LIMIT_REDIS_URL || process.env.REDIS_URL || "").trim();
+  const restUrl =
+    String(process.env.UPSTASH_REDIS_REST_URL || "").trim() ||
+    (rawRateLimitUrl.startsWith("https://") ? rawRateLimitUrl : "");
+  const restToken = String(process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
+  const prefix = String(process.env.RATE_LIMIT_PREFIX || "traderbross:ratelimit").trim() || "traderbross:ratelimit";
+  return { restUrl, restToken, prefix };
+}
+
+async function consumeDistributedCounter(key: string, windowMs: number): Promise<number | null> {
+  const { restUrl, restToken, prefix } = parseUpstashConfig();
+  if (!restUrl || !restToken) return null;
+
+  const nowBucket = Math.floor(Date.now() / windowMs);
+  const redisKey = `${prefix}:${key}:${nowBucket}`;
+  const pipelineEndpoint = `${restUrl.replace(/\/+$/, "")}/pipeline`;
+
+  try {
+    const response = await fetch(pipelineEndpoint, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${restToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify([
+        ["INCR", redisKey],
+        ["PEXPIRE", redisKey, String(windowMs + 1000)],
+      ]),
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+
+    const payload = (await response.json().catch(() => null)) as
+      | Array<{ result?: number | string | null }>
+      | null;
+    const value = Array.isArray(payload) ? payload[0]?.result : null;
+    const count = Number(value || 0);
+    return Number.isFinite(count) && count > 0 ? count : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function rateLimitAsync(
+  key: string,
+  limit: number,
+  windowMs = 60_000,
+): Promise<{ allowed: boolean; remaining: number }> {
+  const distributedCount = await consumeDistributedCounter(key, windowMs);
+  if (!distributedCount) {
+    return rateLimit(key, limit, windowMs);
+  }
+  const remaining = Math.max(0, limit - distributedCount);
+  return { allowed: distributedCount <= limit, remaining };
+}
+
 /** Extract the best-effort client IP from a Next.js request */
 export function getClientIp(req: Request): string {
   const headers = req.headers as Headers;

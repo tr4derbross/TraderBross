@@ -5,7 +5,7 @@ import { getWalletSessionCookieName, verifyWalletSessionToken } from "@/lib/wall
 import { isWalletSessionRevoked } from "@/lib/wallet-session-revocation";
 import { type PlanId, getPaymentNetwork, hasAnyPaymentVerificationEnv, hasPaymentVerificationEnv, verifyPlanPayment } from "@/lib/payment-verification";
 import { grantWalletTier } from "@/lib/wallet-subscriptions";
-import { getClientIp, rateLimit } from "@/lib/rate-limit";
+import { getClientIp, rateLimitAsync } from "@/lib/rate-limit";
 import { hasValidCsrfToken, isRequestSameOrigin } from "@/lib/request-security";
 
 function json(payload: unknown, status = 200) {
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   }
 
   const ip = getClientIp(request);
-  const requestLimit = rateLimit(`wallet-payment-verify:${ip}`, 15, 60_000);
+  const requestLimit = await rateLimitAsync(`wallet-payment-verify:${ip}`, 15, 60_000);
   if (!requestLimit.allowed) {
     return json({ ok: false, error: "Too many payment verification requests. Try again later." }, 429);
   }

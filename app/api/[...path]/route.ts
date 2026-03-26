@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getWalletSessionCookieName, type WalletTier, verifyWalletSessionToken } from "@/lib/wallet-auth";
 import { isWalletSessionRevoked } from "@/lib/wallet-session-revocation";
 import { getWalletTier } from "@/lib/wallet-subscriptions";
-import { getClientIp, rateLimit } from "@/lib/rate-limit";
+import { getClientIp, rateLimitAsync } from "@/lib/rate-limit";
 import { hasValidCsrfToken } from "@/lib/request-security";
 
 const DEFAULT_LOCAL_BACKEND = "http://127.0.0.1:4001";
@@ -48,11 +48,37 @@ function trimSlash(value: string) {
   return value.replace(/\/+$/, "");
 }
 
+function isLocalBackendUrl(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return false;
+  try {
+    const parsed = new URL(raw);
+    return parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+  } catch {
+    return raw.includes("localhost") || raw.includes("127.0.0.1");
+  }
+}
+
 function resolveBackendBaseUrl() {
   const explicit =
     process.env.BACKEND_API_BASE_URL ||
     process.env.NEXT_PUBLIC_API_BASE_URL ||
     "";
+  const isHostedProduction =
+    String(process.env.NODE_ENV || "").toLowerCase() === "production" &&
+    (
+      String(process.env.VERCEL || "") === "1" ||
+      String(process.env.RAILWAY_ENVIRONMENT || "").toLowerCase() === "production" ||
+      String(process.env.RAILWAY_ENVIRONMENT_NAME || "").toLowerCase() === "production"
+    );
+
+  if (
+    isHostedProduction &&
+    explicit &&
+    isLocalBackendUrl(explicit)
+  ) {
+    throw new Error("BACKEND_API_BASE_URL/NEXT_PUBLIC_API_BASE_URL cannot target localhost in production.");
+  }
 
   if (explicit) return trimSlash(explicit);
   if (process.env.NODE_ENV === "production") return DEFAULT_PROD_BACKEND;
@@ -538,13 +564,13 @@ function isSensitiveProxyPath(pathname: string) {
   return SENSITIVE_PROXY_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
-function enforceProxyRateLimit(request: NextRequest, method: string, upstreamPath: string) {
+async function enforceProxyRateLimit(request: NextRequest, method: string, upstreamPath: string) {
   const ip = getClientIp(request);
   const isMutation = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
   const isSensitive = isSensitiveProxyPath(upstreamPath);
   const ipLimit = isMutation ? (isSensitive ? 30 : 60) : 180;
   const ipWindowMs = 60_000;
-  const ipResult = rateLimit(`proxy:${method}:ip:${ip}`, ipLimit, ipWindowMs);
+  const ipResult = await rateLimitAsync(`proxy:${method}:ip:${ip}`, ipLimit, ipWindowMs);
   if (!ipResult.allowed) {
     return json({ error: "Too many requests. Please try again shortly." }, 429);
   }
@@ -553,7 +579,7 @@ function enforceProxyRateLimit(request: NextRequest, method: string, upstreamPat
   const walletSession = verifyWalletSessionToken(walletSessionToken);
   if (walletSession?.address) {
     const userLimit = isMutation ? (isSensitive ? 50 : 80) : 240;
-    const userResult = rateLimit(`proxy:${method}:wallet:${walletSession.address}`, userLimit, ipWindowMs);
+    const userResult = await rateLimitAsync(`proxy:${method}:wallet:${walletSession.address}`, userLimit, ipWindowMs);
     if (!userResult.allowed) {
       return json({ error: "Too many requests. Please try again shortly." }, 429);
     }
@@ -864,7 +890,7 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
   if (isSensitiveProxyPath(upstreamPath) && !String(process.env.PROXY_SHARED_SECRET || "").trim()) {
     return json({ error: "Proxy is not securely configured." }, 503);
   }
-  const rateLimitBlock = enforceProxyRateLimit(request, normalizedMethod, upstreamPath);
+  const rateLimitBlock = await enforceProxyRateLimit(request, normalizedMethod, upstreamPath);
   if (rateLimitBlock) return rateLimitBlock;
   const tierBlock = await enforceApiTier(request, upstreamPath, normalizedMethod);
   if (tierBlock) return tierBlock;

@@ -11,8 +11,37 @@ function isLocalHost(hostname: string) {
   return hostname === "localhost" || hostname === "127.0.0.1";
 }
 
+function looksLikeLocalApiUrl(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return false;
+  try {
+    const parsed = new URL(raw);
+    return isLocalHost(parsed.hostname);
+  } catch {
+    return raw.includes("localhost") || raw.includes("127.0.0.1");
+  }
+}
+
+function assertProductionApiBaseSafety(configuredValue: string) {
+  const isProduction = String(process.env.NODE_ENV || "").toLowerCase() === "production";
+  const isHostedProduction =
+    isProduction &&
+    (
+      String(process.env.VERCEL || "") === "1" ||
+      String(process.env.RAILWAY_ENVIRONMENT || "").toLowerCase() === "production" ||
+      String(process.env.RAILWAY_ENVIRONMENT_NAME || "").toLowerCase() === "production"
+    );
+  if (!isHostedProduction) return;
+  if (looksLikeLocalApiUrl(configuredValue)) {
+    throw new Error(
+      "NEXT_PUBLIC_API_BASE_URL cannot point to localhost/127.0.0.1 in production.",
+    );
+  }
+}
+
 function resolveApiBaseUrl() {
   const configured = trimSlash(process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_LOCAL_API);
+  assertProductionApiBaseSafety(configured);
   if (typeof window === "undefined") return configured;
   const host = window.location.hostname;
   const configLooksLocal = configured.includes("127.0.0.1") || configured.includes("localhost");

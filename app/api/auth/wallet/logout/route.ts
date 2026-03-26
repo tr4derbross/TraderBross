@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWalletSessionCookieName } from "@/lib/wallet-auth";
 import { revokeWalletSessionToken } from "@/lib/wallet-session-revocation";
-import { getClientIp, rateLimit } from "@/lib/rate-limit";
+import { getClientIp, rateLimitAsync } from "@/lib/rate-limit";
 import { hasValidCsrfToken, isRequestSameOrigin } from "@/lib/request-security";
 
 function json(payload: unknown, status = 200) {
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   }
 
   const ip = getClientIp(request);
-  const limit = rateLimit(`wallet-logout:${ip}`, 30, 60_000);
+  const limit = await rateLimitAsync(`wallet-logout:${ip}`, 30, 60_000);
   if (!limit.allowed) {
     return json({ ok: false, error: "Too many logout requests. Please wait." }, 429);
   }

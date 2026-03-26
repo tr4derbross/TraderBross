@@ -10,7 +10,7 @@ import {
 } from "@/lib/wallet-auth";
 import { consumeWalletNonceOnce } from "@/lib/wallet-nonce-store";
 import { getWalletTier } from "@/lib/wallet-subscriptions";
-import { getClientIp, rateLimit } from "@/lib/rate-limit";
+import { getClientIp, rateLimitAsync } from "@/lib/rate-limit";
 import { hasValidCsrfToken, isRequestSameOrigin } from "@/lib/request-security";
 
 function json(payload: unknown, status = 200) {
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   }
 
   const ip = getClientIp(request);
-  const limit = rateLimit(`wallet-verify:${ip}`, 20, 60_000);
+  const limit = await rateLimitAsync(`wallet-verify:${ip}`, 20, 60_000);
   if (!limit.allowed) {
     return json({ ok: false, error: "Too many verification attempts. Please wait." }, 429);
   }
