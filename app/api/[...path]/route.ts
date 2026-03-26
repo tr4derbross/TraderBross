@@ -41,6 +41,51 @@ const SENSITIVE_PROXY_PATH_PREFIXES = [
   "/api/bybit/order",
   "/api/hyperliquid/order",
 ];
+const ALLOWED_PROXY_PATHS = new Set([
+  "/health",
+  "/api/analysis",
+  "/api/aster",
+  "/api/binance",
+  "/api/binance/order",
+  "/api/bootstrap",
+  "/api/bybit",
+  "/api/bybit/order",
+  "/api/calendar",
+  "/api/chat",
+  "/api/coincap",
+  "/api/coins/meta",
+  "/api/feargreed",
+  "/api/forex",
+  "/api/funding",
+  "/api/hyperliquid",
+  "/api/hyperliquid/order",
+  "/api/leverage-brackets",
+  "/api/liquidations",
+  "/api/lsr",
+  "/api/market",
+  "/api/mempool",
+  "/api/news",
+  "/api/news/snapshot",
+  "/api/okx",
+  "/api/okx/order",
+  "/api/okx/orderbook",
+  "/api/prices",
+  "/api/providers/health",
+  "/api/revenue/tier2",
+  "/api/screener",
+  "/api/sentiment",
+  "/api/social",
+  "/api/symbols",
+  "/api/trending",
+  "/api/vault/clear",
+  "/api/vault/status",
+  "/api/vault/store",
+  "/api/venues/symbols",
+  "/api/venues/validate",
+  "/api/whale",
+  "/api/whales",
+  "/api/whales/events",
+]);
 const ALLOWED_PROXY_METHODS = new Set(["GET", "POST", "DELETE", "PUT", "PATCH", "OPTIONS"]);
 const SAFE_PATH_SEGMENT_REGEX = /^[a-zA-Z0-9._-]+$/;
 
@@ -564,6 +609,10 @@ function isSensitiveProxyPath(pathname: string) {
   return SENSITIVE_PROXY_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
+function isAllowedProxyPath(pathname: string) {
+  return ALLOWED_PROXY_PATHS.has(pathname);
+}
+
 async function enforceProxyRateLimit(request: NextRequest, method: string, upstreamPath: string) {
   const ip = getClientIp(request);
   const isMutation = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
@@ -882,6 +931,9 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
     normalizedPath.length === 1 && normalizedPath[0] === "health"
       ? "/health"
       : `/api/${normalizedPath.join("/")}`;
+  if (!isAllowedProxyPath(upstreamPath)) {
+    return json({ error: "Not found" }, 404);
+  }
   if (normalizedMethod !== "GET" && normalizedMethod !== "HEAD" && normalizedMethod !== "OPTIONS") {
     if (!hasValidCsrfToken(request)) {
       return json({ error: "Missing or invalid CSRF token." }, 403);
