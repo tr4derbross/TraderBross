@@ -26,15 +26,15 @@ function toOrigin(value: string) {
 }
 
 function parseCspConnectSrc() {
+  const out = new Set<string>(isProduction ? ["'self'"] : DEFAULT_DEV_CONNECT_SRC);
   const explicit = String(process.env.CSP_CONNECT_SRC || "")
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
   if (explicit.length > 0) {
-    return Array.from(new Set(["'self'", ...explicit]));
+    for (const value of explicit) out.add(value);
   }
 
-  const out = new Set<string>(isProduction ? ["'self'"] : DEFAULT_DEV_CONNECT_SRC);
   const supabaseOrigin = toOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL || "");
   if (supabaseOrigin) {
     out.add(supabaseOrigin);
@@ -44,6 +44,11 @@ function parseCspConnectSrc() {
   }
   const apiOrigin = toOrigin(process.env.NEXT_PUBLIC_API_BASE_URL || "");
   if (apiOrigin) out.add(apiOrigin);
+  const wsOrigin = toOrigin(process.env.NEXT_PUBLIC_WS_URL || "");
+  if (wsOrigin) out.add(wsOrigin);
+  if (apiOrigin.startsWith("https://")) {
+    out.add(apiOrigin.replace(/^https:\/\//, "wss://"));
+  }
   return Array.from(out);
 }
 
