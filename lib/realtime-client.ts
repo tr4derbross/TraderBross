@@ -22,6 +22,8 @@ const HEARTBEAT_INTERVAL = 20_000;
 const BASE_DELAY = 1_000;
 const MAX_RECONNECT_DELAY = 30_000;
 const CONNECT_TIMEOUT_MS = 8_000;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const FALLBACK_BOOTSTRAP_INTERVAL_MS = 30_000;
 
 const fallbackSnapshot: RealtimeStore = {
   quotes: [],
@@ -57,6 +59,7 @@ let reconnectTimer: number | null = null;
 let heartbeatTimer: number | null = null;
 let staleTimer: number | null = null;
 let connectTimer: number | null = null;
+let fallbackBootstrapTimer: number | null = null;
 let reconnectAttempts = 0;
 
 function emit() {
@@ -185,6 +188,12 @@ function reconnectDelay() {
 }
 
 function scheduleReconnect() {
+  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    setState({
+      connectionStatus: state.news.length > 0 || state.quotes.length > 0 ? "stale" : "disconnected",
+    });
+    return;
+  }
   if (reconnectTimer) window.clearTimeout(reconnectTimer);
   const delay = reconnectDelay();
   setState({
@@ -278,12 +287,21 @@ function startStaleCheck() {
   }, STALE_CHECK_MS);
 }
 
+function startFallbackBootstrapRefresh() {
+  if (fallbackBootstrapTimer || typeof window === "undefined") return;
+  fallbackBootstrapTimer = window.setInterval(() => {
+    // Keep baseline data fresh even if websocket channel is unavailable.
+    void loadBootstrap();
+  }, FALLBACK_BOOTSTRAP_INTERVAL_MS);
+}
+
 function ensureStarted() {
   if (started || typeof window === "undefined") return;
   started = true;
   void loadBootstrap();
   connect();
   startStaleCheck();
+  startFallbackBootstrapRefresh();
 }
 
 export function refreshRealtimeSnapshot() {
