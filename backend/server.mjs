@@ -2016,9 +2016,10 @@ const server = http.createServer(async (request, reply) => {
           }
           const settled = tasks.length > 0 ? await Promise.all(tasks) : [];
           const results = settled.filter((row) => row.ok).map((row) => ({ [row.tag]: row.data }));
-          const errors = settled.filter((row) => !row.ok).map((row) => `${String(row.tag).toUpperCase()} failed: ${row.error}`);
-          if (errors.length > 0) {
-            json(reply, 400, { ok: false, error: errors.join(" | "), data: results });
+          const failedTags = settled.filter((row) => !row.ok).map((row) => String(row.tag).toUpperCase());
+          if (failedTags.length > 0) {
+            logger.warn("binance.order.tpsl.failed", { symbol, failedTags });
+            json(reply, 400, { ok: false, error: `Failed to place ${failedTags.join("/")} protective orders.`, data: results });
             return;
           }
           json(reply, 200, { ok: true, data: results });
