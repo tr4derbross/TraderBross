@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
@@ -98,7 +98,7 @@ function extractApiErrorMessage(payload: unknown, fallback = "Unknown error") {
 }
 
 
-/* â”€â”€â”€ Order Book Mini â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Order Book Mini ────────────────────────────────────────────────────────── */
 type OBEntry = [string, string, string, string]; // [price, qty, ?, ?]
 
 function OrderBookMini({ ticker }: { ticker: string }) {
@@ -127,7 +127,7 @@ function OrderBookMini({ ticker }: { ticker: string }) {
 
   const topBid = bids[0] ? parseFloat(bids[0][0]) : null;
   const topAsk = asks[0] ? parseFloat(asks[0][0]) : null;
-  const spread = topBid && topAsk ? (topAsk - topBid).toFixed(2) : "â€”";
+  const spread = topBid && topAsk ? (topAsk - topBid).toFixed(2) : "—";
   const fmtP = (p: string) => {
     const n = parseFloat(p);
     return n >= 1000 ? n.toFixed(1) : n >= 1 ? n.toFixed(3) : n.toFixed(5);
@@ -139,7 +139,7 @@ function OrderBookMini({ ticker }: { ticker: string }) {
       className="hidden lg:flex shrink-0 border-t"
       style={{ borderColor: "rgba(212,161,31,0.1)", background: "rgba(6,5,4,0.95)", height: 86 }}
     >
-      {/* Asks (top â†’ lowest ask first) */}
+      {/* Asks (top → lowest ask first) */}
       <div className="flex-1 flex flex-col justify-end px-3 py-1.5 gap-0.5">
         <div className="text-[8px] font-bold uppercase tracking-[0.14em] text-zinc-700 mb-0.5">Ask</div>
         {[...asks].reverse().map(([price, size], i) => (
@@ -228,7 +228,7 @@ const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
     id: "hyperliquid",
     label: "Hyperliquid",
     type: "wallet",
-    eyebrow: "DEX Â· Live",
+    eyebrow: "DEX · Live",
     description: "Step 1: Connect a Hyperliquid-supported EVM wallet (MetaMask, Rabby, Coinbase Wallet) for account sync. Step 2: Enter your Hyperliquid API wallet private key for in-terminal execution.",
     primaryAction: "Connect Wallet",
     secondaryAction: "Wallet Menu",
@@ -238,7 +238,7 @@ const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
     id: "aster",
     label: "Aster",
     type: "wallet",
-    eyebrow: "DEX Â· Live",
+    eyebrow: "DEX · Live",
     description: "Aster DEX perpetuals with Aster-supported EVM wallet flow in the terminal.",
     primaryAction: "Connect Wallet",
     secondaryAction: "Wallet Menu",
@@ -248,24 +248,24 @@ const HEADER_PLATFORMS: HeaderPlatformMeta[] = [
     id: "okx",
     label: "OKX",
     type: "cex",
-    eyebrow: "CEX API Â· Live",
-    description: "OKX Perpetuals â€” server-side signed API routing with vault session tokens for balance, positions, and order actions.",
+    eyebrow: "CEX API · Live",
+    description: "OKX Perpetuals — server-side signed API routing with vault session tokens for balance, positions, and order actions.",
     primaryAction: "Save API Keys",
   },
   {
     id: "bybit",
     label: "Bybit",
     type: "cex",
-    eyebrow: "CEX API Â· Live",
-    description: "Bybit Linear â€” server-side signed API routing with vault session tokens for balance, positions, and order actions.",
+    eyebrow: "CEX API · Live",
+    description: "Bybit Linear — server-side signed API routing with vault session tokens for balance, positions, and order actions.",
     primaryAction: "Save API Keys",
   },
   {
     id: "binance",
     label: "Binance",
     type: "cex",
-    eyebrow: "CEX API Â· Live",
-    description: "Binance Futures â€” real order placement via HMAC-SHA256 signed requests. API keys are encrypted server-side (AES-256). Never grant withdrawal permissions on keys used here.",
+    eyebrow: "CEX API · Live",
+    description: "Binance Futures — real order placement via HMAC-SHA256 signed requests. API keys are encrypted server-side (AES-256). Never grant withdrawal permissions on keys used here.",
     primaryAction: "Save API Keys",
   },
 ];
@@ -296,8 +296,8 @@ const SECURE_CEX_STORAGE_KEY = "traderbross.cex.credentials.secure.v1";
 
 function maskCredentialPreview(value: string) {
   if (!value) return "Not saved";
-  if (value.length <= 8) return "â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢";
-  return `${value.slice(0, 4)}â€¢â€¢â€¢â€¢${value.slice(-4)}`;
+  if (value.length <= 8) return "••••••••";
+  return `${value.slice(0, 4)}••••${value.slice(-4)}`;
 }
 
 function hasSavedHeaderCredentials(
@@ -397,7 +397,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
   const [headerCexCredentials, setHeaderCexCredentials] = useState<HeaderCexCredentialMap>(
     () => createEmptyHeaderCexCredentials()
   );
-  /** Server-side vault session tokens â€” stored in sessionStorage, NOT localStorage */
+  /** Server-side vault session tokens — stored in sessionStorage, NOT localStorage */
   const [vaultTokens, setVaultTokens] = useState<Partial<Record<HeaderCexPlatform, string>>>({});
   const [cexTestnetMode, setCexTestnetMode] = useState<HeaderCexTestnetMap>(DEFAULT_CEX_TESTNET_MODE);
   const [newsTradeIntent, setNewsTradeIntent] = useState<NewsTradeIntent | null>(null);
@@ -470,7 +470,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         }
       }
 
-      // Load vault tokens from sessionStorage (tokens are safe to persist â€” they're just UUIDs)
+      // Load vault tokens from sessionStorage (tokens are safe to persist — they're just UUIDs)
       const cexPlatforms: HeaderCexPlatform[] = ["okx", "bybit", "binance"];
       const loadedTokens: Partial<Record<HeaderCexPlatform, string>> = {};
       for (const platform of cexPlatforms) {
@@ -557,12 +557,21 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       headerConnection.platform === headerPlatform ? headerConnection.status : "disconnected";
     const nextVenueType: TradingVenueType = venueMeta.type;
 
-    setActiveVenueState((prev) => ({
-      ...prev,
-      venueId: headerPlatform,
-      venueType: nextVenueType,
-      connectionStatus: nextConnectionStatus,
-    }));
+    setActiveVenueState((prev) => {
+      if (
+        prev.venueId === headerPlatform &&
+        prev.venueType === nextVenueType &&
+        prev.connectionStatus === nextConnectionStatus
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        venueId: headerPlatform,
+        venueType: nextVenueType,
+        connectionStatus: nextConnectionStatus,
+      };
+    });
   }, [headerConnection, headerPlatform]);
 
   useEffect(() => {
@@ -646,7 +655,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     updatePositionTpSl,
   } = useTradingState(wsPrices);
 
-  // â”€â”€ Real venue balance + positions (overwrites paper state when connected) â”€â”€
+  // ── Real venue balance + positions (overwrites paper state when connected) ──
   const [venueBalance, setVenueBalance] = useState<VenueBalance | null>(null);
   const [venuePositions, setVenuePositions] = useState<VenuePosition[] | null>(null);
   const [venueOpenOrders, setVenueOpenOrders] = useState<Order[] | null>(null);
@@ -1079,7 +1088,7 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
       if (!activeCexPlatform) return undefined;
       const token = vaultTokens[activeCexPlatform];
       if (token) {
-        // Preferred: vault token â€” raw keys stay on the server
+        // Preferred: vault token — raw keys stay on the server
         return { sessionToken: token };
       }
       return undefined;
@@ -1374,12 +1383,15 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
     headerWalletSessionRef.current = null;
     setHeaderActionMessage("");
 
-    setHeaderConnection((prev) => ({
-      status: "disconnected",
-      platform: prev.platform,
-      walletLabel: prev.walletLabel,
-      address: undefined,
-    }));
+    setHeaderConnection((prev) => {
+      if (prev.status === "disconnected" && !prev.address) return prev;
+      return {
+        status: "disconnected",
+        platform: prev.platform,
+        walletLabel: prev.walletLabel,
+        address: undefined,
+      };
+    });
 
     if (activeSession) {
       try {
@@ -1440,22 +1452,28 @@ export default function TerminalApp({ initialTicker }: { initialTicker?: string 
         headerWalletListenerCleanupRef.current = subscribeWalletSession(session, {
           onDisconnect: () => {
             headerWalletSessionRef.current = null;
-            setHeaderConnection((prev) => ({
-              status: "disconnected",
-              platform: prev.platform,
-              walletLabel: prev.walletLabel,
-              address: undefined,
-            }));
+            setHeaderConnection((prev) => {
+              if (prev.status === "disconnected" && !prev.address) return prev;
+              return {
+                status: "disconnected",
+                platform: prev.platform,
+                walletLabel: prev.walletLabel,
+                address: undefined,
+              };
+            });
             if (headerPlatform === "hyperliquid") {
               setHlWallet("");
             }
           },
           onAddressChange: (nextAddress) => {
-            setHeaderConnection((prev) => ({
-              ...prev,
-              status: "connected",
-              address: nextAddress,
-            }));
+            setHeaderConnection((prev) => {
+              if (prev.status === "connected" && prev.address === nextAddress) return prev;
+              return {
+                ...prev,
+                status: "connected",
+                address: nextAddress,
+              };
+            });
             if (headerPlatform === "hyperliquid") {
               setHlWallet(nextAddress);
             }
@@ -1573,7 +1591,7 @@ const runHeaderCexAction = useCallback(async () => {
       return;
     }
 
-    setHeaderActionMessage("Securing credentialsâ€¦");
+    setHeaderActionMessage("Securing credentials…");
     setHeaderConnection({ status: "testing", platform: headerPlatform });
 
     try {
@@ -1585,7 +1603,7 @@ const runHeaderCexAction = useCallback(async () => {
         return;
       }
 
-      setHeaderActionMessage("Testing API connectionâ€¦");
+      setHeaderActionMessage("Testing API connection…");
       const result = await getVenueAdapter(cexPlatform).testConnection({ sessionToken: store.sessionToken });
 
       if (result.ok) {
@@ -1606,7 +1624,7 @@ const runHeaderCexAction = useCallback(async () => {
       setHeaderActionMessage(
         isProxy403
           ? "Vault rejected request (403). Check PROXY_SHARED_SECRET and proxy marker settings."
-          : "Network error â€” could not reach the credential vault."
+          : "Network error — could not reach the credential vault."
       );
       setHeaderConnection({ status: "failed", platform: headerPlatform, error: message });
     }
@@ -1668,7 +1686,7 @@ const runHeaderCexAction = useCallback(async () => {
     try {
       let effectiveToken = token;
       if (!effectiveToken && hasRawCreds) {
-        setHeaderActionMessage("Securing credentialsâ€¦");
+        setHeaderActionMessage("Securing credentials…");
         const creds = headerCexCredentials[selectedHeaderCexPlatform];
         const store = await storeHeaderCexCredentials(selectedHeaderCexPlatform, creds);
         if (store.ok && store.sessionToken) {
@@ -1736,7 +1754,7 @@ const runHeaderCexAction = useCallback(async () => {
     </ErrorBoundary>
   );
 
-  /* Mobile-only trade panel â€” no tab bar overhead, just the form */
+  /* Mobile-only trade panel — no tab bar overhead, just the form */
   const renderMobileTradePanel = () => (
     <div className="panel-shell soft-divider flex h-full min-h-0 flex-col overflow-hidden border">
       <div className="relative min-h-0 flex-1">
@@ -1986,7 +2004,7 @@ const runHeaderCexAction = useCallback(async () => {
         {/* Center brand */}
         <div className="relative z-10 flex items-center justify-center gap-1.5 px-2">
           <BrandMark />
-          {/* Live dot â€” inline next to logo, no text */}
+          {/* Live dot — inline next to logo, no text */}
           {wsConnected && (
             <span
               className="h-1.5 w-1.5 shrink-0 rounded-full status-dot-online live-dot"
@@ -2061,7 +2079,7 @@ const runHeaderCexAction = useCallback(async () => {
         </div>
       </div>
 
-      {/* â”€â”€ Market Info Bar (desktop only) â”€â”€ */}
+      {/* ── Market Info Bar (desktop only) ── */}
       <div
         className="shrink-0 border-b px-2 py-2 sm:px-4"
         style={{ borderColor: "rgba(212,161,31,0.12)", background: "rgba(11,12,14,0.96)" }}
@@ -2204,7 +2222,7 @@ const runHeaderCexAction = useCallback(async () => {
         </div>
       </div>
 
-      {/* â”€â”€ Status Bar (desktop/tablet only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Status Bar (desktop/tablet only) ───────────────────────────────────── */}
       {!isMobile && <div className="panel-header soft-divider flex shrink-0 items-center justify-between gap-2 border-t px-3 py-1.5 sm:px-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {/* Left: feed status */}
         <div className="flex shrink-0 items-center gap-2">
@@ -2217,16 +2235,16 @@ const runHeaderCexAction = useCallback(async () => {
             </span>
           </div>
 
-          <span className="text-[#2a2820] hidden sm:inline">Â·</span>
+          <span className="text-[#2a2820] hidden sm:inline">·</span>
 
           {/* Venue feeds */}
           {(["OKX", "Bybit", "HL", "Aster"] as const).map((v) => {
             const venueMap: Record<string, string> = { OKX: "okx", Bybit: "bybit", HL: "hyperliquid", Aster: "aster" };
             const tooltipMap: Record<string, string> = {
-              OKX: "OKX â€” CEX data feed",
-              Bybit: "Bybit â€” CEX data feed",
-              HL: "Hyperliquid â€” DEX perp trading",
-              Aster: "Aster v4 â€” coming soon",
+              OKX: "OKX — CEX data feed",
+              Bybit: "Bybit — CEX data feed",
+              HL: "Hyperliquid — DEX perp trading",
+              Aster: "Aster v4 — coming soon",
             };
             const isActive = activeVenueState.venueId === venueMap[v];
             const isConnected = isActive && activeVenueFeedState === "connected";
@@ -2297,7 +2315,7 @@ const runHeaderCexAction = useCallback(async () => {
         </div>
       </div>}
 
-      {/* â”€â”€ Mobile Status Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Mobile Status Bar ─────────────────────────────────────────────── */}
       {isMobile && (
         <div className="shrink-0 flex items-center justify-between px-4 py-1.5 border-t" style={{ borderColor: "rgba(42,42,42,0.9)", background: "rgba(9,9,10,0.99)", paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}>
           <div className="flex items-center gap-1.5">
@@ -2454,7 +2472,7 @@ const runHeaderCexAction = useCallback(async () => {
 
                 {selectedHeaderPlatform.comingSoon ? (
                   <div className="mt-3 rounded-xl border border-amber-400/10 bg-amber-500/5 px-4 py-4 text-center">
-                    <div className="mb-1 text-[20px]">ğŸ”’</div>
+                    <div className="mb-1 text-[20px]">🔒</div>
                     <div className="text-[12px] font-semibold text-amber-200">Coming Soon</div>
                     <p className="mt-1.5 text-[10px] leading-4 text-zinc-400">
                       We&apos;re actively working on {selectedHeaderPlatform.label} integration.
@@ -2549,7 +2567,7 @@ const runHeaderCexAction = useCallback(async () => {
                     {headerPlatform === "hyperliquid" && (
                       <div className="mt-3 space-y-2 rounded-xl border border-[rgba(212,161,31,0.12)] bg-[#0c0f13] p-3">
                         <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300/70">
-                          API Wallet â€” Trading Key
+                          API Wallet — Trading Key
                         </div>
                         <p className="text-[10px] leading-4 text-zinc-500">
                           Enter your Hyperliquid API wallet private key to enable in-terminal order placement.
@@ -2581,7 +2599,7 @@ const runHeaderCexAction = useCallback(async () => {
                               type="password"
                               value={hlPrivateKeyInput}
                               onChange={(e) => setHlPrivateKeyInput(e.target.value)}
-                              placeholder="0xâ€¦ private key"
+                              placeholder="0x… private key"
                               className="terminal-input w-full rounded-xl px-3 py-2 text-[11px] outline-none placeholder:text-zinc-600"
                             />
                             <button
@@ -2590,7 +2608,7 @@ const runHeaderCexAction = useCallback(async () => {
                               onClick={saveHlPrivateKey}
                               className="w-full rounded-xl bg-amber-500/15 px-3 py-2 text-[11px] font-bold text-amber-200 transition hover:bg-amber-500/25 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              {hlKeyStatus === "saving" ? "Securingâ€¦" : hlKeyStatus === "error" ? "Failed â€” Retry" : "Save API Key"}
+                              {hlKeyStatus === "saving" ? "Securing…" : hlKeyStatus === "error" ? "Failed — Retry" : "Save API Key"}
                             </button>
                           </>
                         )}
@@ -2610,7 +2628,7 @@ const runHeaderCexAction = useCallback(async () => {
                           href="/pricing"
                           className="mt-3 inline-flex rounded-lg bg-amber-400 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-black"
                         >
-                          Get Full Plan â€” $50/mo
+                          Get Full Plan — $50/mo
                         </Link>
                       </div>
                     }
@@ -2759,19 +2777,19 @@ const runHeaderCexAction = useCallback(async () => {
                       <div className="mt-2 text-[10px] text-zinc-400">
                         {headerActionMessage || (
                           vaultTokens[selectedHeaderCexPlatform as HeaderCexPlatform]
-                            ? "Credentials secured in server vault Â· device keeps encrypted local backup + session token."
+                            ? "Credentials secured in server vault · device keeps encrypted local backup + session token."
                             : "Enter your API credentials and click Save to store them securely."
                         )}
                       </div>
                       {/* Security status */}
                       {vaultTokens[selectedHeaderCexPlatform as HeaderCexPlatform] ? (
                         <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/8 px-2 py-1.5 text-[9px] text-emerald-400">
-                          <span className="mt-0.5 shrink-0">ğŸ”’</span>
+                          <span className="mt-0.5 shrink-0">🔒</span>
                           <span>Keys encrypted server-side; local backup is AES-GCM encrypted per device + user scope.</span>
                         </div>
                       ) : (
                         <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-500/12 bg-amber-500/5 px-2 py-1.5 text-[9px] text-amber-400/70">
-                          <span className="mt-0.5 shrink-0">âš </span>
+                          <span className="mt-0.5 shrink-0">⚠</span>
                           <span>Never use keys with withdrawal permissions. Restrict by IP in exchange settings.</span>
                         </div>
                       )}
@@ -2792,6 +2810,7 @@ const runHeaderCexAction = useCallback(async () => {
     </div>
   );
 }
+
 
 
 
