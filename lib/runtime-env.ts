@@ -4,8 +4,6 @@ function trimSlash(value: string) {
 
 const DEFAULT_LOCAL_API = "http://127.0.0.1:4001";
 const DEFAULT_LOCAL_WS = "ws://127.0.0.1:4001/ws";
-const DEFAULT_PROD_API = "https://traderbross-production.up.railway.app";
-const DEFAULT_PROD_WS = "wss://traderbross-production.up.railway.app/ws";
 
 function isLocalHost(hostname: string) {
   return hostname === "localhost" || hostname === "127.0.0.1";
@@ -46,7 +44,7 @@ function resolveApiBaseUrl() {
   const host = window.location.hostname;
   const configLooksLocal = configured.includes("127.0.0.1") || configured.includes("localhost");
   if (!isLocalHost(host) && configLooksLocal) {
-    return DEFAULT_PROD_API;
+    return window.location.origin;
   }
   return configured;
 }
@@ -57,7 +55,8 @@ function resolveWsUrl() {
   const host = window.location.hostname;
   const configLooksLocal = configured.includes("127.0.0.1") || configured.includes("localhost");
   if (!isLocalHost(host) && configLooksLocal) {
-    return DEFAULT_PROD_WS;
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${wsProtocol}//${window.location.host}/ws`;
   }
   return configured;
 }
