@@ -135,6 +135,7 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
   const [error, setError] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmChecked, setConfirmChecked] = useState(false);
+  const [walletChainId, setWalletChainId] = useState<number | null>(null);
 
   const planMeta = PLANS[plan];
 
@@ -153,6 +154,7 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
         if (!active) return;
         setSession(walletSession);
         setConfig(paymentConfig);
+        setWalletChainId(await detectWalletChainId());
         setSelectedNetworkId(await resolveInitialNetworkId(paymentConfig));
       } catch (err) {
         if (!active) return;
@@ -165,6 +167,28 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
     void load();
     return () => {
       active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const ethereum = (window as Window & {
+      ethereum?: {
+        on?: (event: string, listener: (payload: unknown) => void) => void;
+        removeListener?: (event: string, listener: (payload: unknown) => void) => void;
+      };
+    }).ethereum;
+    if (!ethereum?.on || !ethereum?.removeListener) return;
+
+    const handleChainChanged = (payload: unknown) => {
+      const raw = String(payload || "");
+      const parsed = Number.parseInt(raw, 16);
+      setWalletChainId(Number.isFinite(parsed) ? parsed : null);
+    };
+
+    ethereum.on("chainChanged", handleChainChanged);
+    return () => {
+      ethereum.removeListener?.("chainChanged", handleChainChanged);
     };
   }, []);
 
@@ -221,6 +245,16 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
   );
 
   const canUseWalletPay = Boolean(paymentReady && session?.authenticated);
+  const walletConnected = Boolean(session?.authenticated && session?.walletAddress);
+  const walletChainMismatch = Boolean(
+    walletChainId &&
+      activeNetwork?.chainId &&
+      Number(walletChainId) !== Number(activeNetwork.chainId),
+  );
+  const walletChainSupported = Boolean(
+    walletChainId &&
+      selectableNetworks.some((network) => Number(network.chainId || 0) === Number(walletChainId)),
+  );
 
   async function handleVerify() {
     if (!txHash.trim()) {
@@ -299,6 +333,7 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
 
       if (activeNetwork.chainId) {
         await switchWalletChain(activeNetwork.chainId);
+        setWalletChainId(activeNetwork.chainId);
       }
 
       const browserProvider = new ethers.BrowserProvider(ethereum as ethers.Eip1193Provider);
@@ -360,6 +395,26 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
 
           {!loading ? (
             <div className="mt-5 space-y-2 text-sm text-zinc-300">
+              <div className="flex flex-wrap items-center gap-2 pb-1">
+                <span
+                  className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${
+                    walletConnected
+                      ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+                      : "border-zinc-500/30 bg-zinc-500/10 text-zinc-300"
+                  }`}
+                >
+                  {walletConnected ? "Wallet Connected" : "Wallet Not Connected"}
+                </span>
+                <span
+                  className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${
+                    canUseWalletPay
+                      ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+                      : "border-rose-400/30 bg-rose-500/10 text-rose-200"
+                  }`}
+                >
+                  {canUseWalletPay ? "Payment Eligible" : "Payment Not Eligible"}
+                </span>
+              </div>
               <p>
                 Price: <span className="font-semibold text-white">${priceUsd}</span>
               </p>
@@ -383,12 +438,27 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
                   Signed wallet: <span className="font-mono text-xs text-zinc-200">{session.walletAddress}</span>
                 </p>
               ) : null}
+              {walletChainId ? (
+                <p>
+                  Wallet chain: <span className="text-zinc-200">{walletChainId}</span>
+                </p>
+              ) : null}
             </div>
           ) : null}
 
           {!loading && !paymentReady ? (
             <div className="mt-5 rounded-lg border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
               Payment is temporarily unavailable. Admin must configure receiver, chain ID, token contract, and token symbol (USDC/USDT).
+            </div>
+          ) : null}
+          {!loading && walletConnected && walletChainId && !walletChainSupported ? (
+            <div className="mt-3 rounded-lg border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+              Your current wallet network (chain {walletChainId}) is not in the supported payment network list.
+            </div>
+          ) : null}
+          {!loading && walletConnected && walletChainMismatch ? (
+            <div className="mt-3 rounded-lg border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+              Selected payment network is chain {activeNetwork?.chainId}. Your wallet is currently on chain {walletChainId}. A switch request will appear before transfer.
             </div>
           ) : null}
 
