@@ -88,6 +88,7 @@ const ALLOWED_PROXY_PATHS = new Set([
 ]);
 const ALLOWED_PROXY_METHODS = new Set(["GET", "POST", "DELETE", "PUT", "PATCH", "OPTIONS"]);
 const SAFE_PATH_SEGMENT_REGEX = /^[a-zA-Z0-9._-]+$/;
+const PAUSED_SYMBOLS = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "AVAX", "LINK", "DOT", "ADA", "TRX"];
 
 function trimSlash(value: string) {
   return value.replace(/\/+$/, "");
@@ -174,6 +175,79 @@ function json(data: unknown, status = 200) {
       "cache-control": "no-store",
     },
   });
+}
+
+function isMarketDataEnabled() {
+  return String(process.env.MARKET_DATA_ENABLED ?? "true").toLowerCase() !== "false";
+}
+
+function isMarketDataPath(upstreamPath: string, normalizedPath: string[]) {
+  if (upstreamPath === "/health") return false;
+  const key = (normalizedPath?.[0] || "").toLowerCase();
+  return [
+    "bootstrap",
+    "prices",
+    "news",
+    "social",
+    "whales",
+    "whale",
+    "market",
+    "mempool",
+    "feargreed",
+    "forex",
+    "funding",
+    "lsr",
+    "liquidations",
+    "okx",
+    "bybit",
+    "hyperliquid",
+    "aster",
+    "symbols",
+    "venues",
+    "coincap",
+    "trending",
+    "sentiment",
+    "screener",
+    "coins",
+  ].includes(key);
+}
+
+function marketPausedResponse(path: string[], request: NextRequest) {
+  const key = (path?.[0] || "").toLowerCase();
+  if (key === "bootstrap") {
+    return json({
+      ...minimalEmergencyBootstrap(),
+      providerState: { market_data: "disabled" },
+      providerHealth: { market_data: { status: "disabled" } },
+      connectionState: "degraded",
+    });
+  }
+  if (key === "market") {
+    return json({
+      marketCapUsd: null,
+      btcDominance: null,
+      ethDominance: null,
+      marketCapChange24h: null,
+      total24hVolume: null,
+      defiMarketCap: null,
+      activeCryptos: null,
+    });
+  }
+  if (key === "symbols") {
+    return json(PAUSED_SYMBOLS.map((symbol) => ({ symbol, aliases: [symbol] })));
+  }
+  if (key === "venues" && (path?.[1] || "").toLowerCase() === "symbols") {
+    const quote = String(request.nextUrl.searchParams.get("quote") || "USDT").toUpperCase();
+    if (quote === "USDC") return json(["BTC", "ETH", "SOL"]);
+    return json(PAUSED_SYMBOLS);
+  }
+  if (key === "prices" || key === "okx" || key === "bybit" || key === "hyperliquid" || key === "aster") {
+    return json([]);
+  }
+  if (key === "news" || key === "social" || key === "whales" || key === "whale" || key === "liquidations" || key === "screener") {
+    return json([]);
+  }
+  return json([]);
 }
 
 function extractTickers(text: string) {
@@ -991,6 +1065,13 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
       : `/api/${normalizedPath.join("/")}`;
   if (!isAllowedProxyPath(upstreamPath)) {
     return json({ error: "Not found" }, 404);
+  }
+  if (
+    (normalizedMethod === "GET" || normalizedMethod === "HEAD") &&
+    !isMarketDataEnabled() &&
+    isMarketDataPath(upstreamPath, normalizedPath)
+  ) {
+    return marketPausedResponse(normalizedPath, request);
   }
   if (normalizedMethod !== "GET" && normalizedMethod !== "HEAD" && normalizedMethod !== "OPTIONS") {
     if (!isRequestSameOrigin(request)) {
