@@ -144,6 +144,17 @@ function resolveBackendCandidates() {
   return Array.from(new Set(candidates.map((value) => trimSlash(value))));
 }
 
+function filterSelfBackendCandidates(request: NextRequest, candidates: string[]) {
+  const requestOrigin = String(request.nextUrl.origin || "").toLowerCase();
+  return candidates.filter((candidate) => {
+    try {
+      return new URL(candidate).origin.toLowerCase() !== requestOrigin;
+    } catch {
+      return true;
+    }
+  });
+}
+
 function cloneHeaders(request: NextRequest) {
   const headers = new Headers(request.headers);
   headers.delete("host");
@@ -929,6 +940,42 @@ async function emergencyResponse(path: string[], request: NextRequest) {
   return json([]);
 }
 
+function minimalEmergencyBootstrap() {
+  return {
+    quotes: [],
+    venueQuotes: { Binance: [], OKX: [], Bybit: [] },
+    marketStats: null,
+    mempoolStats: null,
+    fearGreed: null,
+    ethGas: null,
+    defiTvl: null,
+    forex: null,
+    liquidations: [],
+    news: [],
+    whales: [],
+    whaleEvents: [],
+    social: [],
+    calendar: [],
+    coinMetadata: {},
+    discovery: [],
+    providerState: {},
+    providerHealth: {},
+    connectionState: "degraded",
+  };
+}
+
+async function emergencyResponseSafe(path: string[], request: NextRequest) {
+  try {
+    return await emergencyResponse(path, request);
+  } catch {
+    const key = (path?.[0] || "").toLowerCase();
+    if (key === "bootstrap") {
+      return json(minimalEmergencyBootstrap(), 200);
+    }
+    return json({ error: "Service temporarily unavailable" }, 503);
+  }
+}
+
 async function proxy(request: NextRequest, method: string, path: string[]) {
   const normalizedMethod = String(method || "").toUpperCase();
   if (!ALLOWED_PROXY_METHODS.has(normalizedMethod)) {
@@ -960,7 +1007,7 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
   if (rateLimitBlock) return rateLimitBlock;
   const tierBlock = await enforceApiTier(request, upstreamPath, normalizedMethod);
   if (tierBlock) return tierBlock;
-  const backendCandidates = resolveBackendCandidates();
+  const backendCandidates = filterSelfBackendCandidates(request, resolveBackendCandidates());
 
   const init: RequestInit = {
     method: normalizedMethod,
@@ -1012,14 +1059,14 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
   }
 
   if (!upstream) {
-    if (normalizedMethod === "GET") return emergencyResponse(normalizedPath, request);
+    if (normalizedMethod === "GET") return emergencyResponseSafe(normalizedPath, request);
     const fallbackMessage = normalizedPath[0] === "okx" || normalizedPath[0] === "bybit"
       ? "Trade backend temporarily unavailable. Please retry in a few seconds."
       : "upstream_unavailable";
     return json({ error: fallbackMessage }, 503);
   }
   if (normalizedMethod === "GET" && upstream.status >= 500) {
-    return emergencyResponse(normalizedPath, request);
+    return emergencyResponseSafe(normalizedPath, request);
   }
   if (normalizedMethod === "GET" && upstream.ok) {
     const primary = (normalizedPath?.[0] || "").toLowerCase();
@@ -1057,7 +1104,7 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
           looksEmptyVenueSymbols ||
           looksEmptySymbols
         ) {
-          return emergencyResponse(normalizedPath, request);
+          return emergencyResponseSafe(normalizedPath, request);
         }
       } catch {
         // If response is not JSON, keep upstream response as-is.
