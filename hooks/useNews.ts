@@ -46,7 +46,7 @@ export function useNews({
   const newsItems = useRealtimeSelector((state) => state.news);
   const whaleItems = useRealtimeSelector((state) => state.whales);
   const socialItems = useRealtimeSelector((state) => state.social);
-  const liquidationCount = useRealtimeSelector((state) => (state.liquidations ?? []).length);
+  const liquidationCount = useRealtimeSelector((state) => state.liquidations?.length ?? 0);
   const connectionStatus = useRealtimeSelector((state) => state.connectionStatus);
 
   const loading = (connectionStatus === "connecting" || connectionStatus === "reconnecting") && newsItems.length === 0;

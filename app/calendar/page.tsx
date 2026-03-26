@@ -267,6 +267,7 @@ const ALL_CATEGORIES: (EventCategory | "all")[] = [
   "listing",
   "airdrop",
 ];
+const EMPTY_CALENDAR_EVENTS: CalendarEvent[] = [];
 
 export default function CalendarPage() {
   const { locale } = useI18n();
@@ -387,7 +388,7 @@ export default function CalendarPage() {
   const [loading, setLoading]     = useState(true);
   const [catFilter, setCatFilter] = useState<EventCategory | "all">("all");
   const [showPast, setShowPast]   = useState(false);
-  const realtimeCalendar = useRealtimeSelector((state) => state.calendar || []);
+  const realtimeCalendar = useRealtimeSelector((state) => state.calendar) ?? EMPTY_CALENDAR_EVENTS;
 
   useEffect(() => {
     let active = true;

@@ -3,6 +3,8 @@
 import { useRealtimeSelector } from "@/lib/realtime-client";
 import { AlertTriangle } from "lucide-react";
 
+const EMPTY_PROVIDER_HEALTH: Record<string, unknown> = {};
+
 function fmtMarketCap(usd: number | null): string {
   if (usd == null) return "—";
   if (usd >= 1e12) return `$${(usd / 1e12).toFixed(2)}T`;
@@ -12,7 +14,7 @@ function fmtMarketCap(usd: number | null): string {
 
 export default function MarketStatsBar() {
   const connectionStatus = useRealtimeSelector((state) => state.connectionStatus);
-  const providerHealth = useRealtimeSelector((state) => state.providerHealth ?? {});
+  const providerHealth = useRealtimeSelector((state) => state.providerHealth) ?? EMPTY_PROVIDER_HEALTH;
   const isDev = process.env.NODE_ENV === "development";
   const market = useRealtimeSelector((state) => state.marketStats) ?? {
     marketCapUsd: null,

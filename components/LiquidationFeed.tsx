@@ -10,6 +10,7 @@ import { apiFetch } from "@/lib/api-client";
 const DEV_SIM_ENABLED =
   process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_DEV_SIM_FEEDS === "true";
 const DEV_SYMBOLS = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "LINK"];
+const EMPTY_LIQUIDATIONS: LiquidationEvent[] = [];
 
 type LiqStats = {
   totalUSD: number;
@@ -115,7 +116,7 @@ export default function LiquidationFeed({
   onPulse?: () => void;
   onStatsUpdate?: (stats: LiqStats) => void;
 }) {
-  const realtimeLiquidations = useRealtimeSelector((state) => state.liquidations ?? []);
+  const realtimeLiquidations = useRealtimeSelector((state) => state.liquidations) ?? EMPTY_LIQUIDATIONS;
   const connectionStatus = useRealtimeSelector((state) => state.connectionStatus);
   const [apiFeed, setApiFeed] = useState<LiquidationEvent[]>([]);
   const [devFeed, setDevFeed] = useState<LiquidationEvent[]>([]);
