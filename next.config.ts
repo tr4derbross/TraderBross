@@ -30,7 +30,9 @@ function parseCspConnectSrc() {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
-  if (explicit.length > 0) return explicit;
+  if (explicit.length > 0) {
+    return Array.from(new Set(["'self'", ...explicit]));
+  }
 
   const out = new Set<string>(isProduction ? ["'self'"] : DEFAULT_DEV_CONNECT_SRC);
   const supabaseOrigin = toOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL || "");
