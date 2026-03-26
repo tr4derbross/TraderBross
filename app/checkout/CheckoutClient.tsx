@@ -89,6 +89,10 @@ async function resolveInitialNetworkId(config: PaymentConfigPayload | null | und
   if (walletChainId) {
     const sameChain = enabled.filter((network) => Number(network.chainId || 0) === walletChainId);
     if (sameChain.length > 0) {
+      const preferredUsdt = sameChain.find(
+        (network) => String(network.tokenSymbol || "").trim().toUpperCase() === "USDT",
+      );
+      if (preferredUsdt) return preferredUsdt.id;
       const preferred = sameChain.find((network) => network.id === config?.defaultNetworkId);
       return preferred?.id || sameChain[0].id;
     }
@@ -121,6 +125,25 @@ async function switchWalletChain(targetChainId: number) {
     }
     throw error;
   }
+}
+
+function parseWalletPaymentError(error: unknown) {
+  const raw = error instanceof Error ? error.message : String(error || "Wallet payment failed.");
+  const msg = raw.toLowerCase();
+  if (
+    msg.includes("exceeds balance") ||
+    msg.includes("insufficient funds") ||
+    msg.includes("transfer amount exceeds")
+  ) {
+    return "Insufficient token balance for this payment amount.";
+  }
+  if (msg.includes("user rejected") || msg.includes("rejected the request")) {
+    return "Transaction was rejected in wallet.";
+  }
+  if (msg.includes("target chain is not added")) {
+    return "Selected network is not added in wallet. Add chain first and retry.";
+  }
+  return raw;
 }
 
 export default function CheckoutClient({ plan }: { plan: PlanId }) {
@@ -338,12 +361,25 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
 
       const browserProvider = new ethers.BrowserProvider(ethereum as ethers.Eip1193Provider);
       const signer = await browserProvider.getSigner();
+      const signerAddress = await signer.getAddress();
+
+      const nativeBalance = await browserProvider.getBalance(signerAddress);
+      if (nativeBalance <= BigInt(0)) {
+        throw new Error("Insufficient native gas balance for transaction fees.");
+      }
 
       const contract = new ethers.Contract(
         activeNetwork.tokenAddress,
-        ["function transfer(address to, uint256 value) returns (bool)"],
+        [
+          "function transfer(address to, uint256 value) returns (bool)",
+          "function balanceOf(address account) view returns (uint256)",
+        ],
         signer,
       );
+      const tokenBalance = (await contract.balanceOf(signerAddress)) as bigint;
+      if (tokenBalance < expectedAmountUnits) {
+        throw new Error("Insufficient token balance for this payment amount.");
+      }
       const txResponse: ethers.TransactionResponse = await contract.transfer(activeNetwork.receiver, expectedAmountUnits);
 
       setTxHash(txResponse.hash);
@@ -360,7 +396,7 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
         window.location.href = "/terminal";
       }, 900);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Wallet payment failed.");
+      setError(parseWalletPaymentError(err));
     } finally {
       setPaying(false);
     }
