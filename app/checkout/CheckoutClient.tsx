@@ -511,7 +511,12 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
               <div className="rounded-lg border border-white/10 p-3">
                 <p className="text-xs uppercase tracking-[0.08em] text-zinc-500">Select network and token</p>
                 <div className="mt-2">
+                  <label htmlFor="checkout-network-select" className="sr-only">
+                    Select payment network and token
+                  </label>
                   <select
+                    id="checkout-network-select"
+                    name="checkoutNetwork"
                     value={activeNetwork.id}
                     onChange={(event) => setSelectedNetworkId(event.target.value)}
                     className="w-full rounded-md border border-white/15 bg-black/60 px-3 py-2.5 text-sm text-white outline-none focus:border-amber-400/60"
@@ -547,7 +552,12 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
 
             <div className="rounded-lg border border-white/10 p-3">
               <p className="text-xs uppercase tracking-[0.08em] text-zinc-500">Manual verification</p>
+              <label htmlFor="manual-tx-hash" className="sr-only">
+                Transaction hash
+              </label>
               <input
+                id="manual-tx-hash"
+                name="txHash"
                 value={txHash}
                 onChange={(event) => setTxHash(event.target.value)}
                 placeholder="Paste transaction hash"
@@ -596,15 +606,17 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
                 If your wallet is on a different chain, it will ask for an explicit chain switch confirmation.
               </p>
             </div>
-            <label className="mt-4 flex items-start gap-2 text-sm text-zinc-300">
+            <div className="mt-4 flex items-start gap-2 text-sm text-zinc-300">
               <input
                 type="checkbox"
+                id="confirm-payment-details"
+                name="confirmPaymentDetails"
                 checked={confirmChecked}
                 onChange={(event) => setConfirmChecked(event.target.checked)}
                 className="mt-0.5"
               />
-              <span>I verified all payment details above.</span>
-            </label>
+              <label htmlFor="confirm-payment-details">I verified all payment details above.</label>
+            </div>
             <div className="mt-5 flex gap-2">
               <button
                 type="button"

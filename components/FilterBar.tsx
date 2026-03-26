@@ -113,6 +113,9 @@ export default function FilterBar({
         <div className="terminal-input order-1 flex min-w-0 flex-1 items-center gap-1 rounded-md px-2 py-0.5 sm:w-auto sm:flex-1 sm:rounded-lg sm:px-2 sm:py-1">
           <Search className="h-3 w-3 shrink-0 text-zinc-500" />
           <input
+            id="news-keyword-search"
+            name="newsKeywordSearch"
+            aria-label="Search news"
             className="min-w-0 flex-1 bg-transparent text-[10px] text-amber-100 placeholder-zinc-600 outline-none sm:text-[11px]"
             placeholder="Ara..."
             value={keyword}
@@ -128,6 +131,9 @@ export default function FilterBar({
         {isNewsSource && (
           <div className="order-2 hidden items-center gap-1 xl:flex xl:w-auto">
             <select
+              id="news-sector-filter"
+              name="newsSectorFilter"
+              aria-label="Filter by sector"
               className="terminal-input h-7 min-w-[74px] max-w-[28vw] cursor-pointer rounded-md px-1.5 text-[10px] text-zinc-300 outline-none sm:h-auto sm:w-auto sm:flex-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
               value={sector}
               onChange={(e) => onSector(e.target.value)}
@@ -140,6 +146,9 @@ export default function FilterBar({
             </select>
 
             <select
+              id="news-ticker-filter"
+              name="newsTickerFilter"
+              aria-label="Filter by ticker"
               className="terminal-input h-7 min-w-[96px] max-w-[36vw] cursor-pointer rounded-md px-1.5 text-[10px] text-zinc-100 outline-none sm:w-auto sm:flex-none sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
               value={ticker}
               onChange={(e) => onTicker(e.target.value)}

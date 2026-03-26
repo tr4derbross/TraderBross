@@ -136,8 +136,11 @@ export default function SignInForm() {
 
       <div className="mt-5 space-y-3 rounded-lg border border-amber-400/25 bg-black/45 p-3">
         <label className="block space-y-1">
-          <span className="text-xs text-zinc-400">Wallet</span>
+          <span className="text-xs text-zinc-400" id="wallet-provider-label">Wallet</span>
           <select
+            id="wallet-provider-select"
+            name="walletProvider"
+            aria-labelledby="wallet-provider-label"
             value={walletLabel}
             onChange={(event) => setWalletLabel(event.target.value as SupportedWalletLabel)}
             className="w-full rounded-md border border-white/15 bg-black/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60"

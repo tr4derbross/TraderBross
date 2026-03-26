@@ -36,7 +36,12 @@ export default function AccessPage() {
           This environment is private. Enter the team password to continue.
         </p>
         <form onSubmit={submit} className="mt-4 space-y-3">
+          <label htmlFor="site-access-password" className="sr-only">
+            Access password
+          </label>
           <input
+            id="site-access-password"
+            name="siteAccessPassword"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
