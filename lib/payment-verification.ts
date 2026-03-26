@@ -16,6 +16,13 @@ export type PaymentNetworkConfig = {
 };
 
 const ERC20_ABI = ["event Transfer(address indexed from, address indexed to, uint256 value)"];
+const DEFAULT_EXPLORER_ALLOWLIST: Record<number, string[]> = {
+  1: ["https://etherscan.io/tx"],
+  56: ["https://bscscan.com/tx"],
+  137: ["https://polygonscan.com/tx"],
+  42161: ["https://arbiscan.io/tx"],
+  8453: ["https://basescan.org/tx"],
+};
 const DEFAULT_STABLE_TOKEN_ALLOWLIST: Record<number, Record<StableSymbol, string[]>> = {
   1: {
     USDC: ["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],
@@ -62,6 +69,18 @@ function normalizeNetworkId(value: string) {
     .replace(/[^a-z0-9_-]/g, "");
 }
 
+function normalizeExplorerBaseUrl(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "https:") return "";
+    return parsed.toString().replace(/\/+$/, "").toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
 function chainLabelFromId(chainId: number | null) {
   if (chainId === 56) return "BNB Smart Chain";
   if (chainId === 42161) return "Arbitrum";
@@ -77,6 +96,35 @@ function defaultConfirmationsForChain(chainId: number | null) {
   if (chainId === 42161) return 2;
   if (chainId === 137) return 128;
   return 5;
+}
+
+function parseExplorerAllowlistFromEnv() {
+  const raw = String(process.env.PAYMENT_EXPLORER_ALLOWLIST_JSON || "").trim();
+  if (!raw) return DEFAULT_EXPLORER_ALLOWLIST;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, string[]>;
+    const out: Record<number, string[]> = {};
+    for (const [chainKey, rows] of Object.entries(parsed || {})) {
+      const chainId = Number(chainKey || 0);
+      if (!Number.isFinite(chainId) || chainId <= 0) continue;
+      const normalized = Array.isArray(rows)
+        ? rows.map((row) => normalizeExplorerBaseUrl(row)).filter(Boolean)
+        : [];
+      if (normalized.length > 0) {
+        out[chainId] = Array.from(new Set(normalized));
+      }
+    }
+    return Object.keys(out).length > 0 ? out : DEFAULT_EXPLORER_ALLOWLIST;
+  } catch {
+    return DEFAULT_EXPLORER_ALLOWLIST;
+  }
+}
+
+function isAllowedExplorerBaseUrl(chainId: number | null, explorerBaseUrl: string | null) {
+  const normalized = normalizeExplorerBaseUrl(String(explorerBaseUrl || ""));
+  if (!normalized || !chainId) return false;
+  const allowlist = parseExplorerAllowlistFromEnv()[Number(chainId)] || [];
+  return allowlist.includes(normalized);
 }
 
 function parseTokenAllowlistFromEnv() {
@@ -117,6 +165,8 @@ function toPlanPriceUsd(plan: PlanId) {
 function parseLegacyConfig(): PaymentNetworkConfig {
   const chainId = Number(process.env.PAYMENT_CHAIN_ID || 0) || null;
   const id = chainId === 56 ? "bsc" : chainId === 42161 ? "arbitrum" : "default";
+  const rawExplorerBase = String(process.env.PAYMENT_EXPLORER_TX_BASE_URL || "").trim() || null;
+  const txExplorerBaseUrl = isAllowedExplorerBaseUrl(chainId, rawExplorerBase) ? normalizeExplorerBaseUrl(rawExplorerBase || "") : null;
   return {
     id,
     label: chainLabelFromId(chainId),
@@ -127,7 +177,7 @@ function parseLegacyConfig(): PaymentNetworkConfig {
     tokenSymbol: normalizeStableSymbol(process.env.PAYMENT_TOKEN_SYMBOL || ""),
     tokenDecimals: Math.max(0, Number(process.env.PAYMENT_TOKEN_DECIMALS || 6) || 6),
     confirmations: Math.max(1, Number(process.env.PAYMENT_CONFIRMATIONS || defaultConfirmationsForChain(chainId)) || defaultConfirmationsForChain(chainId)),
-    txExplorerBaseUrl: String(process.env.PAYMENT_EXPLORER_TX_BASE_URL || "").trim() || null,
+    txExplorerBaseUrl,
   };
 }
 
@@ -146,7 +196,10 @@ function parseNetworkRow(raw: unknown): PaymentNetworkConfig | null {
     Number(row.confirmations || process.env.PAYMENT_CONFIRMATIONS || defaultConfirmationsForChain(chainId)) ||
       defaultConfirmationsForChain(chainId),
   );
-  const txExplorerBaseUrl = String(row.txExplorerBaseUrl || "").trim() || null;
+  const rawExplorerBaseUrl = String(row.txExplorerBaseUrl || "").trim() || null;
+  const txExplorerBaseUrl = isAllowedExplorerBaseUrl(chainId, rawExplorerBaseUrl)
+    ? normalizeExplorerBaseUrl(rawExplorerBaseUrl || "")
+    : null;
   if (!id) return null;
 
   return {
