@@ -21,22 +21,24 @@ type WalletSessionPayload = {
   tierExpiresAt?: string | null;
 };
 
+type PaymentNetworkOption = {
+  id: string;
+  label?: string | null;
+  enabled?: boolean;
+  receiver?: string | null;
+  chainId?: number | null;
+  tokenAddress?: string | null;
+  tokenDecimals?: number;
+  tokenSymbol?: string | null;
+  txExplorerBaseUrl?: string | null;
+  tokenAllowed?: boolean;
+};
+
 type PaymentConfigPayload = {
   ok?: boolean;
   enabled?: boolean;
   defaultNetworkId?: string | null;
-  networks?: Array<{
-    id: string;
-    label?: string | null;
-    enabled?: boolean;
-    receiver?: string | null;
-    chainId?: number | null;
-    tokenAddress?: string | null;
-    tokenDecimals?: number;
-    tokenSymbol?: string | null;
-    txExplorerBaseUrl?: string | null;
-    tokenAllowed?: boolean;
-  }>;
+  networks?: PaymentNetworkOption[];
   receiver?: string | null;
   chainId?: number | null;
   tokenAddress?: string | null;
@@ -50,6 +52,51 @@ type PaymentConfigPayload = {
 function parseSafeUnits(value: number, decimals: number) {
   const amount = Number.isFinite(value) && value > 0 ? value : 0;
   return ethers.parseUnits(String(amount), Math.max(0, decimals));
+}
+
+const CHECKOUT_NETWORK_STORAGE_KEY = "traderbross.checkout.network.v1";
+
+function enabledNetworks(config: PaymentConfigPayload | null | undefined) {
+  return (config?.networks || []).filter((network) => network?.id && network?.enabled);
+}
+
+async function detectWalletChainId() {
+  try {
+    const ethereum = (window as Window & { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+    if (!ethereum) return null;
+    const raw = String(await ethereum.request({ method: "eth_chainId" }));
+    const value = Number.parseInt(raw, 16);
+    return Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveInitialNetworkId(config: PaymentConfigPayload | null | undefined) {
+  const enabled = enabledNetworks(config);
+  if (enabled.length === 0) return String(config?.defaultNetworkId || "default");
+
+  try {
+    const saved = String(localStorage.getItem(CHECKOUT_NETWORK_STORAGE_KEY) || "");
+    if (saved && enabled.some((network) => network.id === saved)) {
+      return saved;
+    }
+  } catch {
+    // ignore storage errors
+  }
+
+  const walletChainId = await detectWalletChainId();
+  if (walletChainId) {
+    const sameChain = enabled.filter((network) => Number(network.chainId || 0) === walletChainId);
+    if (sameChain.length > 0) {
+      const preferred = sameChain.find((network) => network.id === config?.defaultNetworkId);
+      return preferred?.id || sameChain[0].id;
+    }
+  }
+
+  const defaultEnabled = enabled.find((network) => network.id === config?.defaultNetworkId);
+  if (defaultEnabled) return defaultEnabled.id;
+  return enabled[0].id;
 }
 
 async function switchWalletChain(targetChainId: number) {
@@ -106,7 +153,7 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
         if (!active) return;
         setSession(walletSession);
         setConfig(paymentConfig);
-        setSelectedNetworkId(String(paymentConfig.defaultNetworkId || ""));
+        setSelectedNetworkId(await resolveInitialNetworkId(paymentConfig));
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : "Could not load checkout state.");
@@ -120,6 +167,15 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!selectedNetworkId) return;
+    try {
+      localStorage.setItem(CHECKOUT_NETWORK_STORAGE_KEY, selectedNetworkId);
+    } catch {
+      // ignore storage errors
+    }
+  }, [selectedNetworkId]);
 
   const priceUsd = useMemo(() => {
     if (!config) return planMeta.fallbackPrice;
@@ -349,9 +405,10 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
                     {selectableNetworks.map((network) => {
                       const chainLabel = network.label || `Chain ${network.chainId || "?"}`;
                       const symbol = String(network.tokenSymbol || "").toUpperCase() || "USDC/USDT";
+                      const hasSymbolInLabel = /\bUSDC\b|\bUSDT\b/i.test(chainLabel);
                       return (
                         <option key={network.id} value={network.id}>
-                          {`${chainLabel} - ${symbol}`}
+                          {hasSymbolInLabel ? chainLabel : `${chainLabel} - ${symbol}`}
                         </option>
                       );
                     })}
