@@ -68,6 +68,19 @@ function normalizeAddress(address: string) {
   return String(address || "").trim().toLowerCase();
 }
 
+function normalizeOriginHost(origin: string) {
+  const value = String(origin || "").trim();
+  if (!value) return "";
+  try {
+    return new URL(value).host.toLowerCase();
+  } catch {
+    return value
+      .replace(/^https?:\/\//i, "")
+      .replace(/\/+$/, "")
+      .toLowerCase();
+  }
+}
+
 export function generateWalletNonce() {
   return crypto.randomBytes(16).toString("hex");
 }
@@ -113,24 +126,31 @@ export function verifyWalletNonceToken(token: string) {
   return { address, nonce, issuedAt };
 }
 
-export function issueWalletSessionToken(address: string) {
+export function issueWalletSessionToken(address: string, origin?: string) {
   const iat = nowSeconds();
+  const originHost = normalizeOriginHost(String(origin || ""));
   return createToken({
     typ: "wallet_session",
     adr: normalizeAddress(address),
     exp: iat + SESSION_TTL_SECONDS,
     iat,
     jti: crypto.randomBytes(12).toString("hex"),
+    ori: originHost || undefined,
   });
 }
 
-export function verifyWalletSessionToken(token: string) {
-  const payload = verifyToken<{ typ?: string; adr?: string; exp?: number; jti?: string }>(token);
+export function verifyWalletSessionToken(token: string, expectedOrigin?: string) {
+  const payload = verifyToken<{ typ?: string; adr?: string; exp?: number; jti?: string; ori?: string }>(token);
   if (!payload || payload.typ !== "wallet_session") return null;
   const exp = Number(payload.exp || 0);
   if (!Number.isFinite(exp) || exp <= nowSeconds()) return null;
   const address = normalizeAddress(String(payload.adr || ""));
   if (!address) return null;
+  const tokenOriginHost = normalizeOriginHost(String(payload.ori || ""));
+  if (tokenOriginHost) {
+    const currentOriginHost = normalizeOriginHost(String(expectedOrigin || ""));
+    if (!currentOriginHost || currentOriginHost !== tokenOriginHost) return null;
+  }
   return { address, exp, jti: String(payload.jti || "") };
 }
 

@@ -576,7 +576,7 @@ async function enforceProxyRateLimit(request: NextRequest, method: string, upstr
   }
 
   const walletSessionToken = request.cookies.get(getWalletSessionCookieName())?.value || "";
-  const walletSession = verifyWalletSessionToken(walletSessionToken);
+  const walletSession = verifyWalletSessionToken(walletSessionToken, request.nextUrl.origin);
   if (walletSession?.address) {
     const userLimit = isMutation ? (isSensitive ? 50 : 80) : 240;
     const userResult = await rateLimitAsync(`proxy:${method}:wallet:${walletSession.address}`, userLimit, ipWindowMs);
@@ -590,7 +590,7 @@ async function enforceProxyRateLimit(request: NextRequest, method: string, upstr
 async function resolveRequestTier(request: NextRequest) {
   const walletSessionToken = request.cookies.get(getWalletSessionCookieName())?.value || "";
   if (walletSessionToken) {
-    const walletSession = verifyWalletSessionToken(walletSessionToken);
+    const walletSession = verifyWalletSessionToken(walletSessionToken, request.nextUrl.origin);
     if (walletSession?.address && !(await isWalletSessionRevoked(walletSessionToken))) {
       const walletTier = await getWalletTier(walletSession.address);
       return {

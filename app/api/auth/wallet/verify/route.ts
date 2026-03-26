@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     return json({ ok: false, error: "Nonce already used. Request a new nonce." }, 401);
   }
 
-  const sessionToken = issueWalletSessionToken(address);
+  const sessionToken = issueWalletSessionToken(address, request.nextUrl.origin);
   const tier = await getWalletTier(address);
   const response = json({
     ok: true,

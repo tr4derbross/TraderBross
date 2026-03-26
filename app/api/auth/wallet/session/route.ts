@@ -15,7 +15,7 @@ function json(payload: unknown, status = 200) {
 
 export async function GET(request: NextRequest) {
   const token = request.cookies.get(getWalletSessionCookieName())?.value || "";
-  const session = verifyWalletSessionToken(token);
+  const session = verifyWalletSessionToken(token, request.nextUrl.origin);
   if (!session || (token && await isWalletSessionRevoked(token))) {
     return json({ ok: true, authenticated: false, tier: "free" });
   }

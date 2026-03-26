@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
   }
 
   const token = request.cookies.get(getWalletSessionCookieName())?.value || "";
-  const session = verifyWalletSessionToken(token);
+  const session = verifyWalletSessionToken(token, request.nextUrl.origin);
   if (!session) {
     return json({ ok: false, error: "Unauthorized wallet session." }, 401);
   }
