@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getWalletSessionCookieName, verifyWalletSessionToken } from "@/lib/wallet-auth";
+import {
+  getWalletSessionCookieName,
+  getWalletSessionIdleTimeoutSeconds,
+  getWalletSessionMaxAgeSeconds,
+  issueWalletSessionToken,
+  verifyWalletSessionToken,
+} from "@/lib/wallet-auth";
 import { isWalletSessionRevoked } from "@/lib/wallet-session-revocation";
 import { getWalletTier } from "@/lib/wallet-subscriptions";
 
@@ -21,11 +27,25 @@ export async function GET(request: NextRequest) {
   }
 
   const tier = await getWalletTier(session.address);
-  return json({
+  const response = json({
     ok: true,
     authenticated: true,
     walletAddress: session.address,
     tier: tier.tier,
     tierExpiresAt: tier.expiresAt,
+    sessionIdleTimeoutSec: getWalletSessionIdleTimeoutSeconds(),
   });
+  const refreshed = issueWalletSessionToken(session.address, request.nextUrl.origin, {
+    iat: session.iat,
+    jti: session.jti,
+    lat: Math.floor(Date.now() / 1000),
+  });
+  response.cookies.set(getWalletSessionCookieName(), refreshed, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: getWalletSessionMaxAgeSeconds(),
+  });
+  return response;
 }

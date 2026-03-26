@@ -6,6 +6,7 @@ const NONCE_COOKIE = "tb_wallet_nonce";
 const SESSION_COOKIE = "tb_wallet_session";
 const NONCE_TTL_SECONDS = 60 * 10; // 10 min
 const SESSION_TTL_SECONDS = Number(process.env.WALLET_SESSION_TTL_SECONDS || 60 * 60 * 24 * 7); // 7 days default
+const SESSION_IDLE_TIMEOUT_SECONDS = Number(process.env.WALLET_SESSION_IDLE_TIMEOUT_SECONDS || 60 * 60 * 2); // 2 hours default
 
 function nowSeconds() {
   return Math.floor(Date.now() / 1000);
@@ -126,24 +127,38 @@ export function verifyWalletNonceToken(token: string) {
   return { address, nonce, issuedAt };
 }
 
-export function issueWalletSessionToken(address: string, origin?: string) {
+export function issueWalletSessionToken(
+  address: string,
+  origin?: string,
+  options?: { iat?: number; jti?: string; lat?: number },
+) {
   const iat = nowSeconds();
+  const issuedAt = Number(options?.iat || iat);
+  const jti = String(options?.jti || crypto.randomBytes(12).toString("hex"));
+  const lat = Number(options?.lat || iat);
   const originHost = normalizeOriginHost(String(origin || ""));
   return createToken({
     typ: "wallet_session",
     adr: normalizeAddress(address),
-    exp: iat + SESSION_TTL_SECONDS,
-    iat,
-    jti: crypto.randomBytes(12).toString("hex"),
+    exp: issuedAt + SESSION_TTL_SECONDS,
+    iat: issuedAt,
+    lat,
+    jti,
     ori: originHost || undefined,
   });
 }
 
 export function verifyWalletSessionToken(token: string, expectedOrigin?: string) {
-  const payload = verifyToken<{ typ?: string; adr?: string; exp?: number; jti?: string; ori?: string }>(token);
+  const payload = verifyToken<{ typ?: string; adr?: string; exp?: number; iat?: number; lat?: number; jti?: string; ori?: string }>(token);
   if (!payload || payload.typ !== "wallet_session") return null;
   const exp = Number(payload.exp || 0);
   if (!Number.isFinite(exp) || exp <= nowSeconds()) return null;
+  const iat = Number(payload.iat || 0);
+  const lastActivity = Number(payload.lat || iat || 0);
+  if (!Number.isFinite(lastActivity) || lastActivity <= 0) return null;
+  if (SESSION_IDLE_TIMEOUT_SECONDS > 0 && nowSeconds() - lastActivity > SESSION_IDLE_TIMEOUT_SECONDS) {
+    return null;
+  }
   const address = normalizeAddress(String(payload.adr || ""));
   if (!address) return null;
   const tokenOriginHost = normalizeOriginHost(String(payload.ori || ""));
@@ -151,11 +166,22 @@ export function verifyWalletSessionToken(token: string, expectedOrigin?: string)
     const currentOriginHost = normalizeOriginHost(String(expectedOrigin || ""));
     if (!currentOriginHost || currentOriginHost !== tokenOriginHost) return null;
   }
-  return { address, exp, jti: String(payload.jti || "") };
+  return {
+    address,
+    exp,
+    iat: Number.isFinite(iat) ? iat : nowSeconds(),
+    lat: lastActivity,
+    jti: String(payload.jti || ""),
+    ori: tokenOriginHost || "",
+  };
 }
 
 export function getWalletSessionMaxAgeSeconds() {
   return SESSION_TTL_SECONDS;
+}
+
+export function getWalletSessionIdleTimeoutSeconds() {
+  return SESSION_IDLE_TIMEOUT_SECONDS;
 }
 
 export function getWalletNonceMaxAgeSeconds() {

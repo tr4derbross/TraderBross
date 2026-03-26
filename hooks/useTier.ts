@@ -37,6 +37,7 @@ export function useTier() {
 
   useEffect(() => {
     let mounted = true;
+    const SESSION_REFRESH_MS = 5 * 60 * 1000;
 
     const resolveTier = async () => {
       if (typeof window !== "undefined") {
@@ -146,9 +147,13 @@ export function useTier() {
     const authListener = supabase?.auth.onAuthStateChange(() => {
       void resolveTier();
     });
+    const heartbeatId = setInterval(() => {
+      void resolveTier();
+    }, SESSION_REFRESH_MS);
     return () => {
       mounted = false;
       authListener?.data.subscription.unsubscribe();
+      clearInterval(heartbeatId);
     };
   }, [supabase]);
 
