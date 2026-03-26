@@ -127,6 +127,7 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
   }, [config, plan, planMeta.fallbackPrice]);
 
   const configuredNetworks = (config?.networks || []).filter((network) => network?.id);
+  const selectableNetworks = configuredNetworks.filter((network) => network?.enabled);
   const fallbackNetwork = {
     id: String(config?.defaultNetworkId || "default"),
     label: "Default",
@@ -140,6 +141,9 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
     tokenAllowed: false,
   };
   const activeNetwork =
+    selectableNetworks.find((network) => network.id === selectedNetworkId) ||
+    selectableNetworks.find((network) => network.id === config?.defaultNetworkId) ||
+    selectableNetworks[0] ||
     configuredNetworks.find((network) => network.id === selectedNetworkId) ||
     configuredNetworks.find((network) => network.id === config?.defaultNetworkId) ||
     configuredNetworks[0] ||
@@ -333,44 +337,30 @@ export default function CheckoutClient({ plan }: { plan: PlanId }) {
           ) : null}
 
           <div className="mt-6 space-y-3">
-            {configuredNetworks.length > 0 ? (
+            {selectableNetworks.length > 0 ? (
               <div className="rounded-lg border border-white/10 p-3">
                 <p className="text-xs uppercase tracking-[0.08em] text-zinc-500">Select network and token</p>
-                <div className="mt-2 grid gap-2">
-                  {configuredNetworks.map((network) => {
-                    const isSelected = network.id === activeNetwork.id;
-                    const networkSymbol = String(network.tokenSymbol || "").toUpperCase();
-                    return (
-                      <button
-                        key={network.id}
-                        type="button"
-                        onClick={() => setSelectedNetworkId(network.id)}
-                        className={`rounded-md border px-3 py-2 text-left transition ${
-                          isSelected
-                            ? "border-amber-400/70 bg-amber-400/10"
-                            : "border-white/10 bg-black/40 hover:border-white/25"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold text-white">
-                            {network.label || network.id}
-                          </span>
-                          <span className={`text-[11px] ${isSelected ? "text-amber-300" : "text-zinc-400"}`}>
-                            {isSelected ? "Selected" : "Select"}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-zinc-400">
-                          {networkSymbol || "USDC/USDT"} • Chain {network.chainId || "?"}
-                        </p>
-                        <p className="mt-1 font-mono text-[11px] text-zinc-500">
-                          {network.receiver || "Receiver not configured"}
-                        </p>
-                        {!network.tokenAllowed ? (
-                          <p className="mt-1 text-xs text-rose-300">Token contract not in allowlist</p>
-                        ) : null}
-                      </button>
-                    );
-                  })}
+                <div className="mt-2">
+                  <select
+                    value={activeNetwork.id}
+                    onChange={(event) => setSelectedNetworkId(event.target.value)}
+                    className="w-full rounded-md border border-white/15 bg-black/60 px-3 py-2.5 text-sm text-white outline-none focus:border-amber-400/60"
+                  >
+                    {selectableNetworks.map((network) => {
+                      const chainLabel = network.label || `Chain ${network.chainId || "?"}`;
+                      const symbol = String(network.tokenSymbol || "").toUpperCase() || "USDC/USDT";
+                      return (
+                        <option key={network.id} value={network.id}>
+                          {`${chainLabel} - ${symbol}`}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                <div className="mt-3 rounded-md border border-white/10 bg-black/30 px-3 py-2 text-xs text-zinc-300">
+                  <p>Chain ID: {activeNetwork?.chainId || "?"}</p>
+                  <p className="mt-1">Token: {String(activeNetwork?.tokenSymbol || "").toUpperCase() || "USDC/USDT"}</p>
+                  <p className="mt-1 font-mono break-all">{activeNetwork?.tokenAddress || "Token not configured"}</p>
                 </div>
               </div>
             ) : null}
