@@ -2,10 +2,19 @@ import { NextResponse } from "next/server";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+function sanitizeRelativeRedirectPath(input: string) {
+  const raw = String(input || "").trim();
+  if (!raw) return "/terminal";
+  if (!raw.startsWith("/")) return "/terminal";
+  if (raw.startsWith("//")) return "/terminal";
+  if (raw.includes("\\") || raw.includes("\0")) return "/terminal";
+  return raw;
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") || "/terminal";
+  const next = sanitizeRelativeRedirectPath(url.searchParams.get("next") || "/terminal");
   const origin = url.origin;
 
   if (!hasSupabasePublicEnv()) {
