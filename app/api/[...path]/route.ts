@@ -584,6 +584,17 @@ function hasRequiredTier(tier: Tier, required: Tier) {
 function requiresTierCheck(pathname: string, method: string) {
   const upperMethod = String(method || "").toUpperCase();
   if (!["POST", "DELETE", "PUT", "PATCH", "OPTIONS", "GET"].includes(upperMethod)) return null;
+  const isReadMethod = upperMethod === "GET" || upperMethod === "HEAD" || upperMethod === "OPTIONS";
+  const isPublicMarketDataPath =
+    pathname === "/api/okx" ||
+    pathname.startsWith("/api/okx/") ||
+    pathname === "/api/bybit" ||
+    pathname.startsWith("/api/bybit/") ||
+    pathname === "/api/hyperliquid" ||
+    pathname.startsWith("/api/hyperliquid/") ||
+    pathname === "/api/aster" ||
+    pathname.startsWith("/api/aster/");
+  if (isReadMethod && isPublicMarketDataPath) return null;
   if (FULL_TIER_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
     return "full" as Tier;
   }
