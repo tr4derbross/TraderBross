@@ -5,7 +5,7 @@ import { getWalletSessionCookieName, type WalletTier, verifyWalletSessionToken }
 import { isWalletSessionRevoked } from "@/lib/wallet-session-revocation";
 import { getWalletTier } from "@/lib/wallet-subscriptions";
 import { getClientIp, rateLimitAsync } from "@/lib/rate-limit";
-import { hasValidCsrfToken } from "@/lib/request-security";
+import { hasValidCsrfToken, isRequestSameOrigin } from "@/lib/request-security";
 
 const DEFAULT_LOCAL_BACKEND = "http://127.0.0.1:4001";
 const DEFAULT_PROD_BACKEND = "https://traderbross-production.up.railway.app";
@@ -946,6 +946,9 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
     return json({ error: "Not found" }, 404);
   }
   if (normalizedMethod !== "GET" && normalizedMethod !== "HEAD" && normalizedMethod !== "OPTIONS") {
+    if (!isRequestSameOrigin(request)) {
+      return json({ error: "Origin mismatch." }, 403);
+    }
     if (!hasValidCsrfToken(request)) {
       return json({ error: "Missing or invalid CSRF token." }, 403);
     }

@@ -3,6 +3,7 @@ import { buildApiUrl } from "@/lib/runtime-env";
 const DEFAULT_GET_TTL_MS = Number(process.env.NEXT_PUBLIC_CLIENT_FETCH_TTL_MS || 8000);
 const inflightRequests = new Map<string, Promise<unknown>>();
 const recentResponses = new Map<string, { expiresAt: number; value: unknown }>();
+let csrfBootstrapPromise: Promise<void> | null = null;
 
 function normalizeMethod(init?: RequestInit) {
   return (init?.method || "GET").toUpperCase();
@@ -37,6 +38,31 @@ function sanitizeHttpErrorDetail(detail: string) {
   return value.length > 220 ? `${value.slice(0, 220)}...` : value;
 }
 
+async function ensureCsrfCookie() {
+  if (typeof document === "undefined") return "";
+  const current = readCookie("tb_csrf_token");
+  if (current) return current;
+
+  if (!csrfBootstrapPromise) {
+    csrfBootstrapPromise = (async () => {
+      try {
+        await fetch(buildApiUrl("/api/csrf"), {
+          method: "GET",
+          cache: "no-store",
+          credentials: "same-origin",
+        });
+      } catch {
+        // Best effort; caller will fail with a clear 403 if cookie is still unavailable.
+      } finally {
+        csrfBootstrapPromise = null;
+      }
+    })();
+  }
+
+  await csrfBootstrapPromise;
+  return readCookie("tb_csrf_token");
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const method = normalizeMethod(init);
   const isGet = method === "GET";
@@ -56,7 +82,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const MUTATION_TIMEOUT_MS = 25_000;
   const requestPromise = (async () => {
     const signal = isGet ? init?.signal : (init?.signal ?? AbortSignal.timeout(MUTATION_TIMEOUT_MS));
-    const csrfToken = isMutation ? readCookie("tb_csrf_token") : "";
+    const csrfToken = isMutation ? await ensureCsrfCookie() : "";
     const response = await fetch(buildApiUrl(path), {
       ...init,
       signal,
