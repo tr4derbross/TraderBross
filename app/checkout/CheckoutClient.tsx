@@ -76,15 +76,6 @@ async function resolveInitialNetworkId(config: PaymentConfigPayload | null | und
   const enabled = enabledNetworks(config);
   if (enabled.length === 0) return String(config?.defaultNetworkId || "default");
 
-  try {
-    const saved = String(localStorage.getItem(CHECKOUT_NETWORK_STORAGE_KEY) || "");
-    if (saved && enabled.some((network) => network.id === saved)) {
-      return saved;
-    }
-  } catch {
-    // ignore storage errors
-  }
-
   const walletChainId = await detectWalletChainId();
   if (walletChainId) {
     const sameChain = enabled.filter((network) => Number(network.chainId || 0) === walletChainId);
@@ -93,9 +84,26 @@ async function resolveInitialNetworkId(config: PaymentConfigPayload | null | und
         (network) => String(network.tokenSymbol || "").trim().toUpperCase() === "USDT",
       );
       if (preferredUsdt) return preferredUsdt.id;
+      try {
+        const saved = String(localStorage.getItem(CHECKOUT_NETWORK_STORAGE_KEY) || "");
+        if (saved && sameChain.some((network) => network.id === saved)) {
+          return saved;
+        }
+      } catch {
+        // ignore storage errors
+      }
       const preferred = sameChain.find((network) => network.id === config?.defaultNetworkId);
       return preferred?.id || sameChain[0].id;
     }
+  }
+
+  try {
+    const saved = String(localStorage.getItem(CHECKOUT_NETWORK_STORAGE_KEY) || "");
+    if (saved && enabled.some((network) => network.id === saved)) {
+      return saved;
+    }
+  } catch {
+    // ignore storage errors
   }
 
   const defaultEnabled = enabled.find((network) => network.id === config?.defaultNetworkId);
